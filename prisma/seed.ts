@@ -69,6 +69,7 @@ type ReadingBlock = {
   type: "reading";
   payload: {
     markdown: string;
+    imageUrl?: string;
   };
 };
 
@@ -87,6 +88,7 @@ const PLACEHOLDER_BLOCKS: ReadingBlock[] = [
         "This block is a **placeholder** seeded by `prisma/seed.ts`. It exists so the",
         "lesson renderer has a valid, well-formed block to display.",
       ].join("\n"),
+      imageUrl: "/globe.svg",
     },
   },
 ];
