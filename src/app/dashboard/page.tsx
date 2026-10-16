@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,8 @@ export const metadata: Metadata = {
  * guard on /admin) can be exercised; the real content lands in later tasks.
  */
 async function DashboardContent() {
+  // Auth.js draws random bytes; keep it out of the prerender pass.
+  await connection();
   const session = await auth();
 
   if (!session?.user) {

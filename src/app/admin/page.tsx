@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,6 +12,8 @@ export const metadata: Metadata = {
 
 /** Placeholder admin surface. Server-side role check mirrors the middleware guard. */
 async function AdminContent() {
+  // Auth.js draws random bytes; keep it out of the prerender pass.
+  await connection();
   const session = await auth();
 
   if (!session?.user) {

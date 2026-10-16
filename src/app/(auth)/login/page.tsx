@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { AuthForm } from "@/components/auth-form";
@@ -21,6 +22,8 @@ async function LoginForm({
 }: {
   searchParams: PageProps<"/login">["searchParams"];
 }) {
+  // Auth.js draws random bytes; keep it out of the prerender pass.
+  await connection();
   const session = await auth();
   if (session?.user) {
     redirect("/dashboard");
