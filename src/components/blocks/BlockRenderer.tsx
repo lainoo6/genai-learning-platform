@@ -20,7 +20,7 @@ export type BlockRendererProps = {
    * `completeBlock` server action, so a page can render blocks without wiring
    * its own handler.
    */
-  onComplete?: (blockId: string) => void;
+  onComplete?: (blockId: string, score?: number) => void;
 };
 
 /**
@@ -36,9 +36,9 @@ export function BlockRenderer(props: BlockRendererProps) {
 
   const handleComplete: BlockRenderProps["onComplete"] =
     onComplete
-    ?? ((blockId) => {
+    ?? ((blockId, score) => {
       startTransition(async () => {
-        const result = await completeBlock(lessonId, blockId);
+        const result = await completeBlock(lessonId, blockId, score);
         if (result.ok) {
           setError(null);
           router.refresh();

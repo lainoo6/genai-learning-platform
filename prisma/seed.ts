@@ -73,7 +73,25 @@ type ReadingBlock = {
   };
 };
 
-const PLACEHOLDER_BLOCKS: ReadingBlock[] = [
+/** Quiz block content: one question per supported kind, so P2.2 can be exercised. */
+type QuizBlock = {
+  id: string;
+  title: string;
+  type: "quiz";
+  payload: {
+    passScore: number;
+    questions: {
+      id: string;
+      kind: "single" | "multi" | "truefalse" | "short";
+      prompt: string;
+      options?: string[];
+      answer: number[] | string;
+      explanation: string;
+    }[];
+  };
+};
+
+const PLACEHOLDER_BLOCKS: (ReadingBlock | QuizBlock)[] = [
   {
     id: "blk_placeholder_reading",
     title: "What Is GenAI?",
@@ -89,6 +107,62 @@ const PLACEHOLDER_BLOCKS: ReadingBlock[] = [
         "lesson renderer has a valid, well-formed block to display.",
       ].join("\n"),
       imageUrl: "/globe.svg",
+    },
+  },
+  {
+    id: "blk_placeholder_quiz",
+    title: "Check your understanding",
+    type: "quiz",
+    payload: {
+      passScore: 0.6,
+      questions: [
+        {
+          id: "q_single",
+          kind: "single",
+          prompt: "What does a generative model do?",
+          options: [
+            "Creates new content such as text or code",
+            "Only sorts existing records into buckets",
+            "Stores files in a database",
+          ],
+          answer: [0],
+          explanation:
+            "Generative models produce new artefacts; sorting records is a classic "
+            + "classification task, not generation.",
+        },
+        {
+          id: "q_multi",
+          kind: "multi",
+          prompt: "Which of these are everyday uses of GenAI for developers?",
+          options: [
+            "Drafting a first version of a function",
+            "Explaining unfamiliar code",
+            "Guaranteeing that code is bug-free",
+          ],
+          answer: [0, 1],
+          explanation:
+            "Drafting and explaining code are realistic uses; no tool can guarantee "
+            + "bug-free output, so you still review and test everything.",
+        },
+        {
+          id: "q_truefalse",
+          kind: "truefalse",
+          prompt: "A GenAI answer should be shipped to users without review.",
+          answer: [1],
+          explanation:
+            "False. Model output can be wrong or outdated, so a human stays "
+            + "accountable for what ships.",
+        },
+        {
+          id: "q_short",
+          kind: "short",
+          prompt: "Name one thing you should always do before trusting generated code.",
+          answer: "review, test, read",
+          explanation:
+            "Reviewing, testing or simply reading the code carefully all count — "
+            + "the point is that you never trust it blindly.",
+        },
+      ],
     },
   },
 ];

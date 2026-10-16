@@ -24,8 +24,88 @@ export const readingBlockSchema = blockBaseSchema.extend({
   }),
 });
 
+/** Answer formats supported by a quiz question. */
+export const questionKindSchema = z.enum(["single", "multi", "truefalse", "short"]);
+
+const questionBaseSchema = z.object({
+  id: z.string().min(1),
+  prompt: z.string().min(1),
+  explanation: z.string().min(1),
+});
+
+/**
+ * Choice answer: indices into `options`. Validated against the option count so
+ * a malformed payload can never point outside the list.
+ */
+function choicesWithinOptions(answer: number[], options: string[]): boolean {
+  return answer.every((index) => index >= 0 && index < options.length);
+}
+
+export const singleQuestionSchema = questionBaseSchema
+  .extend({
+    kind: z.literal("single"),
+    options: z.array(z.string().min(1)).min(2),
+    answer: z.array(z.number().int().min(0)).min(1).max(1),
+  })
+  .refine(
+    (question) => choicesWithinOptions(question.answer, question.options),
+    { message: "Single-choice answer must point at an existing option." },
+  );
+
+export const multiQuestionSchema = questionBaseSchema
+  .extend({
+    kind: z.literal("multi"),
+    options: z.array(z.string().min(1)).min(2),
+    answer: z.array(z.number().int().min(0)).min(1),
+  })
+  .refine(
+    (question) => choicesWithinOptions(question.answer, question.options),
+    { message: "Multi-choice answers must point at existing options." },
+  );
+
+export const trueFalseQuestionSchema = questionBaseSchema
+  .extend({
+    kind: z.literal("truefalse"),
+    /** Defaults to True / False when the author leaves it out. */
+    options: z.array(z.string().min(1)).length(2).optional(),
+    answer: z.array(z.number().int().min(0).max(1)).min(1).max(1),
+  })
+  .refine(
+    (question) =>
+      choicesWithinOptions(question.answer, question.options ?? ["True", "False"]),
+    { message: "True/false answer must be 0 or 1." },
+  );
+
+/**
+ * `short` — free text. `answer` holds comma-separated keywords; the learner is
+ * correct when the response contains any of them (see lib/blocks/scoring.ts).
+ */
+export const shortQuestionSchema = questionBaseSchema.extend({
+  kind: z.literal("short"),
+  answer: z.string().min(1),
+});
+
+export const questionSchema = z.discriminatedUnion("kind", [
+  singleQuestionSchema,
+  multiQuestionSchema,
+  trueFalseQuestionSchema,
+  shortQuestionSchema,
+]);
+
+/** `quiz` — `passScore` is a ratio in [0, 1], matching the stored lesson score. */
+export const quizBlockSchema = blockBaseSchema.extend({
+  type: z.literal("quiz"),
+  payload: z.object({
+    passScore: z.number().min(0).max(1),
+    questions: z.array(questionSchema).min(1),
+  }),
+});
+
 /** Discriminated union of every implemented block. */
-export const blockSchema = z.discriminatedUnion("type", [readingBlockSchema]);
+export const blockSchema = z.discriminatedUnion("type", [
+  readingBlockSchema,
+  quizBlockSchema,
+]);
 
 /** `Lesson.blocks` is stored as a JSON array of blocks. */
 export const blockListSchema = z.array(blockSchema);
@@ -33,16 +113,20 @@ export const blockListSchema = z.array(blockSchema);
 export type BlockType = z.infer<typeof blockSchema>["type"];
 export type Block = z.infer<typeof blockSchema>;
 export type ReadingBlock = z.infer<typeof readingBlockSchema>;
+export type QuizBlock = z.infer<typeof quizBlockSchema>;
+export type QuizQuestion = z.infer<typeof questionSchema>;
+export type QuestionKind = z.infer<typeof questionKindSchema>;
 
 export type BlockOfType<T extends BlockType> = Extract<Block, { type: T }>;
 
 /**
  * Props every block component receives through the registry.
  *
- * `onComplete(blockId)` is called once the learner has satisfied the block.
+ * `onComplete(blockId, score)` — `score` is a 0..1 ratio and is only supplied by
+ * scored blocks (quiz). Blocks that cannot be failed omit it.
  */
 export type BlockRenderProps<T extends Block = Block> = {
   block: T;
   completed: boolean;
-  onComplete: (blockId: string) => void;
+  onComplete: (blockId: string, score?: number) => void;
 };

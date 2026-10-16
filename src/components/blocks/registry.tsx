@@ -5,6 +5,7 @@ import type {
   BlockRenderProps,
   BlockType,
 } from "@/lib/blocks/schema";
+import { QuizBlock } from "./QuizBlock";
 import { ReadingBlock } from "./ReadingBlock";
 
 /**
@@ -17,4 +18,5 @@ type BlockComponent<T extends BlockType> = ComponentType<
 
 export const blockRegistry: { [T in BlockType]: BlockComponent<T> } = {
   reading: ReadingBlock,
+  quiz: QuizBlock,
 };
