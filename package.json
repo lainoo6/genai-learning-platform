@@ -6,10 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "lucide-react": "^1.57.0",
@@ -28,7 +34,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.1",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
