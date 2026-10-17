@@ -5,8 +5,11 @@ import type {
   BlockRenderProps,
   BlockType,
 } from "@/lib/blocks/schema";
+import { FlashcardsBlock } from "./FlashcardsBlock";
 import { QuizBlock } from "./QuizBlock";
 import { ReadingBlock } from "./ReadingBlock";
+import { ReflectionBlock } from "./ReflectionBlock";
+import { SlidesBlock } from "./SlidesBlock";
 
 /**
  * Block type → component map. Adding a block means three edits: the Zod schema,
@@ -19,4 +22,7 @@ type BlockComponent<T extends BlockType> = ComponentType<
 export const blockRegistry: { [T in BlockType]: BlockComponent<T> } = {
   reading: ReadingBlock,
   quiz: QuizBlock,
+  flashcards: FlashcardsBlock,
+  reflection: ReflectionBlock,
+  slides: SlidesBlock,
 };

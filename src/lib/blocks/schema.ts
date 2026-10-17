@@ -101,10 +101,54 @@ export const quizBlockSchema = blockBaseSchema.extend({
   }),
 });
 
+/** One card in a flashcards deck. Both sides are short strings, not markdown. */
+export const flashcardSchema = z.object({
+  front: z.string().min(1),
+  back: z.string().min(1),
+});
+
+/** `flashcards` — a deck browsed one card at a time and flipped to self-check. */
+export const flashcardsBlockSchema = blockBaseSchema.extend({
+  type: z.literal("flashcards"),
+  payload: z.object({
+    cards: z.array(flashcardSchema).min(1),
+  }),
+});
+
+/** `reflection` — a free-text note. `minWords` gates the completion button. */
+export const reflectionBlockSchema = blockBaseSchema.extend({
+  type: z.literal("reflection"),
+  payload: z.object({
+    prompt: z.string().min(1),
+    minWords: z.number().int().min(1),
+  }),
+});
+
+/** One page of a slides deck: a heading, its bullets and the spoken script. */
+export const slideSchema = z.object({
+  title: z.string().min(1),
+  bullets: z.array(z.string().min(1)).min(1),
+  /** Read out loud by `speechSynthesis`; plain text, no markdown. */
+  narration: z.string().min(1),
+});
+
+/** `slides` — one page at a time, optionally narrated by the browser. */
+export const slidesBlockSchema = blockBaseSchema.extend({
+  type: z.literal("slides"),
+  payload: z.object({
+    slides: z.array(slideSchema).min(1),
+    /** When true, opening a page starts its narration automatically. */
+    autoPlay: z.boolean(),
+  }),
+});
+
 /** Discriminated union of every implemented block. */
 export const blockSchema = z.discriminatedUnion("type", [
   readingBlockSchema,
   quizBlockSchema,
+  flashcardsBlockSchema,
+  reflectionBlockSchema,
+  slidesBlockSchema,
 ]);
 
 /** `Lesson.blocks` is stored as a JSON array of blocks. */
@@ -114,19 +158,34 @@ export type BlockType = z.infer<typeof blockSchema>["type"];
 export type Block = z.infer<typeof blockSchema>;
 export type ReadingBlock = z.infer<typeof readingBlockSchema>;
 export type QuizBlock = z.infer<typeof quizBlockSchema>;
+export type FlashcardsBlock = z.infer<typeof flashcardsBlockSchema>;
+export type Flashcard = z.infer<typeof flashcardSchema>;
+export type ReflectionBlock = z.infer<typeof reflectionBlockSchema>;
+export type Slide = z.infer<typeof slideSchema>;
+export type SlidesBlock = z.infer<typeof slidesBlockSchema>;
 export type QuizQuestion = z.infer<typeof questionSchema>;
 export type QuestionKind = z.infer<typeof questionKindSchema>;
 
 export type BlockOfType<T extends BlockType> = Extract<Block, { type: T }>;
+
+/** Where a block is being rendered, handed to every block by the renderer. */
+export type BlockContext = {
+  courseId: string;
+  lessonId: string;
+};
 
 /**
  * Props every block component receives through the registry.
  *
  * `onComplete(blockId, score)` — `score` is a 0..1 ratio and is only supplied by
  * scored blocks (quiz). Blocks that cannot be failed omit it.
+ *
+ * `context` identifies the lesson the block belongs to: the coding block keys
+ * its saved drafts by it, and game / simulation use it for their analytics.
  */
 export type BlockRenderProps<T extends Block = Block> = {
   block: T;
   completed: boolean;
   onComplete: (blockId: string, score?: number) => void;
+  context: BlockContext;
 };

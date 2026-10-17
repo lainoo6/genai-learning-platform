@@ -30,6 +30,46 @@ const validQuiz = {
   },
 };
 
+const validFlashcards = {
+  id: "blk_cards",
+  title: "Terms to remember",
+  type: "flashcards",
+  payload: {
+    cards: [{ front: "Requirement", back: "What the software must do." }],
+  },
+};
+
+const validReflection = {
+  id: "blk_reflection",
+  title: "Your turn",
+  type: "reflection",
+  payload: {
+    prompt: "Which part of today's lesson would you use at work?",
+    minWords: 40,
+  },
+};
+
+const validSlides = {
+  id: "blk_slides",
+  title: "How an agent reads your request",
+  type: "slides",
+  payload: {
+    autoPlay: false,
+    slides: [
+      {
+        title: "It starts with the context you gave it",
+        bullets: ["Files you opened", "The error you pasted"],
+        narration: "It starts with the context you gave it.",
+      },
+      {
+        title: "Then it proposes a change",
+        bullets: ["A diff, not a rewrite"],
+        narration: "Then it proposes a change.",
+      },
+    ],
+  },
+};
+
 describe("blockSchema", () => {
   it("accepts a reading block without an image", () => {
     expect(blockSchema.safeParse(validReading).success).toBe(true);
@@ -49,7 +89,8 @@ describe("blockSchema", () => {
   });
 
   it("rejects an unknown block type", () => {
-    const result = blockSchema.safeParse({ ...validReading, type: "slides" });
+    // `roleplay` is the next block on the roadmap and has no schema yet.
+    const result = blockSchema.safeParse({ ...validReading, type: "roleplay" });
 
     expect(result.success).toBe(false);
   });
@@ -127,6 +168,88 @@ describe("blockSchema", () => {
     expect(blockSchema.safeParse("reading").success).toBe(false);
     expect(blockSchema.safeParse(null).success).toBe(false);
   });
+
+  it("accepts a flashcards block", () => {
+    expect(blockSchema.safeParse(validFlashcards).success).toBe(true);
+  });
+
+  it("rejects a flashcard with an empty side", () => {
+    const result = blockSchema.safeParse({
+      ...validFlashcards,
+      payload: { cards: [{ front: "", back: "Back" }] },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a flashcard deck with no cards", () => {
+    const result = blockSchema.safeParse({
+      ...validFlashcards,
+      payload: { cards: [] },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a reflection block", () => {
+    expect(blockSchema.safeParse(validReflection).success).toBe(true);
+  });
+
+  it("rejects a reflection with a minWords below one word", () => {
+    const result = blockSchema.safeParse({
+      ...validReflection,
+      payload: { prompt: "Say something", minWords: 0 },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a slides block", () => {
+    expect(blockSchema.safeParse(validSlides).success).toBe(true);
+  });
+
+  it("rejects a slides deck with no slides", () => {
+    const result = blockSchema.safeParse({
+      ...validSlides,
+      payload: { ...validSlides.payload, slides: [] },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a slide without a narration script", () => {
+    const result = blockSchema.safeParse({
+      ...validSlides,
+      payload: {
+        ...validSlides.payload,
+        slides: [{ title: "One", bullets: ["Only a bullet"] }],
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a slide whose bullet list is empty", () => {
+    const result = blockSchema.safeParse({
+      ...validSlides,
+      payload: {
+        ...validSlides.payload,
+        slides: [{ title: "One", bullets: [], narration: "One." }],
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a slides payload that forgets the autoPlay flag", () => {
+    const result = blockSchema.safeParse({
+      ...validSlides,
+      payload: { slides: validSlides.payload.slides },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
 });
 
 describe("questionSchema", () => {
@@ -190,6 +313,12 @@ describe("questionSchema", () => {
 describe("blockListSchema", () => {
   it("accepts a mixed lesson block list", () => {
     expect(blockListSchema.safeParse([validReading, validQuiz]).success).toBe(true);
+  });
+
+  it("accepts a list mixing the newer block types", () => {
+    expect(
+      blockListSchema.safeParse([validFlashcards, validReflection, validQuiz]).success,
+    ).toBe(true);
   });
 
   it("rejects a list containing one invalid block", () => {
