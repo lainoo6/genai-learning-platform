@@ -18,22 +18,27 @@ const completeBlockSchema = z.object({
   score: z.number().min(0).max(1).optional(),
 });
 
+const BLOCK_EVENT_TYPES = ["GAME_FINISH", "SIM_END", "QUIZ_ATTEMPT"] as const;
+type BlockEventType = (typeof BLOCK_EVENT_TYPES)[number];
+
 /**
  * Event types a block component may raise from the browser.
  *
  * Kept to this short allow-list: the action is reachable from the client, so a
  * caller must not be able to write arbitrary rows into `EngagementEvent`.
+ * `QUIZ_ATTEMPT` carries the questions a learner got wrong, which "Explain for
+ * me" reads back to explain their own attempt (P4.4).
  */
 const blockEventSchema = z.object({
   lessonId: z.string().min(1),
   blockId: z.string().min(1),
-  type: z.enum(["GAME_FINISH", "SIM_END"]),
+  type: z.enum(BLOCK_EVENT_TYPES),
   payload: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**
- * Records an engagement event raised by a block component (a finished game or
- * simulation).
+ * Records an engagement event raised by a block component (a finished game,
+ * simulation or quiz attempt).
  *
  * Best effort by design — analytics must never block the learner, so anything
  * unexpected is dropped silently instead of being reported back.
@@ -41,7 +46,7 @@ const blockEventSchema = z.object({
 export async function trackBlockEvent(
   lessonId: string,
   blockId: string,
-  type: "GAME_FINISH" | "SIM_END",
+  type: BlockEventType,
   payload?: Record<string, unknown>,
 ): Promise<void> {
   const parsedInput = blockEventSchema.safeParse({

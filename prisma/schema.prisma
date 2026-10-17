@@ -49,6 +49,7 @@ model User {
   events         EngagementEvent[]
   createdCourses Course[]         @relation("CourseCreator")
   tutorSessions  TutorSession[]
+  blockOverrides UserBlockOverride[]
 }
 
 model Course {
@@ -145,6 +146,23 @@ model TutorSession {
   context   Json?
   messages  TutorMessage[]
   createdAt DateTime       @default(now())
+}
+
+/**
+ * Per-learner rewrite of a reading block (P4.4 "Replace content").
+ *
+ * Only the author of the override ever sees it: the lesson payload stays
+ * untouched, and the override is merged in at read time.
+ */
+model UserBlockOverride {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId  String
+  blockId   String
+  markdown  String
+  createdAt DateTime @default(now())
+  @@unique([userId, lessonId, blockId])
 }
 
 model TutorMessage {

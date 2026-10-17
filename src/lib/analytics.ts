@@ -10,6 +10,7 @@ export type EngagementEventType =
   | "LESSON_START"
   | "BLOCK_COMPLETE"
   | "QUIZ_SUBMIT"
+  | "QUIZ_ATTEMPT"
   | "GAME_FINISH"
   | "SIM_END"
   | "ROLEPLAY_END"

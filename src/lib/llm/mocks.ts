@@ -1,0 +1,13 @@
+import { registerMock } from "@/lib/llm/mock";
+import { mockExplain } from "@/lib/llm/prompts/explain";
+
+/**
+ * Registration point for the canned LLM fallbacks (P4.4).
+ *
+ * `generateJson` looks its fallback up by usage key, so a caller has to make
+ * sure its handler is registered before asking. Re-registering simply replaces
+ * the handler, which makes this safe to call on every request.
+ */
+export function registerLlmMocks(): void {
+  registerMock("explain-block", ({ prompt }) => mockExplain(prompt));
+}

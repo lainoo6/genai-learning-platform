@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TutorPanel } from "@/components/tutor/TutorPanel";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
+import { applyBlockOverrides } from "@/lib/blocks/override";
 import { blockListSchema } from "@/lib/blocks/schema";
 import {
   flattenLessons,
@@ -101,8 +102,20 @@ async function LessonPlayer({ params }: LessonPageProps) {
     where: { id: lessonId },
     select: { blocks: true },
   });
+
+  // Per-learner rewrites (P4.4) are merged in at read time, so the stored lesson
+  // payload stays exactly as the author wrote it for everybody else.
+  const overrideRows = await prisma.userBlockOverride.findMany({
+    where: { userId, lessonId },
+    select: { blockId: true, markdown: true },
+  });
+  const overriddenBlockIds = new Set(overrideRows.map((row) => row.blockId));
+
   const parsedBlocks = blockListSchema.safeParse(lessonRow?.blocks);
-  const blocks = parsedBlocks.success ? parsedBlocks.data : [];
+  const blocks = applyBlockOverrides(
+    parsedBlocks.success ? parsedBlocks.data : [],
+    overrideRows,
+  );
 
   await trackEvent("LESSON_START", {
     userId,
@@ -201,6 +214,7 @@ async function LessonPlayer({ params }: LessonPageProps) {
               courseId={courseId}
               key={block.id}
               lessonId={lessonId}
+              overridden={overriddenBlockIds.has(block.id)}
             />
           ))}
         </div>

@@ -16,6 +16,7 @@ import type {
   QuizBlock as QuizBlockData,
   QuizQuestion,
 } from "@/lib/blocks/schema";
+import { trackBlockEvent } from "@/server/progress";
 
 /**
  * Quiz block.
@@ -43,6 +44,7 @@ function optionsOf(question: QuizQuestion): string[] {
 export function QuizBlock({
   block,
   completed,
+  context,
   onComplete,
 }: BlockRenderProps<QuizBlockData>) {
   const { questions, passScore } = block.payload;
@@ -83,9 +85,32 @@ export function QuizBlock({
     setResponse(question.id, { kind: "choice", choices: [optionIndex] });
   }
 
+  /**
+   * Remembers which questions the learner got wrong on this attempt.
+   *
+   * "Explain for me" (P4.4) reads the newest QUIZ_ATTEMPT event back, so the
+   * explanation can quote the learner's own mistakes instead of the block in
+   * general. Recorded when the last question is checked, whether or not the
+   * learner reaches the pass mark.
+   */
+  function recordAttempt(): void {
+    const wrongQuestionIds = questions
+      .filter((entry) => !gradeQuestion(entry, responses[entry.id]))
+      .map((entry) => entry.id);
+
+    void trackBlockEvent(context.lessonId, block.id, "QUIZ_ATTEMPT", {
+      wrongQuestionIds,
+      score: gradeQuiz(questions, responses, passScore).score,
+    });
+  }
+
   function checkAnswer(): void {
     if (!revealed.includes(question.id)) {
       setRevealed((previous) => [...previous, question.id]);
+    }
+
+    if (isLastQuestion) {
+      recordAttempt();
     }
   }
 

@@ -7,6 +7,7 @@ import { type ComponentType, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { Block, BlockRenderProps } from "@/lib/blocks/schema";
 import { completeBlock } from "@/server/progress";
+import { BlockExplainer } from "./block-explainer";
 import { blockRegistry } from "./registry";
 
 export type BlockRendererProps = {
@@ -15,6 +16,8 @@ export type BlockRendererProps = {
   lessonId: string;
   /** Whether this block is already recorded in the learner's lesson progress. */
   completed?: boolean;
+  /** Whether the learner replaced this block's content (P4.4 override). */
+  overridden?: boolean;
   /**
    * Called when the learner satisfies the block. Defaults to the
    * `completeBlock` server action, so a page can render blocks without wiring
@@ -28,7 +31,14 @@ export type BlockRendererProps = {
  * type badge, completion tick and save errors.
  */
 export function BlockRenderer(props: BlockRendererProps) {
-  const { block, courseId, lessonId, completed = false, onComplete } = props;
+  const {
+    block,
+    courseId,
+    lessonId,
+    completed = false,
+    overridden = false,
+    onComplete,
+  } = props;
   const router = useRouter();
 
   const [isPending, startTransition] = useTransition();
@@ -59,12 +69,21 @@ export function BlockRenderer(props: BlockRendererProps) {
       <header className="flex items-center gap-2 border-b px-4 py-3">
         <h2 className="text-sm font-medium">{block.title}</h2>
         <Badge variant="secondary">{block.type}</Badge>
-        {completed ? (
-          <span className="ml-auto flex items-center gap-1 text-xs text-emerald-600">
-            <Check aria-hidden="true" className="size-3.5" />
-            Done
-          </span>
-        ) : null}
+        {overridden ? <Badge variant="outline">Personalised</Badge> : null}
+        <span className="ml-auto flex items-center gap-2">
+          {completed ? (
+            <span className="flex items-center gap-1 text-xs text-emerald-600">
+              <Check aria-hidden="true" className="size-3.5" />
+              Done
+            </span>
+          ) : null}
+          <BlockExplainer
+            blockId={block.id}
+            canReplace={block.type === "reading"}
+            lessonId={lessonId}
+            replaced={overridden}
+          />
+        </span>
       </header>
 
       <div className="px-4 py-4">
