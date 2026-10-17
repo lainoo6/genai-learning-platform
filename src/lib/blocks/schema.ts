@@ -163,6 +163,46 @@ export const codingBlockSchema = blockBaseSchema.extend({
   }),
 });
 
+/** One row of a `sort` game: what it says and where it belongs. */
+export const sortItemSchema = z.object({
+  text: z.string().min(1),
+  /** Target position. Only the relative order matters, not the actual numbers. */
+  order: z.number().int(),
+});
+
+/** One pair of a `match` game. */
+export const matchPairSchema = z.object({
+  left: z.string().min(1),
+  right: z.string().min(1),
+});
+
+const sortGamePayloadSchema = z.object({
+  variant: z.literal("sort"),
+  items: z.array(sortItemSchema).min(2),
+});
+
+const matchGamePayloadSchema = z.object({
+  variant: z.literal("match"),
+  pairs: z.array(matchPairSchema).min(2),
+});
+
+/** `game` — either an ordering puzzle or a matching puzzle. */
+export const gameBlockSchema = blockBaseSchema
+  .extend({
+    type: z.literal("game"),
+    payload: z.discriminatedUnion("variant", [
+      sortGamePayloadSchema,
+      matchGamePayloadSchema,
+    ]),
+  })
+  .refine(
+    (block) =>
+      block.payload.variant !== "sort"
+      || new Set(block.payload.items.map((item) => item.order)).size
+        === block.payload.items.length,
+    { message: "Sort items must all carry a distinct order value." },
+  );
+
 /** Discriminated union of every implemented block. */
 export const blockSchema = z.discriminatedUnion("type", [
   readingBlockSchema,
@@ -171,6 +211,7 @@ export const blockSchema = z.discriminatedUnion("type", [
   reflectionBlockSchema,
   slidesBlockSchema,
   codingBlockSchema,
+  gameBlockSchema,
 ]);
 
 /** `Lesson.blocks` is stored as a JSON array of blocks. */
@@ -187,6 +228,9 @@ export type Slide = z.infer<typeof slideSchema>;
 export type SlidesBlock = z.infer<typeof slidesBlockSchema>;
 export type CodingTest = z.infer<typeof codingTestSchema>;
 export type CodingBlock = z.infer<typeof codingBlockSchema>;
+export type SortItem = z.infer<typeof sortItemSchema>;
+export type MatchPair = z.infer<typeof matchPairSchema>;
+export type GameBlock = z.infer<typeof gameBlockSchema>;
 export type QuizQuestion = z.infer<typeof questionSchema>;
 export type QuestionKind = z.infer<typeof questionKindSchema>;
 

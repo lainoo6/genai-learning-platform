@@ -117,6 +117,29 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/*
+ * P3.3 — the match game shakes a mis-picked card (`animation: match-shake …`
+ * is applied inline, so only the keyframes need to live here).
+ */
+@keyframes match-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

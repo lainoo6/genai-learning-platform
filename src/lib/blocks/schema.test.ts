@@ -49,6 +49,36 @@ const validReflection = {
   },
 };
 
+const validSortGame = {
+  id: "blk_game_sort",
+  title: "Prioritise the backlog",
+  type: "game",
+  payload: {
+    variant: "sort",
+    items: [
+      { text: "Checkout is down for everyone", order: 1 },
+      { text: "Add a dark mode toggle", order: 4 },
+      { text: "Fix the broken password email", order: 2 },
+      { text: "Rename a menu label", order: 5 },
+      { text: "Speed up the search page", order: 3 },
+    ],
+  },
+};
+
+const validMatchGame = {
+  id: "blk_game_match",
+  title: "Good practice, bad practice",
+  type: "game",
+  payload: {
+    variant: "match",
+    pairs: [
+      { left: "Paste the error message", right: "Good: the agent needs evidence" },
+      { left: "Ship the first diff untouched", right: "Bad: nobody reviewed it" },
+      { left: "Ask for tests alongside the fix", right: "Good: proves it works" },
+    ],
+  },
+};
+
 const validCoding = {
   id: "blk_coding",
   title: "Warm up: sums",
@@ -303,6 +333,56 @@ describe("blockSchema", () => {
     const result = blockSchema.safeParse({
       ...validCoding,
       payload: { ...validCoding.payload, problem: "" },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a sort game", () => {
+    expect(blockSchema.safeParse(validSortGame).success).toBe(true);
+  });
+
+  it("accepts a match game", () => {
+    expect(blockSchema.safeParse(validMatchGame).success).toBe(true);
+  });
+
+  it("rejects a sort game whose items share an order value", () => {
+    const result = blockSchema.safeParse({
+      ...validSortGame,
+      payload: {
+        variant: "sort",
+        items: [
+          { text: "First", order: 1 },
+          { text: "Second", order: 1 },
+        ],
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a sort game with a single item", () => {
+    const result = blockSchema.safeParse({
+      ...validSortGame,
+      payload: { variant: "sort", items: [{ text: "Only one", order: 1 }] },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a match game whose payload carries sort items instead of pairs", () => {
+    const result = blockSchema.safeParse({
+      ...validMatchGame,
+      payload: { variant: "match", items: [{ text: "Nope", order: 1 }] },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a game with an unknown variant", () => {
+    const result = blockSchema.safeParse({
+      ...validMatchGame,
+      payload: { variant: "hangman", pairs: [] },
     });
 
     expect(result.success).toBe(false);
