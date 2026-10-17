@@ -7,6 +7,9 @@ import {
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
+import { seedCourse, SEED_COURSE_SLUG } from "./seed-courses";
+import { seedPhase3Courses } from "./seed-courses-phase3";
+
 const prisma = new PrismaClient();
 
 /** Shared password for every demo account. */
@@ -260,9 +263,22 @@ async function main(): Promise<void> {
   }
 
   const courseId = await seedPlaceholderCourse(instructorId);
+  const seededCourse = await seedCourse(prisma, instructorId);
+  const phase3Courses = await seedPhase3Courses(prisma, instructorId);
 
   console.log(`Seeded ${DEMO_USERS.length} demo users (password: ${DEMO_PASSWORD}).`);
   console.log(`Seeded placeholder course ${courseId} (${PLACEHOLDER_COURSE.slug}).`);
+  console.log(
+    `Seeded seed course ${seededCourse.courseId} `
+    + `(${SEED_COURSE_SLUG}, ${seededCourse.lessonCount} lessons).`,
+  );
+
+  for (const course of phase3Courses) {
+    console.log(
+      `Seeded seed course ${course.courseId} `
+      + `(${course.slug}, ${course.lessonCount} lessons).`,
+    );
+  }
 }
 
 main()
