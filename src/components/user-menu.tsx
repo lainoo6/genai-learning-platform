@@ -6,11 +6,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
+
 import { signOutAction } from "@/server/auth";
 
 type UserMenuProps = {
@@ -42,10 +45,19 @@ export function UserMenu({ name, email, role }: UserMenuProps) {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="truncate font-normal text-foreground">
-          {email}
-        </DropdownMenuLabel>
-        <DropdownMenuLabel className="uppercase">{role}</DropdownMenuLabel>
+        {/* Base UI renders labels through Menu.GroupLabel, so they need a group. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="truncate font-normal text-foreground">
+            {email}
+          </DropdownMenuLabel>
+          <DropdownMenuLabel className="uppercase">{role}</DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>
+          <Link className="w-full cursor-pointer" href="/onboarding">
+            Learning profile
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <form action={signOutAction} className="w-full">

@@ -14,6 +14,7 @@ const PROTECTED_ROUTES: ReadonlyArray<{
   { prefix: "/teach", roles: ["INSTRUCTOR", "ADMIN"] },
   { prefix: "/learn", roles: ["LEARNER", "INSTRUCTOR", "ADMIN"] },
   { prefix: "/dashboard", roles: ["LEARNER", "INSTRUCTOR", "ADMIN"] },
+  { prefix: "/onboarding", roles: ["LEARNER", "INSTRUCTOR", "ADMIN"] },
   { prefix: "/generate", roles: ["LEARNER", "INSTRUCTOR", "ADMIN"] },
 ];
 

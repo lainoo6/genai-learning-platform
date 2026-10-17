@@ -12,6 +12,7 @@ import {
   signOut,
   verifyPassword,
 } from "@/lib/auth";
+import { hasProfile } from "@/lib/profile";
 import { prisma } from "@/lib/prisma";
 
 /** State shared between the auth server actions and the client form. */
@@ -41,14 +42,24 @@ function safeRedirectTarget(value: FormDataEntryValue | null): string {
   return value;
 }
 
-/** Signs a user in with Auth.js and lets the redirect error bubble up. */
+/**
+ * Signs a user in with Auth.js and lets the redirect error bubble up.
+ *
+ * Learners without a profile are sent through the onboarding questionnaire
+ * first; `redirectTo` is passed along so they still end up where they wanted.
+ */
 async function startSession(
   email: string,
   password: string,
   redirectTo: string,
+  needsOnboarding: boolean,
 ): Promise<AuthFormState> {
+  const target = needsOnboarding
+    ? `/onboarding?next=${encodeURIComponent(redirectTo)}`
+    : redirectTo;
+
   try {
-    await signIn("credentials", { email, password, redirectTo });
+    await signIn("credentials", { email, password, redirectTo: target });
   } catch (error: unknown) {
     if (error instanceof AuthError) {
       return { error: INVALID_CREDENTIALS };
@@ -86,6 +97,7 @@ export async function loginAction(
     email,
     parsed.data.password,
     safeRedirectTarget(formData.get("callbackUrl")),
+    user.role === "LEARNER" && !hasProfile(user.background),
   );
 }
 
@@ -124,10 +136,12 @@ export async function registerAction(
     },
   });
 
+  // A brand new learner has no profile yet, so start with the questionnaire.
   return startSession(
     email,
     parsed.data.password,
     safeRedirectTarget(formData.get("callbackUrl")),
+    true,
   );
 }
 

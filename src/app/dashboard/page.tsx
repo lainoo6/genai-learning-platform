@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Clock, Trophy } from "lucide-react";
+import { ArrowRight, Check, Clock, Sparkles, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -22,9 +22,12 @@ import {
   flattenLessons,
   listEnrolledCourses,
   listLessonProgress,
+  listPublishedCourses,
   totalMinutes,
   type LessonProgressRecord,
 } from "@/lib/courses";
+import { loadLearnerProfile } from "@/lib/profile";
+import { recommendCourse } from "@/lib/recommendations";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -59,6 +62,17 @@ async function DashboardContent() {
     redirect("/login");
   }
 
+  const [profile, publishedCourses] = await Promise.all([
+    loadLearnerProfile(user.id),
+    listPublishedCourses(),
+  ]);
+
+  // A learner who skipped the questionnaire is sent back to it; instructors and
+  // admins use the dashboard without a profile.
+  if (user.role === "LEARNER" && profile === null) {
+    redirect("/onboarding");
+  }
+
   const enrollments = await listEnrolledCourses(user.id);
   const progressByCourse = await Promise.all(
     enrollments.map(async ({ course }) => [
@@ -70,6 +84,7 @@ async function DashboardContent() {
     ] as const),
   );
   const progress = new Map(progressByCourse);
+  const recommendation = recommendCourse(publishedCourses, profile);
 
   return (
     <div className="space-y-8">
@@ -79,6 +94,46 @@ async function DashboardContent() {
           Pick up where you left off, or browse the catalog for something new.
         </p>
       </header>
+
+      {recommendation === null ? null : (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <CardDescription className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-primary">
+              <Sparkles aria-hidden="true" className="size-3.5" />
+              Recommended start
+            </CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <span aria-hidden="true" className="text-2xl">
+                {recommendation.course.coverEmoji}
+              </span>
+              {recommendation.course.title}
+            </CardTitle>
+            <CardDescription>{recommendation.reason}</CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <p className="line-clamp-2 text-sm text-muted-foreground">
+              {recommendation.course.description}
+            </p>
+          </CardContent>
+
+          <CardFooter className="flex-wrap items-center gap-3">
+            <Link
+              className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
+              href={`/courses/${recommendation.course.slug}`}
+            >
+              Open course
+              <ArrowRight aria-hidden="true" />
+            </Link>
+            <Link
+              className="text-xs text-muted-foreground hover:text-foreground"
+              href="/onboarding"
+            >
+              Update my profile
+            </Link>
+          </CardFooter>
+        </Card>
+      )}
 
       {enrollments.length === 0 ? (
         <Card className="items-center py-12 text-center">
