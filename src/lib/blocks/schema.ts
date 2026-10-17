@@ -252,6 +252,22 @@ export const simulationBlockSchema = blockBaseSchema
     },
   );
 
+/**
+ * `roleplay` — a conversation with an AI character, graded afterwards against
+ * the rubric. The learner is the one being trained; `persona` is the character
+ * the model plays, `scenario` sets the room, and `goal` says what the learner
+ * should achieve. `rubric` is the criteria the feedback report scores.
+ */
+export const roleplayBlockSchema = blockBaseSchema.extend({
+  type: z.literal("roleplay"),
+  payload: z.object({
+    scenario: z.string().min(1),
+    persona: z.string().min(1),
+    goal: z.string().min(1),
+    rubric: z.array(z.string().min(1)).min(1),
+  }),
+});
+
 /** Discriminated union of every implemented block. */
 export const blockSchema = z.discriminatedUnion("type", [
   readingBlockSchema,
@@ -262,6 +278,7 @@ export const blockSchema = z.discriminatedUnion("type", [
   codingBlockSchema,
   gameBlockSchema,
   simulationBlockSchema,
+  roleplayBlockSchema,
 ]);
 
 /** `Lesson.blocks` is stored as a JSON array of blocks. */
@@ -284,6 +301,7 @@ export type GameBlock = z.infer<typeof gameBlockSchema>;
 export type SimulationOption = z.infer<typeof simulationOptionSchema>;
 export type SimulationNode = z.infer<typeof simulationNodeSchema>;
 export type SimulationBlock = z.infer<typeof simulationBlockSchema>;
+export type RoleplayBlock = z.infer<typeof roleplayBlockSchema>;
 export type QuizQuestion = z.infer<typeof questionSchema>;
 export type QuestionKind = z.infer<typeof questionKindSchema>;
 

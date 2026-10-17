@@ -8,7 +8,7 @@ import { blockListSchema } from "../src/lib/blocks/schema";
  * - "Using AI Coding Agents Effectively" (CS students) — reading, quiz, slides,
  *   coding and a match game, plus a simulation about delegation.
  * - "Soft and Product Skills for Developers" (all audiences) — reading, quiz,
- *   flashcards, slides, a sort game, a simulation about giving feedback.
+ *   flashcards, slides, a sort game, a role-play mock interview about feedback.
  *
  * Between them the two courses exercise every block type implemented so far.
  * Every lesson payload is parsed with the real block schema before it is
@@ -1299,142 +1299,33 @@ const SOFT_SKILLS_COURSE: SeedCourse = {
       title: "Working together",
       lessons: [
         {
-          title: "Team feedback",
+          title: "Mock interview: give and receive feedback",
           estimatedMinutes: 14,
           blocks: [
             {
-              id: "blk_soft_l5_simulation",
-              title: "Sam's pull request",
-              type: "simulation",
+              id: "blk_soft_l5_roleplay",
+              title: "Tell me about a time you gave hard feedback",
+              type: "roleplay",
               payload: {
-                intro:
-                  "It is 18:00, there is a demo tomorrow morning, and a teammate has just "
-                    + "opened a pull request. The code works. Feedback is easy to give badly "
-                    + "under exactly these conditions — try it.",
-                start: "pr-opened",
-                end: "debrief",
-                nodes: {
-                  "pr-opened": {
-                    text:
-                      "Sam's pull request makes the export feature work. It is six hundred "
-                        + "lines, has no tests, and it is the day before a demo. You are the "
-                        + "reviewer. What do you do?",
-                    options: [
-                      {
-                        label: "Ask for tests first and keep everything else until after "
-                          + "the demo",
-                        next: "tests-first",
-                        feedback:
-                          "You separated \"must change before it ships\" from \"would "
-                            + "change later\". That separation is the entire skill.",
-                        score: 2,
-                      },
-                      {
-                        label: "Approve it — the demo matters more",
-                        next: "approved",
-                        feedback:
-                          "You have traded a review for a deadline. If that is the right "
-                            + "trade, say so out loud so it is a decision and not an "
-                            + "accident.",
-                        score: 0,
-                      },
-                      {
-                        label: "Leave a comment on everything you dislike",
-                        next: "wall",
-                        feedback:
-                          "Eleven unranked comments on a six-hundred-line pull request "
-                            + "reads as an attack, and none of them will be actioned.",
-                        score: -1,
-                      },
-                      {
-                        label: "Say nothing and fix it yourself tonight",
-                        next: "silent-fix",
-                        feedback:
-                          "Sam never learns what you changed, and you have just made "
-                            + "yourself the bottleneck for every future export feature.",
-                        score: -2,
-                      },
-                    ],
-                  },
-                  "tests-first": {
-                    text:
-                      "Sam replies twenty minutes later: \"Happy to add tests, but I don't "
-                        + "know what is worth testing here.\"",
-                    options: [
-                      {
-                        label: "Name one specific behaviour you would want proven",
-                        next: "debrief",
-                        feedback:
-                          "One concrete case beats a lecture about coverage. Sam can "
-                            + "generalise from one example; he cannot act on a principle.",
-                        score: 2,
-                      },
-                      {
-                        label: "Send him the team's testing guide and move on",
-                        next: "debrief",
-                        feedback:
-                          "He asked a specific question and received a document. A link is "
-                            + "not feedback — it is a place to start looking.",
-                        score: 0,
-                      },
-                    ],
-                  },
-                  approved: {
-                    text:
-                      "It ships. Three weeks later the same six hundred lines cause a "
-                        + "partial outage, and somebody asks in the incident review why the "
-                        + "pull request had a green tick from a senior engineer.",
-                    options: [
-                      {
-                        label: "Own it and take it into the next review",
-                        next: "debrief",
-                        feedback:
-                          "An approval is a judgement you own. Noting what you shipped and "
-                            + "why is the difference between a risk taken and a surprise.",
-                        score: 0,
-                      },
-                    ],
-                  },
-                  wall: {
-                    text:
-                      "Sam pushes back on two of the comments, ignores the other nine, and "
-                        + "the review stalls for two days. The demo happens anyway, with the "
-                        + "code unchanged.",
-                    options: [
-                      {
-                        label: "Start again with the one thing that actually matters",
-                        next: "debrief",
-                        feedback:
-                          "Eleven points with no ranking gives the author nothing to do "
-                            + "first. One ranked point would have shipped.",
-                        score: 0,
-                      },
-                    ],
-                  },
-                  "silent-fix": {
-                    text:
-                      "You rewrite two hundred lines at 23:00. At Monday's stand-up: \"The "
-                        + "export work is done.\" Sam nods, none the wiser, and volunteers "
-                        + "for the next export feature too.",
-                    options: [
-                      {
-                        label: "Walk Sam through what you changed and why",
-                        next: "debrief",
-                        feedback:
-                          "Better late than never, but next time pair on it instead of "
-                            + "rewriting it — the goal is a teammate who needs you less.",
-                        score: 1,
-                      },
-                    ],
-                  },
-                  debrief: {
-                    text:
-                      "Feedback that lands has three properties: it is specific, it is "
-                        + "ranked, and it is about the work rather than the person. Miss any "
-                        + "one of the three and even a correct observation gets ignored.",
-                    options: [],
-                  },
-                },
+                scenario:
+                  "A twenty-minute mock interview for a junior developer role. Morgan has "
+                    + "just asked: \"Tell me about a time you gave a teammate feedback they "
+                    + "did not want to hear.\" The interview continues from your answer, and "
+                    + "you can ask for feedback on how you did before it ends.",
+                persona:
+                  "Morgan, a hiring manager who is friendly but keeps pressing for specifics, "
+                    + "notices when an answer stays abstract, and never fills a silence for you",
+                goal:
+                  "Answer with one concrete situation — what you actually said and what "
+                    + "changed — then ask for feedback on your answer and respond to it "
+                    + "without getting defensive.",
+                rubric: [
+                  "Told one specific story (when, where, who) instead of a general philosophy",
+                  "Quoted what they actually said, in words, rather than \"I gave feedback\"",
+                  "Described the outcome, including how the teammate reacted",
+                  "Asked for feedback on the answer and listened without justifying",
+                  "Kept the answer to roughly two minutes and left room for a follow-up question",
+                ],
               },
             },
           ],

@@ -40,6 +40,8 @@ function blockText(block: Block): string {
             .join(" ");
     case "simulation":
       return `${block.payload.intro} ${block.payload.nodes[block.payload.start]?.text ?? ""}`;
+    case "roleplay":
+      return `${block.payload.scenario} ${block.payload.goal}`;
   }
 }
 

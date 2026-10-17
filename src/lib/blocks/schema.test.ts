@@ -177,6 +177,21 @@ const validSlides = {
   },
 };
 
+const validRoleplay = {
+  id: "blk_roleplay",
+  title: "Interview a stakeholder",
+  type: "roleplay",
+  payload: {
+    scenario: "The product manager has ten minutes and wants checkout to feel faster.",
+    persona: "Priya, a product manager who speaks in vague adjectives",
+    goal: "Leave with one testable requirement and a way to measure success.",
+    rubric: [
+      "Asked about the problem before proposing a feature",
+      "Turned \"faster\" into something measurable",
+    ],
+  },
+};
+
 describe("blockSchema", () => {
   it("accepts a reading block without an image", () => {
     expect(blockSchema.safeParse(validReading).success).toBe(true);
@@ -196,8 +211,7 @@ describe("blockSchema", () => {
   });
 
   it("rejects an unknown block type", () => {
-    // `roleplay` is the next block on the roadmap and has no schema yet.
-    const result = blockSchema.safeParse({ ...validReading, type: "roleplay" });
+    const result = blockSchema.safeParse({ ...validReading, type: "video" });
 
     expect(result.success).toBe(false);
   });
@@ -498,6 +512,28 @@ describe("blockSchema", () => {
       ...validSimulation,
       payload: { ...validSimulation.payload, nodes },
     });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a roleplay block", () => {
+    expect(blockSchema.safeParse(validRoleplay).success).toBe(true);
+  });
+
+  it("rejects a roleplay without a rubric", () => {
+    const result = blockSchema.safeParse({
+      ...validRoleplay,
+      payload: { ...validRoleplay.payload, rubric: [] },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a roleplay without a persona", () => {
+    const payload: Record<string, unknown> = { ...validRoleplay.payload };
+    delete payload.persona;
+
+    const result = blockSchema.safeParse({ ...validRoleplay, payload });
 
     expect(result.success).toBe(false);
   });

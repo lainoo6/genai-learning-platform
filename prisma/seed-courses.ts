@@ -16,7 +16,7 @@ const COURSE = {
   slug: SEED_COURSE_SLUG,
   title: "Software Engineering Fundamentals",
   description:
-    "Six short lessons on how software actually gets built: what engineers do all day, "
+    "Seven short lessons on how software actually gets built: what engineers do all day, "
     + "where ideas turn into requirements, how effort is estimated, and what a team "
     + "does inside a two-week sprint. Written for people who work near software, not in it.",
   topic: "Software Engineering",
@@ -548,6 +548,40 @@ const MODULES: SeedModule[] = [
                     "Assumptions. \"Assumes the old API stays available\" turns a later "
                     + "argument into a documented condition that everybody signed up to.",
                 },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        title: "Interview a stakeholder",
+        estimatedMinutes: 12,
+        blocks: [
+          {
+            id: "blk_se_l4b_roleplay",
+            title: "The checkout that should be \"faster\"",
+            type: "roleplay",
+            payload: {
+              scenario:
+                "You are the business analyst on a small online bookstore. Priya, the "
+                + "product manager, has ten minutes between meetings and wants the checkout "
+                + "to \"feel faster\" before the next release. Nobody has measured anything "
+                + "yet, and the support inbox has forty complaints that all say something "
+                + "different.",
+              persona:
+                "Priya, a product manager who speaks in outcomes and vague adjectives, "
+                + "dislikes being handed solutions before the problem is agreed, and answers "
+                + "questions with stories about customers rather than numbers",
+              goal:
+                "Leave the meeting with one testable requirement, a way to measure success, "
+                + "and a next step — without proposing a solution before you understand the "
+                + "problem.",
+              rubric: [
+                "Opened by asking about the problem or the last time it happened, not by proposing a feature",
+                "Asked who is affected and how often instead of accepting \"everyone\"",
+                "Turned \"faster\" into something measurable — a number, an event, or a user-visible outcome",
+                "Summarised the requirement back in their own words and got it confirmed",
+                "Kept the meeting under control: one question at a time, and left with a next step",
               ],
             },
           },

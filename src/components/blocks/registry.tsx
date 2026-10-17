@@ -11,6 +11,7 @@ import { GameBlock } from "./GameBlock";
 import { QuizBlock } from "./QuizBlock";
 import { ReadingBlock } from "./ReadingBlock";
 import { ReflectionBlock } from "./ReflectionBlock";
+import { RoleplayBlock } from "./RoleplayBlock";
 import { SimulationBlock } from "./SimulationBlock";
 import { SlidesBlock } from "./SlidesBlock";
 
@@ -31,4 +32,5 @@ export const blockRegistry: { [T in BlockType]: BlockComponent<T> } = {
   coding: CodingBlock,
   game: GameBlock,
   simulation: SimulationBlock,
+  roleplay: RoleplayBlock,
 };
