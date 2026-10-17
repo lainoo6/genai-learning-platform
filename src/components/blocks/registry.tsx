@@ -5,6 +5,7 @@ import type {
   BlockRenderProps,
   BlockType,
 } from "@/lib/blocks/schema";
+import { CodingBlock } from "./CodingBlock";
 import { FlashcardsBlock } from "./FlashcardsBlock";
 import { QuizBlock } from "./QuizBlock";
 import { ReadingBlock } from "./ReadingBlock";
@@ -25,4 +26,5 @@ export const blockRegistry: { [T in BlockType]: BlockComponent<T> } = {
   flashcards: FlashcardsBlock,
   reflection: ReflectionBlock,
   slides: SlidesBlock,
+  coding: CodingBlock,
 };

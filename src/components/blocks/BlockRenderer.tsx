@@ -28,7 +28,7 @@ export type BlockRendererProps = {
  * type badge, completion tick and save errors.
  */
 export function BlockRenderer(props: BlockRendererProps) {
-  const { block, lessonId, completed = false, onComplete } = props;
+  const { block, courseId, lessonId, completed = false, onComplete } = props;
   const router = useRouter();
 
   const [isPending, startTransition] = useTransition();
@@ -68,7 +68,12 @@ export function BlockRenderer(props: BlockRendererProps) {
       </header>
 
       <div className="px-4 py-4">
-        <Component block={block} completed={completed} onComplete={handleComplete} />
+        <Component
+          block={block}
+          completed={completed}
+          context={{ courseId, lessonId }}
+          onComplete={handleComplete}
+        />
       </div>
 
       {isPending ? (

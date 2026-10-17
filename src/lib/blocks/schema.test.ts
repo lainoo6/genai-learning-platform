@@ -49,6 +49,21 @@ const validReflection = {
   },
 };
 
+const validCoding = {
+  id: "blk_coding",
+  title: "Warm up: sums",
+  type: "coding",
+  payload: {
+    problem: "Write a function sum(a, b) that returns the sum.",
+    starter: "function sum(a, b) {\n  // your code\n}",
+    tests: [
+      { name: "sums 1+2", expression: "sum(1,2) === 3" },
+      { name: "handles negatives", expression: "sum(-1,1) === 0" },
+    ],
+    hints: ["Return the two arguments added together."],
+  },
+};
+
 const validSlides = {
   id: "blk_slides",
   title: "How an agent reads your request",
@@ -245,6 +260,49 @@ describe("blockSchema", () => {
     const result = blockSchema.safeParse({
       ...validSlides,
       payload: { slides: validSlides.payload.slides },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a coding block", () => {
+    expect(blockSchema.safeParse(validCoding).success).toBe(true);
+  });
+
+  it("accepts a coding block that starts from an empty editor", () => {
+    const result = blockSchema.safeParse({
+      ...validCoding,
+      payload: { ...validCoding.payload, starter: "" },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a coding block without any test", () => {
+    const result = blockSchema.safeParse({
+      ...validCoding,
+      payload: { ...validCoding.payload, tests: [] },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a coding test with an empty expression", () => {
+    const result = blockSchema.safeParse({
+      ...validCoding,
+      payload: {
+        ...validCoding.payload,
+        tests: [{ name: "always true", expression: "" }],
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a coding block without a problem statement", () => {
+    const result = blockSchema.safeParse({
+      ...validCoding,
+      payload: { ...validCoding.payload, problem: "" },
     });
 
     expect(result.success).toBe(false);

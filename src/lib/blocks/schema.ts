@@ -142,6 +142,27 @@ export const slidesBlockSchema = blockBaseSchema.extend({
   }),
 });
 
+/**
+ * One assertion of a coding exercise: `expression` is evaluated inside the
+ * sandbox after the learner's code has run, and must be `true` to pass.
+ */
+export const codingTestSchema = z.object({
+  name: z.string().min(1),
+  expression: z.string().min(1),
+});
+
+/** `coding` — a JavaScript exercise graded by assertions in a Web Worker. */
+export const codingBlockSchema = blockBaseSchema.extend({
+  type: z.literal("coding"),
+  payload: z.object({
+    problem: z.string().min(1),
+    /** Shown in the editor on the first visit; may be an empty string. */
+    starter: z.string(),
+    tests: z.array(codingTestSchema).min(1),
+    hints: z.array(z.string().min(1)),
+  }),
+});
+
 /** Discriminated union of every implemented block. */
 export const blockSchema = z.discriminatedUnion("type", [
   readingBlockSchema,
@@ -149,6 +170,7 @@ export const blockSchema = z.discriminatedUnion("type", [
   flashcardsBlockSchema,
   reflectionBlockSchema,
   slidesBlockSchema,
+  codingBlockSchema,
 ]);
 
 /** `Lesson.blocks` is stored as a JSON array of blocks. */
@@ -163,6 +185,8 @@ export type Flashcard = z.infer<typeof flashcardSchema>;
 export type ReflectionBlock = z.infer<typeof reflectionBlockSchema>;
 export type Slide = z.infer<typeof slideSchema>;
 export type SlidesBlock = z.infer<typeof slidesBlockSchema>;
+export type CodingTest = z.infer<typeof codingTestSchema>;
+export type CodingBlock = z.infer<typeof codingBlockSchema>;
 export type QuizQuestion = z.infer<typeof questionSchema>;
 export type QuestionKind = z.infer<typeof questionKindSchema>;
 
