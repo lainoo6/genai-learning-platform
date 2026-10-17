@@ -4,6 +4,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -30,6 +31,12 @@ const NAV_LINKS: ReadonlyArray<NavLink> = [
     href: "/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
+    roles: ["LEARNER", "INSTRUCTOR", "ADMIN"],
+  },
+  {
+    href: "/generate",
+    label: "Generate",
+    icon: Sparkles,
     roles: ["LEARNER", "INSTRUCTOR", "ADMIN"],
   },
   {

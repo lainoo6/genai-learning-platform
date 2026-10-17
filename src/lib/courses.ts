@@ -65,6 +65,7 @@ export type CourseWithLessons = Pick<
   | "coverEmoji"
   | "source"
   | "status"
+  | "createdById"
 > & {
   modules: CourseModule[];
 };
@@ -80,6 +81,7 @@ const courseWithLessonsSelect = {
   coverEmoji: true,
   source: true,
   status: true,
+  createdById: true,
   modules: {
     orderBy: { order: "asc" },
     select: {
@@ -126,6 +128,7 @@ function toCourseWithLessons(row: CourseRow): CourseWithLessons {
     coverEmoji: row.coverEmoji,
     source: row.source,
     status: row.status,
+    createdById: row.createdById,
     modules: row.modules.map((courseModule) => ({
       id: courseModule.id,
       title: courseModule.title,
@@ -172,9 +175,21 @@ export function firstLesson(
   return flattenLessons(course)[0];
 }
 
+/**
+ * Courses shown in the public catalog.
+ *
+ * Learner-generated courses (P4.7) are published so the player works, but they
+ * belong to the learner who asked for them: they never appear in the catalog,
+ * the recommendations or a public course page.
+ */
+const PUBLIC_COURSE_WHERE = {
+  status: "PUBLISHED",
+  source: { not: "LEARNER" },
+} satisfies Prisma.CourseWhereInput;
+
 export async function listPublishedCourses(): Promise<CourseWithLessons[]> {
   const rows = await prisma.course.findMany({
-    where: { status: "PUBLISHED" },
+    where: PUBLIC_COURSE_WHERE,
     orderBy: { createdAt: "asc" },
     select: courseWithLessonsSelect,
   });
@@ -186,7 +201,7 @@ export async function getPublishedCourseBySlug(
   slug: string,
 ): Promise<CourseWithLessons | null> {
   const row = await prisma.course.findFirst({
-    where: { slug, status: "PUBLISHED" },
+    where: { ...PUBLIC_COURSE_WHERE, slug },
     select: courseWithLessonsSelect,
   });
 

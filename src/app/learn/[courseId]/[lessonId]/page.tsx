@@ -69,6 +69,12 @@ async function LessonPlayer({ params }: LessonPageProps) {
     notFound();
   }
 
+  // Learner-generated courses are private to their author (P4.7): guessing the
+  // id of somebody else's mini-course must not reveal even its outline.
+  if (course.source === "LEARNER" && course.createdById !== userId) {
+    notFound();
+  }
+
   const lessons = flattenLessons(course);
   const lesson = lessons.find((candidate) => candidate.id === lessonId);
   if (lesson === undefined) {
@@ -170,9 +176,15 @@ async function LessonPlayer({ params }: LessonPageProps) {
             Courses
           </Link>
           <ChevronRight aria-hidden="true" className="size-3" />
-          <Link className="hover:text-foreground" href={`/courses/${course.slug}`}>
-            {course.title}
-          </Link>
+          {course.source === "LEARNER" ? (
+            // Generated courses have no public page; showing a link here would
+            // dead-end on the catalog's 404.
+            <span className="text-foreground">{course.title}</span>
+          ) : (
+            <Link className="hover:text-foreground" href={`/courses/${course.slug}`}>
+              {course.title}
+            </Link>
+          )}
           <ChevronRight aria-hidden="true" className="size-3" />
           <span className="text-foreground">{lesson.title}</span>
         </nav>
