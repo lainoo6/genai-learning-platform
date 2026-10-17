@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Progress, ProgressValue } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TutorPanel } from "@/components/tutor/TutorPanel";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
 import { blockListSchema } from "@/lib/blocks/schema";
@@ -30,7 +31,9 @@ import {
   listLessonProgress,
   type CourseLesson,
 } from "@/lib/courses";
+import { isMockMode } from "@/lib/llm/provider";
 import { prisma } from "@/lib/prisma";
+import { loadTutorHistory } from "@/lib/tutor";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -132,6 +135,10 @@ async function LessonPlayer({ params }: LessonPageProps) {
 
   const lessonRatio =
     blocks.length === 0 ? 0 : (completedBlocks.length / blocks.length) * 100;
+
+  // Conversation shown when the tutor drawer opens (P4.3): the last messages of
+  // this lesson's session, or an empty list until the learner asks something.
+  const tutorMessages = await loadTutorHistory(userId, courseId, lessonId);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[17rem_minmax(0,1fr)]">
@@ -251,6 +258,14 @@ async function LessonPlayer({ params }: LessonPageProps) {
           )}
         </nav>
       </div>
+
+      <TutorPanel
+        courseId={courseId}
+        initialMessages={tutorMessages}
+        lessonId={lessonId}
+        lessonTitle={lesson.title}
+        mockMode={isMockMode()}
+      />
     </div>
   );
 }
