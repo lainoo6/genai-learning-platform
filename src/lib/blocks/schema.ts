@@ -203,6 +203,55 @@ export const gameBlockSchema = blockBaseSchema
     { message: "Sort items must all carry a distinct order value." },
   );
 
+/** One choice offered by a simulation node. */
+export const simulationOptionSchema = z.object({
+  label: z.string().min(1),
+  /** Node this choice leads to. Unknown ids end the run (see SimulationBlock). */
+  next: z.string().min(1),
+  feedback: z.string().min(1),
+  /** Points added to the run total; may be negative. */
+  score: z.number(),
+});
+
+/**
+ * One step of a simulation: what happens next, and the ways out of it.
+ *
+ * `options` is only required on nodes the learner has to leave: the `end` node
+ * is a closing statement with nothing left to choose.
+ */
+export const simulationNodeSchema = z.object({
+  text: z.string().min(1),
+  options: z.array(simulationOptionSchema),
+});
+
+/** `simulation` — a branching scenario walked one decision at a time. */
+export const simulationBlockSchema = blockBaseSchema
+  .extend({
+    type: z.literal("simulation"),
+    payload: z.object({
+      intro: z.string().min(1),
+      start: z.string().min(1),
+      end: z.string().min(1),
+      nodes: z.record(z.string(), simulationNodeSchema),
+    }),
+  })
+  .refine((block) => block.payload.start in block.payload.nodes, {
+    message: "The simulation must start on a node that exists.",
+  })
+  .refine((block) => block.payload.end in block.payload.nodes, {
+    message: "The simulation must end on a node that exists.",
+  })
+  .refine(
+    (block) =>
+      Object.entries(block.payload.nodes).every(
+        ([id, node]) => id === block.payload.end || node.options.length > 0,
+      ),
+    {
+      message:
+        "Every simulation node except the end node needs at least one option.",
+    },
+  );
+
 /** Discriminated union of every implemented block. */
 export const blockSchema = z.discriminatedUnion("type", [
   readingBlockSchema,
@@ -212,6 +261,7 @@ export const blockSchema = z.discriminatedUnion("type", [
   slidesBlockSchema,
   codingBlockSchema,
   gameBlockSchema,
+  simulationBlockSchema,
 ]);
 
 /** `Lesson.blocks` is stored as a JSON array of blocks. */
@@ -231,6 +281,9 @@ export type CodingBlock = z.infer<typeof codingBlockSchema>;
 export type SortItem = z.infer<typeof sortItemSchema>;
 export type MatchPair = z.infer<typeof matchPairSchema>;
 export type GameBlock = z.infer<typeof gameBlockSchema>;
+export type SimulationOption = z.infer<typeof simulationOptionSchema>;
+export type SimulationNode = z.infer<typeof simulationNodeSchema>;
+export type SimulationBlock = z.infer<typeof simulationBlockSchema>;
 export type QuizQuestion = z.infer<typeof questionSchema>;
 export type QuestionKind = z.infer<typeof questionKindSchema>;
 

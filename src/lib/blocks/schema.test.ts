@@ -79,6 +79,68 @@ const validMatchGame = {
   },
 };
 
+const validSimulation = {
+  id: "blk_simulation",
+  title: "Friday, 5pm: what goes to the agent?",
+  type: "simulation",
+  payload: {
+    intro: "Three things land on your desk at once. Choose what to delegate.",
+    start: "triage",
+    end: "debrief",
+    nodes: {
+      triage: {
+        text: "A customer reports that checkout fails on Safari only.",
+        options: [
+          {
+            label: "Ask the agent to reproduce it first",
+            next: "reproduce",
+            feedback: "It narrows the bug to one browser before anyone edits code.",
+            score: 2,
+          },
+          {
+            label: "Let the agent patch checkout straight away",
+            next: "blind-patch",
+            feedback: "A guess at the cause is still a guess.",
+            score: 0,
+          },
+        ],
+      },
+      reproduce: {
+        text: "The agent reproduced it and proposes a one-line fix.",
+        options: [
+          {
+            label: "Read the diff, then run the checkout tests",
+            next: "debrief",
+            feedback: "Shipped with evidence. The fix was correct.",
+            score: 2,
+          },
+          {
+            label: "Merge it, it is only one line",
+            next: "debrief",
+            feedback: "It worked this time — the habit is the risk.",
+            score: 0,
+          },
+        ],
+      },
+      "blind-patch": {
+        text: "The patch touches six files and nobody knows why.",
+        options: [
+          {
+            label: "Revert and start over properly",
+            next: "debrief",
+            feedback: "Costly, but you stopped before it reached customers.",
+            score: 1,
+          },
+        ],
+      },
+      debrief: {
+        text: "Whatever the path, Monday's lesson is the same: delegate the work, keep the judgement.",
+        options: [],
+      },
+    },
+  },
+};
+
 const validCoding = {
   id: "blk_coding",
   title: "Warm up: sums",
@@ -388,6 +450,57 @@ describe("blockSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts a simulation", () => {
+    expect(blockSchema.safeParse(validSimulation).success).toBe(true);
+  });
+
+  it("rejects a simulation without a start node", () => {
+    const payload: Record<string, unknown> = { ...validSimulation.payload };
+    delete payload.start;
+
+    const result = blockSchema.safeParse({ ...validSimulation, payload });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a simulation without an end node", () => {
+    const payload: Record<string, unknown> = { ...validSimulation.payload };
+    delete payload.end;
+
+    const result = blockSchema.safeParse({ ...validSimulation, payload });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a simulation whose start node is missing from the map", () => {
+    const result = blockSchema.safeParse({
+      ...validSimulation,
+      payload: { ...validSimulation.payload, start: "does-not-exist" },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a simulation whose end node is missing from the map", () => {
+    const result = blockSchema.safeParse({
+      ...validSimulation,
+      payload: { ...validSimulation.payload, end: "does-not-exist" },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a simulation node that offers no way out", () => {
+    const nodes = { ...validSimulation.payload.nodes };
+    nodes.reproduce = { text: "A dead end.", options: [] };
+
+    const result = blockSchema.safeParse({
+      ...validSimulation,
+      payload: { ...validSimulation.payload, nodes },
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("questionSchema", () => {
