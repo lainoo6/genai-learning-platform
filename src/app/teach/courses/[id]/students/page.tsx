@@ -1,4 +1,4 @@
-import { ArrowLeft, Pencil, Users } from "lucide-react";
+import { ArrowLeft, Download, Pencil, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -111,6 +111,18 @@ async function StudentsContent({ params }: StudentsPageProps) {
               {students.length} student{students.length === 1 ? "" : "s"}
             </p>
           </div>
+
+          <Link
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "gap-1.5",
+            )}
+            href={`/teach/courses/${course.id}/students/export`}
+            prefetch={false}
+          >
+            <Download aria-hidden="true" />
+            Export CSV
+          </Link>
         </div>
 
         {students.length === 0 ? (
