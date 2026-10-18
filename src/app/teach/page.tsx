@@ -84,7 +84,7 @@ async function TeachContent({ searchParams }: TeachPageProps) {
         <p className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm">
           <span className="font-medium">Saved “{created}” as a draft.</span>{" "}
           <span className="text-muted-foreground">
-            The block editor lands in P5.1; for now the course stays unpublished.
+            Open its editor below to add blocks and publish it.
           </span>
         </p>
       )}
@@ -163,16 +163,22 @@ async function TeachContent({ searchParams }: TeachPageProps) {
                     </div>
 
                     <div className="flex flex-col items-end gap-1">
+                      <Link
+                        className="text-xs font-medium text-primary hover:underline"
+                        href={`/teach/courses/${course.id}/edit`}
+                      >
+                        Edit course
+                      </Link>
                       {isPublished ? (
                         <Link
-                          className="text-xs text-primary hover:underline"
+                          className="text-xs text-muted-foreground hover:underline"
                           href={`/courses/${course.slug}`}
                         >
                           View public page
                         </Link>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          Publishing arrives in P5.1
+                          Not in the catalog yet
                         </span>
                       )}
                     </div>
