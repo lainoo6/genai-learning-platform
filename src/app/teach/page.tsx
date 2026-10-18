@@ -163,12 +163,26 @@ async function TeachContent({ searchParams }: TeachPageProps) {
                     </div>
 
                     <div className="flex flex-col items-end gap-1">
-                      <Link
-                        className="text-xs font-medium text-primary hover:underline"
-                        href={`/teach/courses/${course.id}/edit`}
-                      >
-                        Edit course
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          className="text-xs font-medium text-primary hover:underline"
+                          href={`/teach/courses/${course.id}/edit`}
+                        >
+                          Edit course
+                        </Link>
+                        <span
+                          aria-hidden="true"
+                          className="text-xs text-muted-foreground"
+                        >
+                          ·
+                        </span>
+                        <Link
+                          className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                          href={`/teach/courses/${course.id}/students`}
+                        >
+                          Students
+                        </Link>
+                      </div>
                       {isPublished ? (
                         <Link
                           className="text-xs text-muted-foreground hover:underline"
