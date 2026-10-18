@@ -182,6 +182,18 @@ async function TeachContent({ searchParams }: TeachPageProps) {
                         >
                           Students
                         </Link>
+                        <span
+                          aria-hidden="true"
+                          className="text-xs text-muted-foreground"
+                        >
+                          ·
+                        </span>
+                        <Link
+                          className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                          href={`/teach/courses/${course.id}/insights`}
+                        >
+                          Insights
+                        </Link>
                       </div>
                       {isPublished ? (
                         <Link
