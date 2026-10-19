@@ -1,4 +1,3 @@
-import { createOpenAI } from "@ai-sdk/openai";
 import { type ModelMessage, streamText } from "ai";
 import { z } from "zod";
 
@@ -6,7 +5,7 @@ import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { blockListSchema } from "@/lib/blocks/schema";
 import { contentLanguageFromLocale } from "@/lib/llm/language";
-import { isMockMode, llmModel, openaiApiKey } from "@/lib/llm/provider";
+import { isMockMode, llmClient, llmModel, llmApiKey } from "@/lib/llm/provider";
 import {
   mockRoleplayReply,
   roleplaySystemPrompt,
@@ -118,7 +117,7 @@ export async function POST(request: Request): Promise<Response> {
     return chunkedTextResponse(mockRoleplayReply(assistantTurns, language));
   }
 
-  const apiKey = openaiApiKey();
+  const apiKey = llmApiKey();
   if (apiKey === null) {
     return Response.json(
       { error: t("server.roleplay.unavailable") },
@@ -133,7 +132,7 @@ export async function POST(request: Request): Promise<Response> {
     { role: "user", content: message },
   ];
 
-  const openai = createOpenAI({ apiKey });
+  const openai = llmClient();
   const result = streamText({
     model: openai.chat(llmModel()),
     system: roleplaySystemPrompt(block, language),

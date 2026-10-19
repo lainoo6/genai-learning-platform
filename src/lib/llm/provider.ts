@@ -77,16 +77,24 @@ function isFlagEnabled(value: string | null): boolean {
   return value !== null && ["true", "1", "yes"].includes(value.toLowerCase());
 }
 
-export function openaiApiKey(): string | null {
-  return readEnv("OPENAI_API_KEY");
+export function llmApiKey(): string | null {
+  return readEnv("LLM_API_KEY");
 }
 
 /**
- * True when no OpenAI key is configured or `LLM_MOCK` is switched on. Read at
+ * Optional OpenAI-compatible gateway (e.g. OpenRouter). When unset the client
+ * talks to api.openai.com directly.
+ */
+export function llmBaseUrl(): string | null {
+  return readEnv("LLM_BASE_URL");
+}
+
+/**
+ * True when no LLM key is configured or `LLM_MOCK` is switched on. Read at
  * call time (not at import time) so tests and runtime config changes apply.
  */
 export function isMockMode(): boolean {
-  return isFlagEnabled(readEnv("LLM_MOCK")) || openaiApiKey() === null;
+  return isFlagEnabled(readEnv("LLM_MOCK")) || llmApiKey() === null;
 }
 
 /** Model actually used: `LLM_MODEL` when set, otherwise the default. */
@@ -94,15 +102,24 @@ export function llmModel(): string {
   return readEnv("LLM_MODEL") ?? DEFAULT_OPENAI_MODEL;
 }
 
-async function defaultComplete(request: LlmCompleteRequest): Promise<string> {
-  const apiKey = openaiApiKey();
+/**
+ * Client shared by every LLM call. `LLM_BASE_URL` redirects it to any
+ * OpenAI-compatible gateway, so call sites never build their own client.
+ */
+export function llmClient() {
+  const apiKey = llmApiKey();
   if (apiKey === null) {
     throw new LlmError(
-      "OPENAI_API_KEY is not configured. Set it or enable LLM_MOCK=true.",
+      "LLM_API_KEY is not configured. Set it or enable LLM_MOCK=true.",
     );
   }
 
-  const openai = createOpenAI({ apiKey });
+  const baseURL = llmBaseUrl();
+  return createOpenAI(baseURL === null ? { apiKey } : { apiKey, baseURL });
+}
+
+async function defaultComplete(request: LlmCompleteRequest): Promise<string> {
+  const openai = llmClient();
   const { text } = await generateText({
     model: openai.chat(llmModel()),
     system: request.system,

@@ -1,4 +1,3 @@
-import { createOpenAI } from "@ai-sdk/openai";
 import { type ModelMessage, streamText } from "ai";
 import { z } from "zod";
 
@@ -6,7 +5,7 @@ import { getI18n } from "@/i18n/server";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
 import { contentLanguageFromLocale } from "@/lib/llm/language";
-import { isMockMode, llmModel, openaiApiKey } from "@/lib/llm/provider";
+import { isMockMode, llmClient, llmModel, llmApiKey } from "@/lib/llm/provider";
 import {
   mockTutorReply,
   tutorQuestionPrompt,
@@ -126,14 +125,14 @@ export async function POST(request: Request): Promise<Response> {
     { role: "user", content: tutorQuestionPrompt(parsed.data.message) },
   ];
 
-  const apiKey = openaiApiKey();
+  const apiKey = llmApiKey();
   if (isMockMode() || apiKey === null) {
     const reply = mockTutorReply(context, parsed.data.message);
     await appendTutorMessage(sessionId, "assistant", reply);
     return chunkedTextResponse(reply);
   }
 
-  const openai = createOpenAI({ apiKey });
+  const openai = llmClient();
 
   const result = streamText({
     model: openai.chat(llmModel()),

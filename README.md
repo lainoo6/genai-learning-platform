@@ -62,9 +62,11 @@ npm run db:seed               # demo users + three sample courses
 npm run dev                   # http://localhost:3000
 ```
 
-Set `DATABASE_URL` in `.env` first. Leaving `OPENAI_API_KEY` empty is supported: the app
+Set `DATABASE_URL` in `.env` first. Leaving `LLM_API_KEY` empty is supported: the app
 then runs in **mock mode**, where every LLM call returns a deterministic fixture, so all
-AI features stay clickable offline.
+AI features stay clickable offline. To use a real model, set `LLM_API_KEY` and
+`LLM_BASE_URL` (any OpenAI-compatible gateway, e.g. `https://openrouter.ai/api/v1`) plus
+`LLM_MODEL`.
 
 ### Demo accounts
 
@@ -168,7 +170,7 @@ npm run db:seed               # 演示账号 + 三门示例课程
 npm run dev                   # http://localhost:3000
 ```
 
-先在 `.env` 里填好 `DATABASE_URL`。`OPENAI_API_KEY` 可以留空：留空时应用运行在**模拟模式**，所有大模型调用返回确定性的固定内容，因此离线也能完整体验全部 AI 功能。
+先在 `.env` 里填好 `DATABASE_URL`。`LLM_API_KEY` 可以留空：留空时应用运行在**模拟模式**，所有大模型调用返回确定性的固定内容，因此离线也能完整体验全部 AI 功能。要用真实模型，就填 `LLM_API_KEY`、`LLM_BASE_URL`（任何 OpenAI 兼容网关，例如 `https://openrouter.ai/api/v1`）和 `LLM_MODEL`。
 
 #### 演示账号
 

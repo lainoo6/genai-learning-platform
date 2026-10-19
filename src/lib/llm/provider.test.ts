@@ -7,7 +7,7 @@ import {
   generateJson,
   isMockMode,
   LlmValidationError,
-  openaiApiKey,
+  llmApiKey,
 } from "@/lib/llm/provider";
 
 const answerSchema = z.object({
@@ -15,7 +15,7 @@ const answerSchema = z.object({
   body: z.string(),
 });
 
-const ENV_KEYS = ["OPENAI_API_KEY", "LLM_MOCK", "LLM_MODEL"] as const;
+const ENV_KEYS = ["LLM_API_KEY", "LLM_MOCK", "LLM_MODEL"] as const;
 const savedEnv = new Map<string, string | undefined>();
 
 const { createJob, createdJobs } = vi.hoisted(() => {
@@ -38,12 +38,12 @@ vi.mock("@/lib/prisma", () => ({
 
 /** Switches the service layer to real mode without a network call. */
 function useRealMode(): void {
-  process.env.OPENAI_API_KEY = "test-key";
+  process.env.LLM_API_KEY = "test-key";
   delete process.env.LLM_MOCK;
 }
 
 function useMockMode(): void {
-  delete process.env.OPENAI_API_KEY;
+  delete process.env.LLM_API_KEY;
   delete process.env.LLM_MOCK;
 }
 
@@ -81,12 +81,12 @@ describe("isMockMode", () => {
   it("is on when no key is configured", () => {
     useMockMode();
 
-    expect(openaiApiKey()).toBeNull();
+    expect(llmApiKey()).toBeNull();
     expect(isMockMode()).toBe(true);
   });
 
   it("is forced on by LLM_MOCK even with a key present", () => {
-    process.env.OPENAI_API_KEY = "test-key";
+    process.env.LLM_API_KEY = "test-key";
     process.env.LLM_MOCK = "true";
 
     expect(isMockMode()).toBe(true);
