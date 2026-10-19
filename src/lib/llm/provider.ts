@@ -1,4 +1,4 @@
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAI, type OpenAIChatLanguageModelOptions } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import type { Prisma } from "@prisma/client";
 import type { ZodError, ZodType } from "zod";
@@ -118,6 +118,22 @@ export function llmClient() {
   return createOpenAI(baseURL === null ? { apiKey } : { apiKey, baseURL });
 }
 
+/**
+ * Keeps reasoning short so the first token arrives sooner. OpenRouter maps
+ * `reasoningEffort` onto its own effort setting; plain OpenAI rejects the field
+ * for non-reasoning models, so it is only sent to the OpenRouter gateway.
+ */
+export function llmProviderOptions():
+  | { openai: OpenAIChatLanguageModelOptions }
+  | undefined {
+  const baseURL = llmBaseUrl();
+  if (baseURL === null || !baseURL.includes("openrouter.ai")) {
+    return undefined;
+  }
+
+  return { openai: { reasoningEffort: "minimal" } };
+}
+
 async function defaultComplete(request: LlmCompleteRequest): Promise<string> {
   const openai = llmClient();
   const { text } = await generateText({
@@ -125,6 +141,7 @@ async function defaultComplete(request: LlmCompleteRequest): Promise<string> {
     system: request.system,
     prompt: request.prompt,
     temperature: request.temperature,
+    providerOptions: llmProviderOptions(),
   });
 
   return text;

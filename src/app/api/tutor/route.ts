@@ -5,7 +5,7 @@ import { getI18n } from "@/i18n/server";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
 import { contentLanguageFromLocale } from "@/lib/llm/language";
-import { isMockMode, llmClient, llmModel, llmApiKey } from "@/lib/llm/provider";
+import { isMockMode, llmApiKey, llmClient, llmModel, llmProviderOptions } from "@/lib/llm/provider";
 import {
   mockTutorReply,
   tutorQuestionPrompt,
@@ -139,6 +139,7 @@ export async function POST(request: Request): Promise<Response> {
     system: tutorSystemPrompt(context),
     messages,
     temperature: TEMPERATURE,
+    providerOptions: llmProviderOptions(),
     onFinish: async ({ text }) => {
       await appendTutorMessage(sessionId, "assistant", text);
     },

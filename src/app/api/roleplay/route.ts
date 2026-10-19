@@ -5,7 +5,7 @@ import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { blockListSchema } from "@/lib/blocks/schema";
 import { contentLanguageFromLocale } from "@/lib/llm/language";
-import { isMockMode, llmClient, llmModel, llmApiKey } from "@/lib/llm/provider";
+import { isMockMode, llmApiKey, llmClient, llmModel, llmProviderOptions } from "@/lib/llm/provider";
 import {
   mockRoleplayReply,
   roleplaySystemPrompt,
@@ -138,6 +138,7 @@ export async function POST(request: Request): Promise<Response> {
     system: roleplaySystemPrompt(block, language),
     messages,
     temperature: TEMPERATURE,
+    providerOptions: llmProviderOptions(),
   });
 
   return result.toTextStreamResponse({ headers: NO_STORE });
