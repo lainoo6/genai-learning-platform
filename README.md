@@ -47,7 +47,7 @@ bilingual (English / 简体中文) and switches instantly from the header.
 | Data | PostgreSQL + Prisma 6 (typed client only, no raw SQL) |
 | Auth | Auth.js (NextAuth v5) with JWT sessions and role claims |
 | Validation | Zod 4 — one schema per block type, shared by client and server |
-| AI | Vercel AI SDK 5 with the OpenAI provider |
+| AI | Vercel AI SDK 5 against any OpenAI-compatible gateway (OpenRouter in the demo) |
 
 ## Getting started
 
@@ -155,7 +155,7 @@ prisma/
 | 数据 | PostgreSQL + Prisma 6（只用类型化客户端，不写裸 SQL） |
 | 认证 | Auth.js（NextAuth v5），JWT 会话携带角色 |
 | 校验 | Zod 4——每种内容块一个 schema，前后端共用 |
-| AI | Vercel AI SDK 5 + OpenAI Provider |
+| AI | Vercel AI SDK 5，任意 OpenAI 兼容网关（演示环境用 OpenRouter） |
 
 ### 快速开始
 
