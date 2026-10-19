@@ -5,8 +5,10 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import { getI18n } from "@/i18n/server";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
+import { contentLanguageFromLocale } from "@/lib/llm/language";
 import { registerLlmMocks } from "@/lib/llm/mocks";
 import { generateJson } from "@/lib/llm/provider";
 import {
@@ -54,18 +56,20 @@ function courseSlug(topic: string): string {
 export async function generateLearnerCourse(
   input: GenerateCourseInput,
 ): Promise<GenerateCourseResult> {
+  const { locale, t } = await getI18n();
+  const language = contentLanguageFromLocale(locale);
   const parsedInput = generateInputSchema.safeParse(input);
   if (!parsedInput.success) {
     return {
       ok: false,
-      error: "Give the course a topic of at least three characters.",
+      error: t("server.generate.topicTooShort"),
     };
   }
 
   const session = await auth();
   const userId = session?.user?.id;
   if (userId === undefined) {
-    return { ok: false, error: "Sign in to generate a course." };
+    return { ok: false, error: t("server.generate.signIn") };
   }
 
   const { topic, goal } = parsedInput.data;
@@ -75,7 +79,7 @@ export async function generateLearnerCourse(
   try {
     const generated = await generateJson(
       learnerCourseSchema,
-      learnerCoursePrompt(topic, goal),
+      learnerCoursePrompt(topic, goal, language),
       {
         usage: "learner-course",
         userId,
@@ -90,16 +94,17 @@ export async function generateLearnerCourse(
         title: `🎯 ${generated.title}`,
         description: generated.description,
         topic,
-        audience: "Self-directed learners",
+        audience: language === "zh" ? "自主学习" : "Self-directed learners",
         difficulty: generated.difficulty,
         coverEmoji: "✨",
+        language,
         status: "PUBLISHED",
         source: "LEARNER",
         createdById: userId,
         modules: {
           create: [
             {
-              title: "Module 1 · The essentials",
+              title: language === "zh" ? "模块 1 · 核心内容" : "Module 1 · The essentials",
               order: 0,
               lessons: {
                 create: generated.lessons.map((lesson, index) => ({
@@ -131,7 +136,7 @@ export async function generateLearnerCourse(
     const firstLessonId = course.modules[0]?.lessons[0]?.id;
     if (firstLessonId === undefined) {
       await prisma.course.delete({ where: { id: course.id } });
-      return { ok: false, error: "The generated course had no lessons. Try again." };
+      return { ok: false, error: t("server.generate.noLessons") };
     }
 
     await prisma.enrollment.upsert({
@@ -156,8 +161,7 @@ export async function generateLearnerCourse(
     console.error("[generate] course generation failed", error);
     return {
       ok: false,
-      error:
-        "The course could not be generated. Your topic is still here — try again in a moment.",
+      error: t("server.generate.failed"),
     };
   }
 }
@@ -166,15 +170,16 @@ export async function generateLearnerCourse(
 export async function deleteGeneratedCourse(
   courseId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { t } = await getI18n();
   const parsedInput = deleteInputSchema.safeParse(courseId);
   if (!parsedInput.success) {
-    return { ok: false, error: "Invalid course." };
+    return { ok: false, error: t("server.generate.invalid") };
   }
 
   const session = await auth();
   const userId = session?.user?.id;
   if (userId === undefined) {
-    return { ok: false, error: "Sign in to delete this course." };
+    return { ok: false, error: t("server.generate.signInDelete") };
   }
 
   const course = await prisma.course.findUnique({
@@ -183,11 +188,11 @@ export async function deleteGeneratedCourse(
   });
 
   if (course === null) {
-    return { ok: false, error: "Course not found." };
+    return { ok: false, error: t("server.generate.courseNotFound") };
   }
 
   if (course.source !== "LEARNER" || course.createdById !== userId) {
-    return { ok: false, error: "You can only delete courses you generated." };
+    return { ok: false, error: t("server.generate.notOwner") };
   }
 
   await prisma.course.delete({ where: { id: parsedInput.data } });

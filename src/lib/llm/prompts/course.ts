@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 import { blockListSchema } from "@/lib/blocks/schema";
+import {
+  CONTENT_LANGUAGE_LABEL,
+  contentLanguageLine,
+  type ContentLanguage,
+} from "@/lib/llm/language";
 
 /**
  * Course generation for the learner-facing /generate page (P4.7).
@@ -74,7 +79,11 @@ export type LearnerCourse = z.infer<typeof learnerCourseSchema>;
  * Prompt for the whole course. The JSON skeleton and the per-block shapes are
  * spelled out because the reply is parsed directly by `learnerCourseSchema`.
  */
-export function learnerCoursePrompt(topic: string, goal: string): string {
+export function learnerCoursePrompt(
+  topic: string,
+  goal: string,
+  language: ContentLanguage = "en",
+): string {
   const goalLine =
     goal.trim().length === 0
       ? "No specific goal was given, so assume curiosity."
@@ -87,6 +96,7 @@ export function learnerCoursePrompt(topic: string, goal: string): string {
     "",
     `Topic: ${topic}`,
     goalLine,
+    contentLanguageLine(language),
     "",
     "Structure: exactly one module of three lessons. Each lesson has exactly three",
     "blocks, in this order:",
@@ -105,6 +115,7 @@ export function learnerCoursePrompt(topic: string, goal: string): string {
     "- Every lesson title is concrete (\"Tea arrives in Taiwan\"), never \"Lesson 1\".",
     "- Factual claims must be things a careful encyclopedia would agree with; hedge",
     "  disputed origin stories instead of picking a winner.",
+    `- Write every string in ${CONTENT_LANGUAGE_LABEL[language]}.`,
     "- Do not use emoji. Do not wrap the reply in code fences.",
     "",
     "Reply with one JSON object of this exact shape:",
@@ -137,7 +148,11 @@ export function learnerCoursePrompt(topic: string, goal: string): string {
  * It is complete enough to learn from, not a stub: three lessons, real prose,
  * and every block required by `learnerCourseSchema`.
  */
-export function mockLearnerCourse(): unknown {
+export function mockLearnerCourse(language: ContentLanguage = "en"): unknown {
+  if (language === "zh") {
+    return mockChineseLearnerCourse();
+  }
+
   return {
     title: "History of Bubble Tea",
     description:
@@ -530,6 +545,349 @@ export function mockLearnerCourse(): unknown {
                   answer: [0],
                   explanation:
                     "The queue is social proof and part of the product's image.",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * Chinese demo course used when the interface language is Chinese.
+ *
+ * Same shape as the English demo (three lessons: reading, one interactive
+ * block, quiz) and the same subject, so switching the language shows the same
+ * course written naturally in Chinese rather than a machine translation.
+ */
+function mockChineseLearnerCourse(): unknown {
+  return {
+    title: "珍珠奶茶的历史",
+    description:
+      "一杯有嚼劲的饮料，如何从台湾的茶摊走向四大洲的商场：两段互相竞争的起源故事、"
+      + "珍珠背后的供应链，以及「每一杯都能定制」这门生意。",
+    difficulty: "beginner",
+    lessons: [
+      {
+        title: "茶摊上发明的一杯饮料",
+        estimatedMinutes: 8,
+        blocks: [
+          {
+            id: "blk_l1_reading",
+            title: "两家茶店，一个嚼劲十足的点子",
+            type: "reading",
+            payload: {
+              markdown: [
+                "# 一杯比个人电脑还年轻的饮料",
+                "",
+                "很多人以为珍珠奶茶是古老的中国传统，其实不是。它出现在 1980 年代中期的台湾，"
+                  + "至今仍有两家茶店在争谁先发明了它。",
+                "",
+                "台中的春水堂说，创始人在 1980 年代就开始试验冷茶；流传的版本是，1988 年的一次"
+                  + "员工会议上，产品经理林秀慧把粉圆丢进了自己的茶杯。台南的翰林茶馆讲了一个"
+                  + "相似的故事，只是时间和人物都不同。两个版本在一件重要的事上是一致的：有人把"
+                  + "有嚼劲的木薯珍珠放进了甜茶里，口感从此彻底改变了这杯饮料。",
+                "",
+                "## 杯子里到底有什么",
+                "",
+                "珍珠——也就是 boba——由木薯淀粉制成，煮软后泡在糖浆里保持弹性。下面的茶通常是"
+                  + "轻发酵的乌龙或红茶，加糖、加冰后摇匀。粗吸管不是装饰：它是把杯底的一颗珍珠"
+                  + "送到嘴边的唯一办法。",
+                "",
+                "## 一个具体的例子",
+                "",
+                "走进台北的任何一家店，说一句「珍珠奶茶，半糖，少冰」。一句话里做了三个决定："
+                  + "基底的饮料、甜度、冰量，而价格不变。这种「可以配置而不只是点单」的体验，"
+                  + "正是它传播出去的部分。",
+                "",
+                "## 为什么扩散得这么快",
+                "",
+                "原料便宜，设备只是一台摇杯机和一台封口机，而这杯饮料在任何人拥有智能手机之前"
+                  + "就已经很上镜。一个摊位一分钟就能出一杯，天然适合夜市：人流大、地方小、不用"
+                  + "餐具。下一课，我们跟着它从夜市走进四大洲的商场。",
+              ].join("\n"),
+            },
+          },
+          {
+            id: "blk_l1_cards",
+            title: "一杯饮料的词汇表",
+            type: "flashcards",
+            payload: {
+              cards: [
+                {
+                  front: "Boba（珍珠）",
+                  back: "指的是木薯珍珠本身，也常用来指这杯饮料。深色、有嚼劲，由木薯淀粉制成。",
+                },
+                {
+                  front: "木薯珍珠",
+                  back: "木薯淀粉搓成的小球，煮熟后泡在糖浆里。它本身几乎没有味道，提供的是口感。",
+                },
+                {
+                  front: "木薯",
+                  back: "珍珠的原料，一种富含淀粉的块根作物，热带地区广泛种植，也是木薯粉的来源。",
+                },
+                {
+                  front: "摇杯机",
+                  back: "把茶、糖浆和冰块混合的设备。摇动既降温，也让饮料充气。",
+                },
+                {
+                  front: "封口机",
+                  back: "把塑料膜热封在杯口上的机器。这样饮料不加盖也能摇，带走也不会洒。",
+                },
+                {
+                  front: "乌龙茶",
+                  back: "台湾与中国南方部分发酵的茶，常被用作珍珠奶茶的茶底。",
+                },
+                {
+                  front: "夜市",
+                  back: "傍晚开始的街头小吃市场。珍珠奶茶最早的大众观众，就是在这些摊位前形成的。",
+                },
+              ],
+            },
+          },
+          {
+            id: "blk_l1_quiz",
+            title: "检查一下理解",
+            type: "quiz",
+            payload: {
+              passScore: 0.7,
+              questions: [
+                {
+                  id: "q_l1_1",
+                  kind: "single",
+                  prompt: "珍珠奶茶最早出现在哪里？",
+                  options: ["台湾", "香港", "新加坡", "日本"],
+                  answer: [0],
+                  explanation: "这杯饮料 1980 年代中期出现在台湾，其他地方是后来才接受的。",
+                },
+                {
+                  id: "q_l1_2",
+                  kind: "single",
+                  prompt: "珍珠是用什么做的？",
+                  options: ["木薯淀粉", "米粉", "小麦面筋", "明胶"],
+                  answer: [0],
+                  explanation: "木薯珍珠就是木薯淀粉，所以它是有嚼劲的，而不是松散易碎的。",
+                },
+                {
+                  id: "q_l1_3",
+                  kind: "single",
+                  prompt: "为什么珍珠奶茶需要粗吸管？",
+                  options: [
+                    "这样珍珠才能被吸上来",
+                    "为了让饮料保持冰凉",
+                    "为了方便搅拌",
+                    "为了方便封口",
+                  ],
+                  answer: [0],
+                  explanation: "普通吸管会把珍珠挡住，粗吸管的口径正是为它准备的。",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        title: "从夜市走向全球品牌",
+        estimatedMinutes: 9,
+        blocks: [
+          {
+            id: "blk_l2_reading",
+            title: "一杯本地饮料如何走出去",
+            type: "reading",
+            payload: {
+              markdown: [
+                "# 从台中到购物中心",
+                "",
+                "1990 年代，珍珠奶茶从台湾扩散到香港、中国大陆和东南亚。靠的不是广告，而是"
+                  + "加盟：一家把糖浆配方调好的店，可以把配方、杯子和封口机一起卖给另一个城市"
+                  + "的经营者。",
+                "",
+                "到了 2010 年代，它经由在亚洲求学、想念这口味的学生传到了欧洲和北美。日出茶太、"
+                  + "CoCo 等连锁开出上百家门店；一些专门店则靠单一产品排起长队——黑糖珍珠奶茶，"
+                  + "牛奶里一道焦糖色的渐变，天生适合被拍下来。",
+                "",
+                "## 两个互相竞争的起源故事",
+                "",
+                "台湾的两种说法值得知道，因为它们展示了食物史通常是怎么形成的。春水堂指向台中"
+                  + "与 1980 年代末；翰林茶馆指向台南，时间稍早。两边都没有专利，依据主要是当事"
+                  + "家族的回忆。更诚实的版本是：这杯饮料差不多同时在好几家茶店里出现。",
+                "",
+                "## 跨过一条边界之后会变什么",
+                "",
+                "配方不会原封不动地旅行。北美的店往往把默认甜度调低，因为当地口味期待更少的糖；"
+                  + "有些市场在茶加奶的基底上加了奶盖或鲜果。但珍珠相当稳定——它是顾客闭着眼睛也"
+                  + "认得出来的那一部分。",
+                "",
+                "## 值得记住的例子",
+                "",
+                "温哥华卖的一杯和高雄卖的一杯，可能共享同一个名字、同一根吸管和同一台封口机，"
+                  + "喝起来却像两种产品。这不是「不正宗」，而是成功的餐饮连锁本来就会做的事，"
+                  + "也是这杯饮料能走完全程的原因。",
+              ].join("\n"),
+            },
+          },
+          {
+            id: "blk_l2_match",
+            title: "把每一项和它的作用配对",
+            type: "game",
+            payload: {
+              variant: "match",
+              pairs: [
+                { left: "春水堂", right: "提出起源说法之一的台中茶店" },
+                { left: "翰林茶馆", right: "提出竞争性起源说法的台南茶店" },
+                { left: "木薯淀粉", right: "珍珠的原料" },
+                { left: "封口机", right: "把膜封在杯口，方便摇匀" },
+                { left: "加盟", right: "这杯饮料快速进入其他国家的方式" },
+              ],
+            },
+          },
+          {
+            id: "blk_l2_quiz",
+            title: "检查一下理解",
+            type: "quiz",
+            payload: {
+              passScore: 0.7,
+              questions: [
+                {
+                  id: "q_l2_1",
+                  kind: "single",
+                  prompt: "发明故事与哪两座城市有关？",
+                  options: [
+                    "台中与台南",
+                    "台北与高雄",
+                    "香港与澳门",
+                    "上海与厦门",
+                  ],
+                  answer: [0],
+                  explanation: "两种互相竞争的说法，分别来自台中与台南的茶店。",
+                },
+                {
+                  id: "q_l2_2",
+                  kind: "single",
+                  prompt: "1990 年代把这杯饮料带到其他国家的机制是什么？",
+                  options: ["加盟", "政府出口计划", "电视广告", "航空配餐合同"],
+                  answer: [0],
+                  explanation: "加盟让一家已经跑通的店，把配方和设备卖给海外的经营者。",
+                },
+                {
+                  id: "q_l2_3",
+                  kind: "single",
+                  prompt: "在不同市场之间，哪一部分变化最小？",
+                  options: ["木薯珍珠", "甜度", "配料", "茶底"],
+                  answer: [0],
+                  explanation: "甜度、配料和茶底都会被调整，只有珍珠保持着一望即知的相同。",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        title: "五美元一杯的生意经",
+        estimatedMinutes: 8,
+        blocks: [
+          {
+            id: "blk_l3_reading",
+            title: "为什么「可定制」就是产品本身",
+            type: "reading",
+            payload: {
+              markdown: [
+                "# 五美元一杯的生意经",
+                "",
+                "珍珠奶茶的原料——茶、水、奶粉、糖和淀粉——每杯成本很低。价格来自别的地方："
+                  + "这家店卖的其实是一个「负担得起的小决定」。",
+                "",
+                "## 不增加成本的定制",
+                "",
+                "甜度、冰量、配料、加不加奶。每个选择都显得私人，而店家提供它们几乎不花钱。"
+                  + "餐厅没法让你决定汤要多咸而不多请一位厨师；奶茶店却能在队伍继续前进的同时，"
+                  + "让你做六个选择。",
+                "",
+                "这和咖啡连锁在牛奶与糖浆上发现的窍门是同一条：产品不是那杯液体，而是「这杯是"
+                  + "为你做的」这种感觉，而且价格低到明天还可以再来一次。",
+                "",
+                "## 队伍在卖什么",
+                "",
+                "看得见的队伍干两件事。它告诉路人这家店值得排，也生产出一张照片：柜台上的一排"
+                  + "杯子、塑料杯里的渐变色、一只手把它举到街景前。这杯饮料在被喝掉之前就已经被"
+                  + "设计成适合拍照——封口保住了它的样子，珍珠是一层一层的，而不是化开。",
+                "",
+                "## 钱到底花在哪里",
+                "",
+                "租金、人力和冷藏占掉了大部分毛利，而不是茶叶。这就是为什么这门生意要靠高人流"
+                  + "地段的小店面扩张，也是为什么一份糟糕的租约会关掉一个本来赚钱的品牌。珍珠很"
+                  + "便宜，那个街角不便宜。",
+                "",
+                "## 带走的结论",
+                "",
+                "珍珠奶茶是个好案例，因为它小到可以完整看清：便宜的原料、可配置的产品、上镜的"
+                  + "外形，以及一门依赖位置的生意。几乎每一个消费趋势，都在用不同的口味重复这个"
+                  + "组合。",
+              ].join("\n"),
+            },
+          },
+          {
+            id: "blk_l3_sort",
+            title: "把做一杯的步骤排好序",
+            type: "game",
+            payload: {
+              variant: "sort",
+              items: [
+                { text: "泡好茶并放凉", order: 1 },
+                { text: "把糖浆和冰块放进摇杯", order: 2 },
+                { text: "摇到冰凉均匀", order: 3 },
+                { text: "倒进已经放好珍珠的杯子", order: 4 },
+                { text: "封口并递给顾客", order: 5 },
+              ],
+            },
+          },
+          {
+            id: "blk_l3_quiz",
+            title: "检查一下理解",
+            type: "quiz",
+            payload: {
+              passScore: 0.7,
+              questions: [
+                {
+                  id: "q_l3_1",
+                  kind: "single",
+                  prompt: "为什么奶茶店能提供这么多定制选项？",
+                  options: [
+                    "提供这些选项几乎不增加成本",
+                    "每一单都需要一位训练有素的厨师",
+                    "它们会显著提高原料成本",
+                    "食品安全法要求如此",
+                  ],
+                  answer: [0],
+                  explanation: "糖、冰和配料都是便宜的变量，真正值钱的是那份「为你而定」的感觉。",
+                },
+                {
+                  id: "q_l3_2",
+                  kind: "single",
+                  prompt: "一家店的毛利主要被什么占掉？",
+                  options: [
+                    "租金、人力和冷藏",
+                    "茶叶",
+                    "木薯珍珠",
+                    "塑料杯",
+                  ],
+                  answer: [0],
+                  explanation: "每杯的原料都很便宜，贵的是那个位置和那些人。",
+                },
+                {
+                  id: "q_l3_3",
+                  kind: "single",
+                  prompt: "看得见的队伍对一家店有什么用？",
+                  options: [
+                    "传递人气，并制造一个拍照的时刻",
+                    "降低原料成本",
+                    "让饮料更冰",
+                    "缩短员工培训时间",
+                  ],
+                  answer: [0],
+                  explanation: "队伍是社交证明，也是这杯饮料形象的一部分。",
                 },
               ],
             },

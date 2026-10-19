@@ -8,19 +8,16 @@ import { Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
-import { COURSE_STATUS_LABELS, listTaughtCourses } from "@/lib/teach";
+import { listTaughtCourses } from "@/lib/teach";
+import { EDITOR_STATUS_KEYS } from "@/lib/teach-editor";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = {
-  title: "Teaching",
-};
-
-const DATE_FORMAT = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("teach.metaTitle") };
+}
 
 type TeachPageProps = {
   searchParams: Promise<{ created?: string }>;
@@ -37,7 +34,7 @@ type TeachPageProps = {
 async function TeachContent({ searchParams }: TeachPageProps) {
   // Auth.js draws random bytes; keep it out of the prerender pass.
   await connection();
-  const session = await auth();
+  const [session, { locale, t }] = await Promise.all([auth(), getI18n()]);
   const user = session?.user;
 
   if (!user) {
@@ -55,6 +52,11 @@ async function TeachContent({ searchParams }: TeachPageProps) {
     searchParams,
   ]);
   const created = query.created?.trim() ?? "";
+  const dateFormat = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
   return (
     <div className="space-y-8">
@@ -62,12 +64,11 @@ async function TeachContent({ searchParams }: TeachPageProps) {
         <div className="space-y-2">
           <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-primary">
             <GraduationCap aria-hidden="true" className="size-3.5" />
-            Teaching
+            {t("teach.eyebrow")}
           </p>
-          <h1 className="text-2xl font-semibold">My courses</h1>
+          <h1 className="text-2xl font-semibold">{t("teach.title")}</h1>
           <p className="max-w-xl text-sm text-muted-foreground">
-            Every course you author. Generated courses start as drafts, so you
-            can review the blocks before anybody can enrol.
+            {t("teach.subtitle")}
           </p>
         </div>
 
@@ -76,42 +77,41 @@ async function TeachContent({ searchParams }: TeachPageProps) {
           href="/teach/courses/new"
         >
           <Sparkles aria-hidden="true" />
-          New course with AI
+          {t("teach.newCourse")}
         </Link>
       </header>
 
       {created.length === 0 ? null : (
         <p className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm">
-          <span className="font-medium">Saved “{created}” as a draft.</span>{" "}
-          <span className="text-muted-foreground">
-            Open its editor below to add blocks and publish it.
-          </span>
+          <span className="font-medium">
+            {t("teach.saved", { title: created })}
+          </span>{" "}
+          <span className="text-muted-foreground">{t("teach.savedHint")}</span>
         </p>
       )}
 
       <section aria-labelledby="courses-heading" className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-medium" id="courses-heading">
-            Authored courses
+            {t("teach.authored")}
           </h2>
           <p className="text-xs text-muted-foreground">
-            {courses.length} course{courses.length === 1 ? "" : "s"}
+            {t("teach.count", { count: courses.length })}
           </p>
         </div>
 
         {courses.length === 0 ? (
           <div className="rounded-xl px-4 py-10 text-center ring-1 ring-foreground/10">
-            <p className="text-sm font-medium">No courses yet</p>
+            <p className="text-sm font-medium">{t("teach.empty")}</p>
             <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-              Describe a topic and the wizard will plan an outline and write the
-              lessons, one block at a time.
+              {t("teach.emptyHint")}
             </p>
             <Link
               className={cn(buttonVariants({ variant: "outline" }), "mt-4 gap-1.5")}
               href="/teach/courses/new"
             >
               <Sparkles aria-hidden="true" />
-              Start the first one
+              {t("teach.emptyCta")}
             </Link>
           </div>
         ) : (
@@ -135,12 +135,12 @@ async function TeachContent({ searchParams }: TeachPageProps) {
                         <Badge
                           variant={isPublished ? "default" : "secondary"}
                         >
-                          {COURSE_STATUS_LABELS[course.status]}
+                          {t(EDITOR_STATUS_KEYS[course.status])}
                         </Badge>
                         <Badge variant="outline">
                           {course.source === "AI_GENERATED"
-                            ? "AI generated"
-                            : "Authored"}
+                            ? t("teach.badge.ai")
+                            : t("teach.badge.authored")}
                         </Badge>
                       </div>
 
@@ -150,15 +150,21 @@ async function TeachContent({ searchParams }: TeachPageProps) {
 
                       <p className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <span>
-                          {course.moduleCount} module
-                          {course.moduleCount === 1 ? "" : "s"}
+                          {t("editor.course.modulesCount", {
+                            count: course.moduleCount,
+                          })}
                         </span>
                         <span>
-                          {course.lessonCount} lesson
-                          {course.lessonCount === 1 ? "" : "s"}
+                          {t("editor.course.lessonsCount", {
+                            count: course.lessonCount,
+                          })}
                         </span>
                         <span>{course.difficulty}</span>
-                        <span>Updated {DATE_FORMAT.format(course.updatedAt)}</span>
+                        <span>
+                          {t("teach.updated", {
+                            date: dateFormat.format(course.updatedAt),
+                          })}
+                        </span>
                       </p>
                     </div>
 
@@ -168,7 +174,7 @@ async function TeachContent({ searchParams }: TeachPageProps) {
                           className="text-xs font-medium text-primary hover:underline"
                           href={`/teach/courses/${course.id}/edit`}
                         >
-                          Edit course
+                          {t("teach.edit")}
                         </Link>
                         <span
                           aria-hidden="true"
@@ -180,7 +186,7 @@ async function TeachContent({ searchParams }: TeachPageProps) {
                           className="text-xs text-muted-foreground hover:text-foreground hover:underline"
                           href={`/teach/courses/${course.id}/students`}
                         >
-                          Students
+                          {t("teach.students")}
                         </Link>
                         <span
                           aria-hidden="true"
@@ -192,7 +198,7 @@ async function TeachContent({ searchParams }: TeachPageProps) {
                           className="text-xs text-muted-foreground hover:text-foreground hover:underline"
                           href={`/teach/courses/${course.id}/insights`}
                         >
-                          Insights
+                          {t("teach.insights")}
                         </Link>
                       </div>
                       {isPublished ? (
@@ -200,11 +206,11 @@ async function TeachContent({ searchParams }: TeachPageProps) {
                           className="text-xs text-muted-foreground hover:underline"
                           href={`/courses/${course.slug}`}
                         >
-                          View public page
+                          {t("teach.viewPublic")}
                         </Link>
                       ) : (
                         <span className="text-xs text-muted-foreground">
-                          Not in the catalog yet
+                          {t("teach.notPublic")}
                         </span>
                       )}
                     </div>

@@ -8,12 +8,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { auth } from "@/lib/auth";
 import { loadLearnerProfile } from "@/lib/profile";
 import { saveProfileAction } from "@/server/onboarding";
+import { getI18n } from "@/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Your learning profile",
-  description:
-    "Tell us about your background and goals so we can recommend where to start.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return {
+    title: t("onboarding.metaTitle"),
+    description: t("onboarding.metaDescription"),
+  };
+}
 
 type OnboardingPageProps = {
   searchParams: Promise<{ next?: string | string[] }>;

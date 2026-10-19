@@ -57,7 +57,8 @@ export type StudentInsight = CourseStudent & {
 
 export type BlockTypeSlice = {
   type: string;
-  label: string;
+  /** Dictionary key for the block type name; the chart translates it. */
+  labelKey: string;
   count: number;
 };
 
@@ -344,7 +345,7 @@ export async function loadCourseInsights(
   const blockMix = [...blockTypeTotals.keys()]
     .map((type) => ({
       type,
-      label: blockMetaFor(type).label,
+      labelKey: blockMetaFor(type).labelKey,
       count: blockTypeCounts.get(type) ?? 0,
     }))
     .filter((slice) => slice.count > 0)

@@ -7,11 +7,15 @@ import { AuthForm } from "@/components/auth-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { auth } from "@/lib/auth";
 import { loginAction } from "@/server/auth";
+import { getI18n } from "@/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Sign in",
-  description: "Sign in to your GenAI Learning account.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return {
+    title: t("auth.login.metaTitle"),
+    description: t("auth.login.metaDescription"),
+  };
+}
 
 /**
  * Reads the session cookie, so it is streamed behind a Suspense boundary under

@@ -12,6 +12,7 @@ import {
   signOut,
   verifyPassword,
 } from "@/lib/auth";
+import { getI18n } from "@/i18n/server";
 import { hasProfile } from "@/lib/profile";
 import { prisma } from "@/lib/prisma";
 
@@ -27,9 +28,6 @@ const registerSchema = z.object({
 });
 
 const DEFAULT_REDIRECT = "/dashboard";
-const INVALID_CREDENTIALS = "Invalid email or password.";
-const INVALID_REGISTRATION =
-  "Enter your name, a valid email, and a password of at least 8 characters.";
 
 /**
  * Only same-origin absolute paths may be used as a post-login destination,
@@ -54,6 +52,7 @@ async function startSession(
   redirectTo: string,
   needsOnboarding: boolean,
 ): Promise<AuthFormState> {
+  const { t } = await getI18n();
   const target = needsOnboarding
     ? `/onboarding?next=${encodeURIComponent(redirectTo)}`
     : redirectTo;
@@ -62,7 +61,7 @@ async function startSession(
     await signIn("credentials", { email, password, redirectTo: target });
   } catch (error: unknown) {
     if (error instanceof AuthError) {
-      return { error: INVALID_CREDENTIALS };
+      return { error: t("server.auth.invalidCredentials") };
     }
     // `signIn` signals a successful redirect by throwing; never swallow it.
     throw error;
@@ -75,20 +74,21 @@ export async function loginAction(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  const { t } = await getI18n();
   const parsed = credentialsSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
   });
 
   if (!parsed.success) {
-    return { error: INVALID_CREDENTIALS };
+    return { error: t("server.auth.invalidCredentials") };
   }
 
   const email = normaliseEmail(parsed.data.email);
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (user === null || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
-    return { error: INVALID_CREDENTIALS };
+    return { error: t("server.auth.invalidCredentials") };
   }
 
   await trackEvent("LOGIN", { userId: user.id });
@@ -106,6 +106,7 @@ export async function registerAction(
   _previous: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  const { t } = await getI18n();
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -113,7 +114,7 @@ export async function registerAction(
   });
 
   if (!parsed.success) {
-    return { error: INVALID_REGISTRATION };
+    return { error: t("server.auth.invalidRegistration") };
   }
 
   const email = normaliseEmail(parsed.data.email);
@@ -123,7 +124,7 @@ export async function registerAction(
   });
 
   if (existingUser !== null) {
-    return { error: "An account with this email already exists." };
+    return { error: t("auth.error.emailTaken") };
   }
 
   const passwordHash = await hashPassword(parsed.data.password);

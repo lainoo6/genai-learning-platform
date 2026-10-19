@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { encodeProfile, onboardingSchema } from "@/lib/profile";
 import { prisma } from "@/lib/prisma";
@@ -12,7 +13,6 @@ export type OnboardingState = {
 };
 
 const DEFAULT_REDIRECT = "/dashboard";
-const INVALID_PROFILE = "Choose your background and at least one goal.";
 
 /** Only same-origin absolute paths may be used as a post-onboarding target. */
 function safeRedirectTarget(value: FormDataEntryValue | null): string {
@@ -50,7 +50,8 @@ export async function saveProfileAction(
   });
 
   if (!parsed.success) {
-    return { error: INVALID_PROFILE };
+    const { t } = await getI18n();
+    return { error: t("server.onboarding.invalidProfile") };
   }
 
   const encoded = encodeProfile(parsed.data);

@@ -2,8 +2,10 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { type ModelMessage, streamText } from "ai";
 import { z } from "zod";
 
+import { getI18n } from "@/i18n/server";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
+import { contentLanguageFromLocale } from "@/lib/llm/language";
 import { isMockMode, llmModel, openaiApiKey } from "@/lib/llm/provider";
 import {
   mockTutorReply,
@@ -64,12 +66,14 @@ function chunkedTextResponse(text: string): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const { locale, t } = await getI18n();
+  const language = contentLanguageFromLocale(locale);
   const body: unknown = await request.json().catch(() => null);
   const parsed = requestSchema.safeParse(body);
 
   if (!parsed.success) {
     return Response.json(
-      { error: "Send a lesson id and a message." },
+      { error: t("server.tutor.invalidRequest") },
       { status: 400, headers: NO_STORE },
     );
   }
@@ -78,18 +82,20 @@ export async function POST(request: Request): Promise<Response> {
   const userId = session?.user?.id;
   if (userId === undefined) {
     return Response.json(
-      { error: "Sign in to use the tutor." },
+      { error: t("server.tutor.signIn") },
       { status: 401, headers: NO_STORE },
     );
   }
 
-  const context = await loadTutorLessonContext(userId, parsed.data.lessonId);
-  if (context === null) {
+  const loaded = await loadTutorLessonContext(userId, parsed.data.lessonId);
+  if (loaded === null) {
     return Response.json(
-      { error: "Lesson not found." },
+      { error: t("server.tutor.lessonNotFound") },
       { status: 404, headers: NO_STORE },
     );
   }
+
+  const context = { ...loaded, language };
 
   const sessionId = await resolveTutorSession(
     userId,

@@ -5,6 +5,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useT } from "@/i18n/client";
 import {
   AUDIENCES,
   AUTHORING_DIFFICULTIES,
@@ -26,10 +27,16 @@ import type { CourseFormValues } from "./wizard-types";
 const SELECT_CLASS =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50";
 
-const DIFFICULTY_LABELS: Record<AuthoringDifficulty, string> = {
-  beginner: "Beginner",
-  intermediate: "Intermediate",
-  advanced: "Advanced",
+const DIFFICULTY_KEYS: Record<AuthoringDifficulty, string> = {
+  beginner: "courses.difficulty.beginner",
+  intermediate: "courses.difficulty.intermediate",
+  advanced: "courses.difficulty.advanced",
+};
+
+const AUDIENCE_KEYS: Record<Audience, string> = {
+  "Non-CS learners": "wizard.audience.nonCs",
+  "CS students": "wizard.audience.cs",
+  "All learners": "wizard.audience.all",
 };
 
 const LESSON_COUNTS = Array.from(
@@ -47,6 +54,7 @@ export type CourseBasicsFormProps = {
 
 export function CourseBasicsForm(props: CourseBasicsFormProps) {
   const { value, onChange, onSubmit, isGenerating, error } = props;
+  const t = useT();
 
   function patch(changes: Partial<CourseFormValues>): void {
     onChange({ ...value, ...changes });
@@ -59,7 +67,7 @@ export function CourseBasicsForm(props: CourseBasicsFormProps) {
       <div className="space-y-4 px-4 py-5 sm:px-5">
         <div className="space-y-1.5">
           <label className="text-sm font-medium" htmlFor="wizard-topic">
-            What is the course about?
+            {t("wizard.topic")}
           </label>
           <Input
             disabled={isGenerating}
@@ -68,19 +76,18 @@ export function CourseBasicsForm(props: CourseBasicsFormProps) {
             onChange={(event) => {
               patch({ topic: event.target.value });
             }}
-            placeholder="Introduction to Git for beginners"
+            placeholder={t("wizard.topicPlaceholder")}
             value={value.topic}
           />
           <p className="text-xs text-muted-foreground">
-            A topic and a level is enough. The outline is planned first, and you
-            edit it before any lesson is written.
+            {t("wizard.topicHint")}
           </p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="wizard-audience">
-              Audience
+              {t("wizard.audience")}
             </label>
             <select
               className={SELECT_CLASS}
@@ -93,7 +100,7 @@ export function CourseBasicsForm(props: CourseBasicsFormProps) {
             >
               {AUDIENCES.map((audience) => (
                 <option key={audience} value={audience}>
-                  {audience}
+                  {t(AUDIENCE_KEYS[audience])}
                 </option>
               ))}
             </select>
@@ -101,7 +108,7 @@ export function CourseBasicsForm(props: CourseBasicsFormProps) {
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="wizard-difficulty">
-              Difficulty
+              {t("wizard.difficulty")}
             </label>
             <select
               className={SELECT_CLASS}
@@ -114,7 +121,7 @@ export function CourseBasicsForm(props: CourseBasicsFormProps) {
             >
               {AUTHORING_DIFFICULTIES.map((difficulty) => (
                 <option key={difficulty} value={difficulty}>
-                  {DIFFICULTY_LABELS[difficulty]}
+                  {t(DIFFICULTY_KEYS[difficulty])}
                 </option>
               ))}
             </select>
@@ -122,7 +129,7 @@ export function CourseBasicsForm(props: CourseBasicsFormProps) {
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="wizard-lessons">
-              Lessons
+              {t("wizard.lessons")}
             </label>
             <select
               className={SELECT_CLASS}
@@ -135,7 +142,7 @@ export function CourseBasicsForm(props: CourseBasicsFormProps) {
             >
               {LESSON_COUNTS.map((count) => (
                 <option key={count} value={count}>
-                  {count} lessons
+                  {t("wizard.lessonsOption", { count })}
                 </option>
               ))}
             </select>
@@ -144,8 +151,10 @@ export function CourseBasicsForm(props: CourseBasicsFormProps) {
 
         <div className="space-y-1.5">
           <label className="text-sm font-medium" htmlFor="wizard-notes">
-            Anything specific?{" "}
-            <span className="font-normal text-muted-foreground">(optional)</span>
+            {t("wizard.notes")}{" "}
+            <span className="font-normal text-muted-foreground">
+              {t("generate.form.optional")}
+            </span>
           </label>
           <Textarea
             disabled={isGenerating}
@@ -154,7 +163,7 @@ export function CourseBasicsForm(props: CourseBasicsFormProps) {
             onChange={(event) => {
               patch({ notes: event.target.value });
             }}
-            placeholder="Use short paragraphs, assume the reader has never used a terminal, and include one exercise per lesson."
+            placeholder={t("wizard.notesPlaceholder")}
             rows={3}
             value={value.notes}
           />
@@ -179,18 +188,17 @@ export function CourseBasicsForm(props: CourseBasicsFormProps) {
             {isGenerating ? (
               <>
                 <Loader2 aria-hidden="true" className="animate-spin" />
-                Planning the outline…
+                {t("wizard.planning")}
               </>
             ) : (
               <>
                 <Sparkles aria-hidden="true" />
-                Generate outline
+                {t("wizard.generateOutline")}
               </>
             )}
           </Button>
           <p className="text-xs text-muted-foreground">
-            Nothing is saved until you review the lessons and press “Save as
-            draft”.
+            {t("wizard.nothingSaved")}
           </p>
         </div>
       </div>

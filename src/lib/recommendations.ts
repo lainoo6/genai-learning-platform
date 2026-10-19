@@ -1,9 +1,6 @@
-import {
-  BACKGROUND_LABELS,
-  GOAL_LABELS,
-  type Goal,
-  type LearnerProfile,
-} from "@/lib/profile";
+import { englishT } from "@/i18n/english";
+import type { Translator } from "@/i18n/translate";
+import { GOAL_LABEL_KEYS, type Goal, type LearnerProfile } from "@/lib/profile";
 
 /**
  * Rule-based course recommendation (P4.2).
@@ -84,28 +81,35 @@ function slugForGoals(profile: LearnerProfile): string {
 }
 
 /** One sentence explaining why a course was picked. */
-function reasonFor(course: CourseSummary, profile: LearnerProfile | null): string {
+function reasonFor(
+  course: CourseSummary,
+  profile: LearnerProfile | null,
+  t: Translator,
+): string {
   if (profile === null) {
-    return `Answer the short profile questionnaire and this pick becomes yours. Until then, “${course.title}” is the safest place to start.`;
+    return t("dashboard.recommend.reason.noProfile", { title: course.title });
   }
 
   switch (profile.background) {
     case "NON_CS":
-      return `You are ${BACKGROUND_LABELS.NON_CS.toLowerCase()}, so start with “${course.title}”: it explains how software gets built without assuming any code.`;
+      return t("dashboard.recommend.reason.nonCs", { title: course.title });
     case "CS_STUDENT":
-      return `You are a ${BACKGROUND_LABELS.CS_STUDENT.toLowerCase()}, so “${course.title}” turns what you already know into AI-assisted practice.`;
+      return t("dashboard.recommend.reason.csStudent", { title: course.title });
     default: {
-      const goalLabel = primaryGoalLabel(profile);
-      return `You want to ${goalLabel.toLowerCase()}, so “${course.title}” is the closest match in the catalog.`;
+      const goalLabel = primaryGoalLabel(profile, t);
+      return t("dashboard.recommend.reason.goal", {
+        title: course.title,
+        goal: goalLabel.toLowerCase(),
+      });
     }
   }
 }
 
 /** The goal to quote in the reason: first checkbox, else free text, else a default. */
-function primaryGoalLabel(profile: LearnerProfile): string {
+function primaryGoalLabel(profile: LearnerProfile, t: Translator): string {
   const firstGoal = profile.goals[0];
   if (firstGoal !== undefined) {
-    return GOAL_LABELS[firstGoal];
+    return t(GOAL_LABEL_KEYS[firstGoal]);
   }
 
   const statement = profile.statement.trim();
@@ -113,7 +117,7 @@ function primaryGoalLabel(profile: LearnerProfile): string {
     return statement.length > 60 ? `${statement.slice(0, 60)}…` : statement;
   }
 
-  return "Learn something new";
+  return t("dashboard.recommend.goalFallback");
 }
 
 /**
@@ -124,6 +128,8 @@ function primaryGoalLabel(profile: LearnerProfile): string {
 export function recommendCourse(
   courses: ReadonlyArray<CourseSummary>,
   profile: LearnerProfile | null,
+  /** Request-bound translator; defaults to English for tests and scripts. */
+  t: Translator = englishT,
 ): Recommendation | null {
   const [firstCourse] = courses;
   if (firstCourse === undefined) {
@@ -141,5 +147,5 @@ export function recommendCourse(
       : courses.find((course) => course.slug === slugForGoals(profile));
   const course = bySlug ?? byGoals ?? firstCourse;
 
-  return { course, reason: reasonFor(course, profile) };
+  return { course, reason: reasonFor(course, profile, t) };
 }

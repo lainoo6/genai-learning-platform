@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import type { RoleplayBlock } from "@/lib/blocks/schema";
+import {
+  CONTENT_LANGUAGE_LABEL,
+  contentLanguageLine,
+  readContentLanguage,
+  type ContentLanguage,
+} from "@/lib/llm/language";
 import { mockText } from "@/lib/llm/mock";
 
 /**
@@ -29,7 +35,10 @@ export type RoleplayTurn = z.infer<typeof roleplayTurnSchema>;
 export const ROLEPLAY_MAX_TRANSCRIPT = 40;
 
 /** In-character system prompt: persona + room + what the learner is after. */
-export function roleplaySystemPrompt(block: RoleplayBlock): string {
+export function roleplaySystemPrompt(
+  block: RoleplayBlock,
+  language: ContentLanguage = "en",
+): string {
   const { persona, scenario, goal } = block.payload;
 
   return [
@@ -45,6 +54,7 @@ export function roleplaySystemPrompt(block: RoleplayBlock): string {
     "- Do not coach, grade or explain the exercise while it is running.",
     "- Push the conversation forward with a question or a realistic objection.",
     "- If the learner asks something outside the scenario, answer briefly in character.",
+    `- Speak in ${CONTENT_LANGUAGE_LABEL[language]}, whatever language the learner uses.`,
   ].join("\n");
 }
 
@@ -78,6 +88,7 @@ function transcriptLines(transcript: RoleplayTurn[]): string[] {
 export function roleplayFeedbackPrompt(
   block: RoleplayBlock,
   transcript: RoleplayTurn[],
+  language: ContentLanguage = "en",
 ): string {
   const { scenario, persona, goal, rubric } = block.payload;
 
@@ -87,17 +98,19 @@ export function roleplayFeedbackPrompt(
     `Scenario: ${scenario}`,
     `Character the model played: ${persona}`,
     `The learner's goal: ${goal}`,
+    contentLanguageLine(language),
     "",
-    "Rubric (score each criterion from 1 to 5):",
+    language === "zh" ? "评分标准（每项 1 到 5 分）：" : "Rubric (score each criterion from 1 to 5):",
     ...rubric.map((criterion) => `- ${criterion}`),
     "",
-    "Transcript:",
+    language === "zh" ? "对话记录：" : "Transcript:",
     ...transcriptLines(transcript),
     "",
     "Task: return one entry per rubric criterion, in the rubric's order, quoting the",
     "criterion as `criterion`. Give a 1-5 integer score and a comment that names",
     "something the learner actually said (or failed to say). Then write one overall",
-    "suggestion they could act on in the next attempt.",
+    `suggestion they could act on in the next attempt. Write every comment and the`,
+    `suggestion in ${CONTENT_LANGUAGE_LABEL[language]}.`,
     "",
     'Reply with a single JSON object: { "criteria": [{ "criterion": string, "score": number, "comment": string }], "suggestion": string }.',
   ].join("\n");
@@ -110,6 +123,17 @@ export function roleplayFeedbackPrompt(
  * conversation: each one probes for evidence, so the mock still behaves like a
  * partner in a conversation rather than a wall of text.
  */
+const MOCK_LINES_ZH: readonly string[] = [
+  "谢谢你开始。先用一句话说说你第一步会怎么做。",
+  "这是一个角度。是什么让你对这个判断有信心？",
+  "举一个你真的这么做的例子——当时发生了什么？",
+  "如果对方不同意你，你会怎么调整？",
+  "我还没被说服。什么样的证据能改变我的看法？",
+  "如果只能保留一半，你会留下哪一半？",
+  "事后你怎么判断它有没有奏效？",
+  "好。结束之前，你有什么想问我的吗？",
+];
+
 const MOCK_LINES: readonly string[] = [
   "Thanks for starting. Give me the short version of what you would do first.",
   "That is one angle. What makes you confident about it?",
@@ -122,9 +146,13 @@ const MOCK_LINES: readonly string[] = [
 ];
 
 /** Canned in-character reply, rotating through `MOCK_LINES`. */
-export function mockRoleplayReply(assistantTurns: number): string {
-  const index = Math.abs(assistantTurns) % MOCK_LINES.length;
-  return mockText(MOCK_LINES[index] ?? MOCK_LINES[0]);
+export function mockRoleplayReply(
+  assistantTurns: number,
+  language: ContentLanguage = "en",
+): string {
+  const lines = language === "zh" ? MOCK_LINES_ZH : MOCK_LINES;
+  const index = Math.abs(assistantTurns) % lines.length;
+  return mockText(lines[index] ?? lines[0]);
 }
 
 /** Reads the `- ...` bullets that follow a section heading. */
@@ -154,7 +182,25 @@ function readBullets(prompt: string, heading: string): string[] {
  * rubric rather than a generic checklist.
  */
 export function mockRoleplayFeedback(prompt: string): unknown {
-  const rubric = readBullets(prompt, "Rubric");
+  const chinese = readContentLanguage(prompt) === "zh";
+  const rubric = readBullets(prompt, chinese ? "评分标准" : "Rubric");
+
+  if (chinese) {
+    const lines = rubric.length > 0 ? rubric : ["参与了这场对话"];
+    return {
+      criteria: lines.map((criterion, index) => ({
+        criterion,
+        score: index % 2 === 0 ? 4 : 3,
+        comment: mockText(
+          `你在这场对话里回应了「${criterion}」，不过答案可以落在一个具体的时刻上，而不只是笼统的描述。`,
+        ),
+      })),
+      suggestion: mockText(
+        "挑出得分最低的两条标准，各练一句话：当时的情形、你实际说了什么、之后有什么变化。真实的对话奖励的正是这些。",
+      ),
+    };
+  }
+
   const criteria = (rubric.length > 0 ? rubric : ["Contributed to the conversation"]).map(
     (criterion, index) => ({
       criterion,

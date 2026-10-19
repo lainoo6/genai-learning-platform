@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import type { BlockType } from "@/lib/blocks/schema";
+import {
+  CONTENT_LANGUAGE_LABEL,
+  contentLanguageLine,
+  readContentLanguage,
+  type ContentLanguage,
+} from "@/lib/llm/language";
 
 /**
  * Course outline generation for the instructor wizard (P4.6).
@@ -105,6 +111,8 @@ export type OutlineRequest = {
   lessonCount: number;
   /** Free-text requirements from the author; may be empty. */
   notes: string;
+  /** Language of the generated content; defaults to English. */
+  language?: ContentLanguage;
 };
 
 /**
@@ -119,6 +127,7 @@ export function courseOutlinePrompt(request: OutlineRequest): string {
     request.notes.trim().length === 0
       ? "None."
       : request.notes.trim();
+  const language = request.language ?? "en";
 
   return [
     "You are an instructional designer planning a short interactive course for",
@@ -128,6 +137,7 @@ export function courseOutlinePrompt(request: OutlineRequest): string {
     `Topic: ${request.topic}`,
     `Audience: ${request.audience}`,
     `Difficulty: ${request.difficulty}`,
+    contentLanguageLine(language),
     `Requested length: exactly ${request.lessonCount} lessons in total.`,
     "Author's notes:",
     notes,
@@ -147,6 +157,7 @@ export function courseOutlinePrompt(request: OutlineRequest): string {
     "- Always include \"reading\" and \"quiz\". Add interactive blocks only when",
     "  they fit the content: coding for programming, roleplay for interviews and",
     "  soft skills, simulation for decisions, game or flashcards for recall.",
+    `- Write every title, summary and description in ${CONTENT_LANGUAGE_LABEL[language]}.`,
     "- Do not use emoji. Do not wrap the reply in code fences.",
     "",
     "Reply with one JSON object of this exact shape:",
@@ -163,7 +174,11 @@ export function courseOutlinePrompt(request: OutlineRequest): string {
  * the task's acceptance run uses — so the wizard's four steps can be walked
  * end to end without a key.
  */
-export function mockCourseOutline(): unknown {
+export function mockCourseOutline(prompt = ""): unknown {
+  if (readContentLanguage(prompt) === "zh") {
+    return mockChineseOutline();
+  }
+
   return {
     title: "Introduction to Git for beginners",
     description:
@@ -193,6 +208,49 @@ export function mockCourseOutline(): unknown {
             summary:
               "Create a branch, switch between branches and merge work back, "
               + "including what a conflict actually is and why it happens.",
+            suggestedBlocks: ["reading", "game", "quiz"],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * Chinese demo outline used when the interface language is Chinese.
+ *
+ * It mirrors `mockCourseOutline`, so the wizard's four steps can be walked end
+ * to end in Chinese as well, without an API key.
+ */
+function mockChineseOutline(): unknown {
+  return {
+    title: "Git 入门（面向初学者）",
+    description:
+      "一门短小、以动手为主的 Git 版本控制入门课：项目为什么需要历史记录、"
+      + "一次提交是如何形成的，以及分支如何让你在不破坏可用代码的前提下做实验。",
+    modules: [
+      {
+        title: "项目的历史",
+        lessons: [
+          {
+            title: "为什么需要版本控制",
+            summary:
+              "解释 Git 要解决的问题：项目需要记录改了什么、何时改的、为什么改，"
+              + "这样工作才能被安全地回退与共享。",
+            suggestedBlocks: ["reading", "slides", "quiz"],
+          },
+          {
+            title: "完成你的第一次提交",
+            summary:
+              "追踪一次改动从工作区经过暂存区进入提交的全过程，"
+              + "并读懂由此产生的历史记录。",
+            suggestedBlocks: ["reading", "flashcards", "quiz"],
+          },
+          {
+            title: "不再害怕分支",
+            summary:
+              "创建分支、在分支之间切换并合并工作，"
+              + "理解冲突究竟是什么，以及它为什么会发生。",
             suggestedBlocks: ["reading", "game", "quiz"],
           },
         ],

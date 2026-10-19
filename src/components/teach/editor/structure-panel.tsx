@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Layers, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/i18n/client";
 import type { EditorCourse } from "@/lib/teach-editor";
 import { cn } from "@/lib/utils";
 
@@ -46,15 +47,22 @@ export function StructurePanel(props: StructurePanelProps) {
     onRequestDeleteLesson,
   } = props;
 
+  const t = useT();
+
   return (
     <aside className="space-y-3 self-start rounded-xl p-3 ring-1 ring-foreground/10">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Course outline
+          {t("editor.structure.outline")}
         </p>
-        <Button onClick={onAddModule} size="icon-xs" title="Add module" variant="ghost">
+        <Button
+          onClick={onAddModule}
+          size="icon-xs"
+          title={t("editor.structure.addModule")}
+          variant="ghost"
+        >
           <Plus aria-hidden="true" />
-          <span className="sr-only">Add module</span>
+          <span className="sr-only">{t("editor.structure.addModule")}</span>
         </Button>
       </div>
 
@@ -65,11 +73,13 @@ export function StructurePanel(props: StructurePanelProps) {
           <section className="space-y-1.5" key={courseModule.id}>
             <div className="flex items-center justify-between gap-1">
               <p className="text-[11px] font-medium text-muted-foreground">
-                Module {moduleIndex + 1}
+                {t("editor.structure.moduleNumber", { index: moduleIndex + 1 })}
               </p>
               <div className="flex items-center">
                 <Button
-                  aria-label={`Move module ${String(moduleIndex + 1)} up`}
+                  aria-label={t("editor.structure.moveModuleUp", {
+                    index: moduleIndex + 1,
+                  })}
                   disabled={moduleIndex === 0}
                   onClick={() => {
                     onMoveModule(moduleIndex, -1);
@@ -80,7 +90,9 @@ export function StructurePanel(props: StructurePanelProps) {
                   <ArrowUp aria-hidden="true" />
                 </Button>
                 <Button
-                  aria-label={`Move module ${String(moduleIndex + 1)} down`}
+                  aria-label={t("editor.structure.moveModuleDown", {
+                    index: moduleIndex + 1,
+                  })}
                   disabled={moduleIndex === course.modules.length - 1}
                   onClick={() => {
                     onMoveModule(moduleIndex, 1);
@@ -91,7 +103,9 @@ export function StructurePanel(props: StructurePanelProps) {
                   <ArrowDown aria-hidden="true" />
                 </Button>
                 <Button
-                  aria-label={`Delete module ${String(moduleIndex + 1)}`}
+                  aria-label={t("editor.structure.deleteModule", {
+                    index: moduleIndex + 1,
+                  })}
                   disabled={course.modules.length <= 1}
                   onClick={() => {
                     onRequestDeleteModule(courseModule.id, courseModule.title);
@@ -105,7 +119,9 @@ export function StructurePanel(props: StructurePanelProps) {
             </div>
 
             <Input
-              aria-label={`Title of module ${String(moduleIndex + 1)}`}
+              aria-label={t("editor.structure.moduleTitleAria", {
+                index: moduleIndex + 1,
+              })}
               className="h-7 text-xs font-medium"
               onChange={(event) => {
                 onRenameModule(courseModule.id, event.target.value);
@@ -144,7 +160,9 @@ export function StructurePanel(props: StructurePanelProps) {
                         type="button"
                       >
                         <span className="tabular-nums">{lessonIndex + 1}.</span>{" "}
-                        {lesson.title.trim().length === 0 ? "Untitled" : lesson.title}
+                        {lesson.title.trim().length === 0
+                          ? t("editor.structure.untitled")
+                          : lesson.title}
                         <span className="ml-1 text-[10px] text-muted-foreground/70">
                           · {lesson.blocks.length}
                         </span>
@@ -156,7 +174,9 @@ export function StructurePanel(props: StructurePanelProps) {
                       </button>
 
                       <Button
-                        aria-label={`Move lesson ${String(lessonIndex + 1)} up`}
+                        aria-label={t("editor.structure.moveLessonUp", {
+                          index: lessonIndex + 1,
+                        })}
                         disabled={lessonIndex === 0}
                         onClick={() => {
                           onMoveLesson(courseModule.id, lessonIndex, -1);
@@ -167,7 +187,9 @@ export function StructurePanel(props: StructurePanelProps) {
                         <ArrowUp aria-hidden="true" />
                       </Button>
                       <Button
-                        aria-label={`Move lesson ${String(lessonIndex + 1)} down`}
+                        aria-label={t("editor.structure.moveLessonDown", {
+                          index: lessonIndex + 1,
+                        })}
                         disabled={lessonIndex === courseModule.lessons.length - 1}
                         onClick={() => {
                           onMoveLesson(courseModule.id, lessonIndex, 1);
@@ -178,7 +200,9 @@ export function StructurePanel(props: StructurePanelProps) {
                         <ArrowDown aria-hidden="true" />
                       </Button>
                       <Button
-                        aria-label={`Delete lesson ${String(lessonIndex + 1)}`}
+                        aria-label={t("editor.structure.deleteLesson", {
+                          index: lessonIndex + 1,
+                        })}
                         disabled={courseModule.lessons.length <= 1}
                         onClick={() => {
                           onRequestDeleteLesson(lesson.id, lesson.title);
@@ -203,7 +227,7 @@ export function StructurePanel(props: StructurePanelProps) {
               variant="ghost"
             >
               <Plus aria-hidden="true" />
-              Add lesson
+              {t("editor.structure.addLesson")}
             </Button>
           </section>
         );
@@ -211,8 +235,7 @@ export function StructurePanel(props: StructurePanelProps) {
 
       <p className="flex items-start gap-1.5 border-t pt-2 text-[11px] text-muted-foreground">
         <Layers aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
-        Lessons keep their progress when you move them; deleting a lesson
-        removes it when you save.
+        {t("editor.structure.hint")}
       </p>
     </aside>
   );

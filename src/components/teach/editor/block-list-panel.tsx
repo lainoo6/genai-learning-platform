@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/i18n/client";
 import { blockMetaFor } from "@/lib/blocks/meta";
 import type { BlockType } from "@/lib/blocks/schema";
 import type { EditorLesson } from "@/lib/teach-editor";
@@ -64,14 +65,15 @@ export function BlockListPanel(props: BlockListPanelProps) {
     onAddBlock,
   } = props;
 
+  const t = useT();
   const [pickerOpen, setPickerOpen] = useState(false);
 
   if (lesson === null) {
     return (
       <section className="rounded-xl p-4 ring-1 ring-foreground/10">
-        <p className="text-sm font-medium">No lesson selected</p>
+        <p className="text-sm font-medium">{t("editor.lesson.none")}</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pick a lesson on the left, or add one, to edit its blocks.
+          {t("editor.lesson.noneHint")}
         </p>
       </section>
     );
@@ -82,27 +84,27 @@ export function BlockListPanel(props: BlockListPanelProps) {
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Lesson content
+            {t("editor.lesson.content")}
           </p>
           <Badge variant="secondary">
-            {lesson.blocks.length} block{lesson.blocks.length === 1 ? "" : "s"}
+            {t("editor.blocks.count", { count: lesson.blocks.length })}
           </Badge>
         </div>
 
         <Input
-          aria-label="Lesson title"
+          aria-label={t("editor.lesson.titleAria")}
           className="h-8 font-medium"
           onChange={(event) => {
             onRenameLesson(event.target.value);
           }}
-          placeholder="Lesson title"
+          placeholder={t("editor.lesson.titlePlaceholder")}
           value={lesson.title}
         />
 
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          Estimated
+          {t("editor.lesson.estimated")}
           <Input
-            aria-label="Estimated minutes"
+            aria-label={t("editor.lesson.minutesAria")}
             className="h-7 w-16"
             min={1}
             onChange={(event) => {
@@ -112,16 +114,14 @@ export function BlockListPanel(props: BlockListPanelProps) {
             type="number"
             value={lesson.estimatedMinutes}
           />
-          minutes
+          {t("editor.lesson.minutes")}
         </label>
       </div>
 
       {lesson.droppedBlocks > 0 ? (
         <p className="flex items-start gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-800">
           <TriangleAlert aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-          {lesson.droppedBlocks} stored block
-          {lesson.droppedBlocks === 1 ? "" : "s"} no longer match the block
-          schema and could not be loaded. Saving this lesson replaces them.
+          {t("editor.lesson.dropped", { count: lesson.droppedBlocks })}
         </p>
       ) : null}
 
@@ -136,9 +136,9 @@ export function BlockListPanel(props: BlockListPanelProps) {
 
       {lesson.blocks.length === 0 ? (
         <div className="rounded-lg border border-dashed px-3 py-6 text-center">
-          <p className="text-xs font-medium">No blocks yet</p>
+          <p className="text-xs font-medium">{t("editor.blocks.none")}</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            Add a reading, a quiz, or any of the seven other activity types.
+            {t("editor.blocks.noneHint")}
           </p>
         </div>
       ) : (
@@ -174,17 +174,17 @@ export function BlockListPanel(props: BlockListPanelProps) {
                     >
                       <span className="block truncate text-xs font-medium">
                         {block.title.trim().length === 0
-                          ? "Untitled block"
+                          ? t("editor.blocks.untitled")
                           : block.title}
                       </span>
                       <span className="block text-[10px] text-muted-foreground">
-                        {meta.label}
+                        {t(meta.labelKey)}
                       </span>
                     </button>
 
                     <div className="flex shrink-0 items-center">
                       <Button
-                        aria-label={`Move block ${String(index + 1)} up`}
+                        aria-label={t("editor.blocks.moveUp", { index: index + 1 })}
                         disabled={index === 0}
                         onClick={() => {
                           onMoveBlock(index, -1);
@@ -195,7 +195,7 @@ export function BlockListPanel(props: BlockListPanelProps) {
                         <ArrowUp aria-hidden="true" />
                       </Button>
                       <Button
-                        aria-label={`Move block ${String(index + 1)} down`}
+                        aria-label={t("editor.blocks.moveDown", { index: index + 1 })}
                         disabled={index === lesson.blocks.length - 1}
                         onClick={() => {
                           onMoveBlock(index, 1);
@@ -206,7 +206,9 @@ export function BlockListPanel(props: BlockListPanelProps) {
                         <ArrowDown aria-hidden="true" />
                       </Button>
                       <Button
-                        aria-label={`Duplicate block ${String(index + 1)}`}
+                        aria-label={t("editor.blocks.duplicate", {
+                          index: index + 1,
+                        })}
                         onClick={() => {
                           onDuplicateBlock(block.id);
                         }}
@@ -216,7 +218,7 @@ export function BlockListPanel(props: BlockListPanelProps) {
                         <Copy aria-hidden="true" />
                       </Button>
                       <Button
-                        aria-label={`Delete block ${String(index + 1)}`}
+                        aria-label={t("editor.blocks.delete", { index: index + 1 })}
                         onClick={() => {
                           onDeleteBlock(block.id);
                         }}
@@ -252,16 +254,15 @@ export function BlockListPanel(props: BlockListPanelProps) {
         variant="outline"
       >
         <Plus aria-hidden="true" />
-        Add block
+        {t("editor.blocks.add")}
       </Button>
 
       <Dialog onOpenChange={setPickerOpen} open={pickerOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add a block</DialogTitle>
+            <DialogTitle>{t("editor.blocks.pickerTitle")}</DialogTitle>
             <DialogDescription>
-              Pick an activity. It is added at the end of “{lesson.title}” and
-              can be moved afterwards.
+              {t("editor.blocks.pickerDescription", { lesson: lesson.title })}
             </DialogDescription>
           </DialogHeader>
 
@@ -282,9 +283,11 @@ export function BlockListPanel(props: BlockListPanelProps) {
                 >
                   <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                   <span className="min-w-0">
-                    <span className="block text-xs font-medium">{info.label}</span>
+                    <span className="block text-xs font-medium">
+                      {t(info.labelKey)}
+                    </span>
                     <span className="block text-[11px] text-muted-foreground">
-                      {info.description}
+                      {t(info.descriptionKey)}
                     </span>
                   </span>
                 </button>

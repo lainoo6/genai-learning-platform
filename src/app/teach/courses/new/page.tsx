@@ -7,10 +7,12 @@ import { CourseWizard } from "@/components/teach/course-wizard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { auth } from "@/lib/auth";
 import { isMockMode } from "@/lib/llm/provider";
+import { getI18n } from "@/i18n/server";
 
-export const metadata: Metadata = {
-  title: "New course",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("courseNew.metaTitle") };
+}
 
 /**
  * Hosts the four-step wizard (P4.6).

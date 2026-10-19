@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { getI18n } from "@/i18n/server";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
 import { firstLesson, getCourseById } from "@/lib/courses";
@@ -26,14 +27,15 @@ const enrollSchema = z.object({
  * behaves like pressing Continue.
  */
 export async function enroll(courseId: string): Promise<EnrollResult> {
+  const { t } = await getI18n();
   const parsedInput = enrollSchema.safeParse({ courseId });
   if (!parsedInput.success) {
-    return { ok: false, error: "Invalid course." };
+    return { ok: false, error: t("server.course.invalid") };
   }
 
   const course = await getCourseById(courseId);
   if (course === null) {
-    return { ok: false, error: "Course not found." };
+    return { ok: false, error: t("server.course.notFound") };
   }
 
   const session = await auth();
@@ -41,18 +43,18 @@ export async function enroll(courseId: string): Promise<EnrollResult> {
   if (userId === undefined) {
     return {
       ok: false,
-      error: "Sign in to enroll in this course.",
+      error: t("server.course.signInToEnroll"),
       loginUrl: `/login?callbackUrl=${encodeURIComponent(`/courses/${course.slug}`)}`,
     };
   }
 
   if (course.status !== "PUBLISHED") {
-    return { ok: false, error: "This course is not open for enrollment." };
+    return { ok: false, error: t("server.course.notOpen") };
   }
 
   const lesson = firstLesson(course);
   if (lesson === undefined) {
-    return { ok: false, error: "This course has no lessons yet." };
+    return { ok: false, error: t("server.course.noLessons") };
   }
 
   try {
@@ -63,7 +65,7 @@ export async function enroll(courseId: string): Promise<EnrollResult> {
       && error.code === "P2002";
     if (!isDuplicate) {
       console.error("[enroll] failed", error);
-      return { ok: false, error: "Could not enroll. Please try again." };
+      return { ok: false, error: t("server.course.enrollFailed") };
     }
   }
 

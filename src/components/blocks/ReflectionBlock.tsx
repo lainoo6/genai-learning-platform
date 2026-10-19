@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useT } from "@/i18n/client";
 import type {
   BlockRenderProps,
   ReflectionBlock as ReflectionBlockData,
@@ -17,12 +18,23 @@ import type {
  * button. The text itself stays local (nothing to score or persist beyond the
  * completion record); AI feedback on top of it is an AI-phase feature.
  */
+const CJK_CHARACTER = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/g;
+
+/**
+ * Length of a reflection, counted the way the language is written: Chinese has
+ * no spaces between words, so each CJK character counts as one unit and the
+ * remaining text is split on whitespace.
+ */
 function countWords(text: string): number {
   const trimmed = text.trim();
   if (trimmed.length === 0) {
     return 0;
   }
-  return trimmed.split(/\s+/).length;
+
+  const cjk = trimmed.match(CJK_CHARACTER)?.length ?? 0;
+  const rest = trimmed.replace(CJK_CHARACTER, " ").trim();
+
+  return cjk + (rest.length === 0 ? 0 : rest.split(/\s+/).length);
 }
 
 export function ReflectionBlock({
@@ -30,6 +42,7 @@ export function ReflectionBlock({
   completed,
   onComplete,
 }: BlockRenderProps<ReflectionBlockData>) {
+  const t = useT();
   const { prompt, minWords } = block.payload;
 
   const [text, setText] = useState("");
@@ -45,7 +58,7 @@ export function ReflectionBlock({
         onChange={(event) => {
           setText(event.target.value);
         }}
-        placeholder="Write your answer here…"
+        placeholder={t("block.reflection.placeholder")}
         rows={6}
         value={text}
       />
@@ -61,18 +74,18 @@ export function ReflectionBlock({
           {completed ? (
             <>
               <Check aria-hidden="true" />
-              Saved
+              {t("block.reflection.saved")}
             </>
           ) : (
-            "Save reflection"
+            t("block.reflection.save")
           )}
         </Button>
 
         <p className="text-xs text-muted-foreground tabular-nums">
-          {words} / {minWords} words
+          {t("block.reflection.words", { words, min: minWords })}
           {canComplete
             ? ""
-            : ` · write ${minWords - words} more to finish this block`}
+            : ` · ${t("block.reflection.more", { count: minWords - words })}`}
         </p>
       </div>
     </div>

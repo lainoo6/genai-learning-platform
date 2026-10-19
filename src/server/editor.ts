@@ -2,6 +2,7 @@
 
 import { Prisma } from "@prisma/client";
 
+import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadEditorCourse } from "@/lib/teach";
@@ -48,14 +49,16 @@ export async function saveCourse(
   courseId: string,
   input: EditorCourseInput,
 ): Promise<SaveCourseResult> {
+  const { t } = await getI18n();
+
   if (typeof courseId !== "string" || courseId.length === 0) {
-    return { ok: false, error: "This course could not be found." };
+    return { ok: false, error: t("server.editor.courseMissing") };
   }
 
   const session = await auth();
   const user = session?.user;
   if (user === undefined) {
-    return { ok: false, error: "Sign in to edit a course." };
+    return { ok: false, error: t("server.editor.signIn") };
   }
 
   const parsed = editorCourseSchema.safeParse(input);
@@ -78,13 +81,13 @@ export async function saveCourse(
   });
 
   if (course === null) {
-    return { ok: false, error: "This course no longer exists." };
+    return { ok: false, error: t("server.editor.courseGone") };
   }
 
   // Ownership is the edit guard: the middleware only proves the caller is a
   // teacher, not that this course is theirs.
   if (course.createdById !== user.id) {
-    return { ok: false, error: "You can only edit courses you created." };
+    return { ok: false, error: t("server.editor.notOwner") };
   }
 
   const existingModuleIds = new Set(
@@ -100,7 +103,7 @@ export async function saveCourse(
     if (!existingModuleIds.has(courseModule.id) && !FRESH_ID.test(courseModule.id)) {
       return {
         ok: false,
-        error: "The editor is out of date with the database. Reload the page and try again.",
+        error: t("server.editor.stale"),
       };
     }
 
@@ -108,7 +111,7 @@ export async function saveCourse(
       if (!existingLessonIds.has(lesson.id) && !FRESH_ID.test(lesson.id)) {
         return {
           ok: false,
-          error: "The editor is out of date with the database. Reload the page and try again.",
+          error: t("server.editor.stale"),
         };
       }
     }
@@ -213,7 +216,7 @@ export async function saveCourse(
   if (saved === null) {
     return {
       ok: false,
-      error: "The course was saved but could not be reloaded. Refresh the page.",
+      error: t("server.editor.saveReloadFailed"),
     };
   }
 

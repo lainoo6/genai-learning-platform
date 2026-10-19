@@ -7,11 +7,15 @@ import { AuthForm } from "@/components/auth-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { auth } from "@/lib/auth";
 import { registerAction } from "@/server/auth";
+import { getI18n } from "@/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Create an account",
-  description: "Register as a learner and start your first mini-course.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return {
+    title: t("auth.register.metaTitle"),
+    description: t("auth.register.metaDescription"),
+  };
+}
 
 /**
  * Reads the session cookie, so it is streamed behind a Suspense boundary under

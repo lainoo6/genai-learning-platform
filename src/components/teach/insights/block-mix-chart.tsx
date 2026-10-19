@@ -2,6 +2,8 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
+import { useT } from "@/i18n/client";
+
 /**
  * Share of completed blocks per block type (P5.3).
  *
@@ -14,7 +16,8 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 export type BlockMixSliceView = {
   type: string;
-  label: string;
+  /** Dictionary key for the block type name. */
+  labelKey: string;
   count: number;
 };
 
@@ -37,7 +40,12 @@ function sliceColor(index: number): string {
 }
 
 export function BlockMixChart({ data }: { data: BlockMixSliceView[] }) {
-  const total = data.reduce((sum, slice) => sum + slice.count, 0);
+  const t = useT();
+  const slices = data.map((slice) => ({
+    ...slice,
+    label: t(slice.labelKey),
+  }));
+  const total = slices.reduce((sum, slice) => sum + slice.count, 0);
 
   return (
     <div className="space-y-2">
@@ -45,7 +53,7 @@ export function BlockMixChart({ data }: { data: BlockMixSliceView[] }) {
         <ResponsiveContainer height="100%" width="100%">
           <PieChart>
             <Pie
-              data={data}
+              data={slices}
               dataKey="count"
               innerRadius={54}
               isAnimationActive={false}
@@ -54,7 +62,7 @@ export function BlockMixChart({ data }: { data: BlockMixSliceView[] }) {
               paddingAngle={2}
               stroke="none"
             >
-              {data.map((slice, index) => (
+              {slices.map((slice, index) => (
                 <Cell fill={sliceColor(index)} key={slice.type} />
               ))}
             </Pie>
@@ -70,7 +78,7 @@ export function BlockMixChart({ data }: { data: BlockMixSliceView[] }) {
       </div>
 
       <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-        {data.map((slice, index) => (
+        {slices.map((slice, index) => (
           <li className="flex items-center gap-2 text-xs" key={slice.type}>
             <span
               aria-hidden="true"

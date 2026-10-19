@@ -11,6 +11,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 import type { SortItem } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +64,7 @@ export function SortGame({
     [items],
   );
 
+  const t = useT();
   const [rows, setRows] = useState<Row[]>(() => toRows(items));
   const [selected, setSelected] = useState<number | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -118,15 +120,13 @@ export function SortGame({
     if (correct === nextRows.length) {
       setSolved(true);
       setSelected(null);
-      setFeedback(
-        `Sorted in ${taken} attempt${taken === 1 ? "" : "s"} — fewer is better.`,
-      );
+      setFeedback(t("block.sort.solved", { attempts: taken }));
       onFinish({ variant: "sort", attempts: taken });
       return;
     }
 
     setFeedback(
-      `${correct} of ${nextRows.length} in the right place. The green rows are locked; move the rest around them.`,
+      t("block.sort.partial", { correct, total: nextRows.length }),
     );
   }
 
@@ -141,7 +141,7 @@ export function SortGame({
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Pick a row, then move it up or down until the order is right.
+        {t("block.sort.instruction")}
       </p>
 
       <ol className="space-y-2">
@@ -180,7 +180,7 @@ export function SortGame({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
-          aria-label="Move the selected row up"
+          aria-label={t("block.sort.moveUp")}
           disabled={!canMoveUp}
           onClick={() => {
             move(-1);
@@ -191,7 +191,7 @@ export function SortGame({
           <ArrowUp aria-hidden="true" />
         </Button>
         <Button
-          aria-label="Move the selected row down"
+          aria-label={t("block.sort.moveDown")}
           disabled={!canMoveDown}
           onClick={() => {
             move(1);
@@ -204,16 +204,16 @@ export function SortGame({
 
         <Button className="min-h-9" disabled={solved} onClick={checkOrder}>
           <Shuffle aria-hidden="true" />
-          Check order
+          {t("block.sort.check")}
         </Button>
 
         <Button onClick={startOver} variant="ghost">
           <RotateCcw aria-hidden="true" />
-          Start over
+          {t("common.startOver")}
         </Button>
 
         <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-          Attempts: {attempts}
+          {t("block.sort.attempts", { count: attempts })}
         </span>
       </div>
 
@@ -237,16 +237,16 @@ export function SortGame({
           {completed ? (
             <>
               <Check aria-hidden="true" />
-              Completed
+              {t("common.completed")}
             </>
           ) : (
-            "Mark as complete"
+            t("common.markComplete")
           )}
         </Button>
         <p className="text-xs text-muted-foreground">
           {solved || completed
-            ? "Everything is in the right place."
-            : "Check your order once you think it is right."}
+            ? t("block.sort.done")
+            : t("block.sort.need")}
         </p>
       </div>
     </div>

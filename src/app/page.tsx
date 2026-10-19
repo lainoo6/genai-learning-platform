@@ -13,31 +13,29 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buttonVariants } from "@/components/ui/button";
+import { getI18n } from "@/i18n/server";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 
 const FEATURES: ReadonlyArray<{
   icon: typeof Blocks;
-  title: string;
-  description: string;
+  titleKey: string;
+  descriptionKey: string;
 }> = [
   {
     icon: Blocks,
-    title: "Interactive courses",
-    description:
-      "Nine activity types per lesson: reading, quiz, flashcards, narrated slides, coding exercises, games, simulations, role-play and reflection.",
+    titleKey: "home.feature.interactive.title",
+    descriptionKey: "home.feature.interactive.description",
   },
   {
     icon: Sparkles,
-    title: "AI personalisation",
-    description:
-      "A short onboarding survey, an always-available AI tutor and \"explain it for me\" rewrites adapt every lesson to your background.",
+    titleKey: "home.feature.ai.title",
+    descriptionKey: "home.feature.ai.description",
   },
   {
     icon: WandSparkles,
-    title: "Instructor generation",
-    description:
-      "Describe a topic, review the AI draft and publish. Then track participation, quiz scores and export grades to CSV.",
+    titleKey: "home.feature.generation.title",
+    descriptionKey: "home.feature.generation.description",
   },
 ];
 
@@ -45,26 +43,28 @@ const FEATURES: ReadonlyArray<{
 async function PublishedCourses() {
   await connection();
 
-  const courses = await prisma.course.findMany({
-    where: { status: "PUBLISHED" },
-    orderBy: { createdAt: "desc" },
-    take: 6,
-    select: {
-      slug: true,
-      title: true,
-      description: true,
-      topic: true,
-      difficulty: true,
-      coverEmoji: true,
-    },
-  });
+  const [courses, { t }] = await Promise.all([
+    prisma.course.findMany({
+      where: { status: "PUBLISHED" },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+      select: {
+        slug: true,
+        title: true,
+        description: true,
+        topic: true,
+        difficulty: true,
+        coverEmoji: true,
+      },
+    }),
+    getI18n(),
+  ]);
 
   if (courses.length === 0) {
     return (
       <Card className="w-full">
         <CardContent className="text-muted-foreground">
-          No published mini-courses yet. The seeded placeholder course is still a
-          draft — instructors can publish it from the teacher console.
+          {t("home.published.empty")}
         </CardContent>
       </Card>
     );
@@ -104,23 +104,22 @@ function CoursePreviewSkeleton() {
   );
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { t } = await getI18n();
+
   return (
     <div className="flex flex-1 flex-col">
       <section className="mx-auto w-full max-w-6xl px-4 py-16 text-center sm:py-24">
         <Badge variant="secondary" className="mb-5">
-          Interactive · AI-personalised · Mini-courses
+          {t("home.badge")}
         </Badge>
 
         <h1 className="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
-          Learn AI-assisted software development one interactive mini-course at a
-          time.
+          {t("home.title")}
         </h1>
 
         <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground text-pretty sm:text-lg">
-          Short, hands-on courses on software engineering, AI coding assistants and
-          soft skills — adapted to your background by AI, authored in minutes by your
-          instructors.
+          {t("home.subtitle")}
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -128,7 +127,7 @@ export default function HomePage() {
             href="/courses"
             className={cn(buttonVariants({ size: "lg" }), "w-full px-4 sm:w-auto")}
           >
-            Browse courses
+            {t("home.cta.browse")}
           </Link>
           <Link
             href="/teach"
@@ -137,21 +136,21 @@ export default function HomePage() {
               "w-full px-4 sm:w-auto",
             )}
           >
-            Create a course
+            {t("home.cta.create")}
           </Link>
         </div>
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-4 pb-12">
         <div className="grid gap-4 md:grid-cols-3">
-          {FEATURES.map(({ icon: Icon, title, description }) => (
-            <Card key={title}>
+          {FEATURES.map(({ icon: Icon, titleKey, descriptionKey }) => (
+            <Card key={titleKey}>
               <CardHeader>
                 <span className="mb-1 flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon aria-hidden="true" />
                 </span>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>{description}</CardDescription>
+                <CardTitle>{t(titleKey)}</CardTitle>
+                <CardDescription>{t(descriptionKey)}</CardDescription>
               </CardHeader>
             </Card>
           ))}
@@ -164,11 +163,10 @@ export default function HomePage() {
         aria-labelledby="courses-heading"
       >
         <h2 id="courses-heading" className="text-xl font-semibold">
-          Published mini-courses
+          {t("home.published.title")}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          A preview of the catalogue. More courses appear here as instructors publish
-          them.
+          {t("home.published.subtitle")}
         </p>
 
         <div className="mt-6">

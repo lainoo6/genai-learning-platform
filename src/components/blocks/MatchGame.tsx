@@ -4,6 +4,7 @@ import { Check, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 import type { MatchPair } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +71,7 @@ export function MatchGame({
   );
 
   /** Pair indices already matched. */
+  const t = useT();
   const [matched, setMatched] = useState<number[]>([]);
   const [pickedLeft, setPickedLeft] = useState<number | null>(null);
   const [wrongRight, setWrongRight] = useState<number | null>(null);
@@ -102,7 +104,7 @@ export function MatchGame({
     }
 
     if (pickedLeft === null) {
-      setNotice("Pick something on the left first, then its match on the right.");
+      setNotice(t("block.match.pickLeftFirst"));
       return;
     }
 
@@ -122,14 +124,16 @@ export function MatchGame({
 
       if (nextMatched.length === pairs.length) {
         setSolved(true);
-        setNotice(`All ${pairs.length} pairs matched in ${taken} attempts.`);
+        setNotice(
+          t("block.match.solved", { count: pairs.length, attempts: taken }),
+        );
         onFinish({ variant: "match", attempts: taken });
       }
       return;
     }
 
     setWrongRight(index);
-    setNotice("Not that one — try again.");
+    setNotice(t("block.match.wrong"));
     resetTimerRef.current = window.setTimeout(() => {
       resetTimerRef.current = null;
       setWrongRight(null);
@@ -153,7 +157,7 @@ export function MatchGame({
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Tap an item on the left, then the item on the right that belongs with it.
+        {t("block.match.instruction")}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -230,10 +234,14 @@ export function MatchGame({
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={startOver} variant="outline">
           <RotateCcw aria-hidden="true" />
-          Start over
+          {t("common.startOver")}
         </Button>
         <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-          Attempts: {attempts} · {matched.length} / {pairs.length} matched
+          {t("block.match.attempts", {
+            attempts,
+            matched: matched.length,
+            total: pairs.length,
+          })}
         </span>
       </div>
 
@@ -257,16 +265,16 @@ export function MatchGame({
           {completed ? (
             <>
               <Check aria-hidden="true" />
-              Completed
+              {t("common.completed")}
             </>
           ) : (
-            "Mark as complete"
+            t("common.markComplete")
           )}
         </Button>
         <p className="text-xs text-muted-foreground">
           {solved || completed
-            ? "Every pair is matched."
-            : "Match all the pairs to finish this block."}
+            ? t("block.match.done")
+            : t("block.match.need")}
         </p>
       </div>
     </div>

@@ -2,15 +2,29 @@ import { Check, ChevronLeft, Clock, Lock } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { CONTENT_LANGUAGES } from "@/i18n/config";
+import { getI18n } from "@/i18n/server";
 import { blockMetaFor } from "@/lib/blocks/meta";
 import {
   countLessons,
-  DIFFICULTY_LABELS,
-  SOURCE_LABELS,
   totalMinutes,
   type CourseWithLessons,
 } from "@/lib/courses";
 import { EnrollButton } from "./enroll-button";
+
+/** Dictionary keys for the two enums shown as badges. */
+const DIFFICULTY_KEYS: Record<string, string> = {
+  beginner: "courses.difficulty.beginner",
+  intermediate: "courses.difficulty.intermediate",
+  advanced: "courses.difficulty.advanced",
+};
+
+const SOURCE_KEYS: Record<string, string> = {
+  SEED: "courses.source.seed",
+  AI_GENERATED: "courses.source.ai",
+  INSTRUCTOR: "courses.source.instructor",
+  LEARNER: "courses.source.learner",
+};
 
 /**
  * Read-only course detail view: hero + module outline + enroll action.
@@ -19,7 +33,7 @@ import { EnrollButton } from "./enroll-button";
  * same screen (with a notice) when somebody opens a player URL for a course
  * they have not enrolled in yet.
  */
-export function CourseDetail({
+export async function CourseDetail({
   course,
   enrolled,
   firstLessonHref,
@@ -32,7 +46,11 @@ export function CourseDetail({
   /** Optional callout shown above the hero (e.g. "Enroll to start learning"). */
   notice?: string | null;
 }) {
-  const difficultyLabel = DIFFICULTY_LABELS[course.difficulty] ?? course.difficulty;
+  const { t } = await getI18n();
+  const difficultyLabel =
+    DIFFICULTY_KEYS[course.difficulty] === undefined
+      ? course.difficulty
+      : t(DIFFICULTY_KEYS[course.difficulty] as string);
 
   return (
     <article className="space-y-8">
@@ -41,7 +59,7 @@ export function CourseDetail({
         href="/courses"
       >
         <ChevronLeft aria-hidden="true" className="size-3.5" />
-        All courses
+        {t("course.back")}
       </Link>
 
       {notice === null ? null : (
@@ -68,21 +86,33 @@ export function CourseDetail({
             <Badge>{difficultyLabel}</Badge>
             <Badge variant="secondary">{course.audience}</Badge>
             <Badge variant="outline">{course.topic}</Badge>
-            <Badge variant="outline">{SOURCE_LABELS[course.source]}</Badge>
+            <Badge variant="outline">
+              {SOURCE_KEYS[course.source] === undefined
+                ? course.source
+                : t(SOURCE_KEYS[course.source] as string)}
+            </Badge>
+            <Badge variant="outline">
+              {t("courses.contentLanguage", {
+                language: CONTENT_LANGUAGES[course.language] ?? course.language,
+              })}
+            </Badge>
           </div>
 
           <p className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span>
-              {course.modules.length} modules · {countLessons(course)} lessons
+              {t("course.summary", {
+                modules: course.modules.length,
+                lessons: countLessons(course),
+              })}
             </span>
             <span className="flex items-center gap-1">
-              <Clock aria-hidden="true" className="size-3.5" />~
-              {totalMinutes(course)} min
+              <Clock aria-hidden="true" className="size-3.5" />
+              {t("courses.card.minutes", { count: totalMinutes(course) })}
             </span>
             {enrolled ? (
               <span className="flex items-center gap-1 text-emerald-600">
                 <Check aria-hidden="true" className="size-3.5" />
-                Enrolled
+                {t("course.enrolled")}
               </span>
             ) : null}
           </p>
@@ -98,14 +128,14 @@ export function CourseDetail({
       <hr className="border-foreground/10" />
 
       <section className="space-y-4">
-        <h2 className="text-sm font-medium">What you will work through</h2>
+        <h2 className="text-sm font-medium">{t("course.outline.title")}</h2>
 
         {course.modules.map((courseModule) => (
           <div className="rounded-xl ring-1 ring-foreground/10" key={courseModule.id}>
             <header className="border-b px-4 py-3">
               <h3 className="text-sm font-medium">{courseModule.title}</h3>
               <p className="text-xs text-muted-foreground">
-                {courseModule.lessons.length} lessons
+                {t("course.outline.lessons", { count: courseModule.lessons.length })}
               </p>
             </header>
 
@@ -116,8 +146,11 @@ export function CourseDetail({
                     href={enrolled ? `/learn/${course.id}/${lesson.id}` : null}
                     title={lesson.title}
                     types={lesson.blockTypes}
-                    minutes={lesson.estimatedMinutes}
                     position={index + 1}
+                    minutesLabel={t("course.lesson.minutes", {
+                      count: lesson.estimatedMinutes,
+                    })}
+                    lockedLabel={t("course.lesson.locked")}
                   />
                 </li>
               ))}
@@ -131,16 +164,18 @@ export function CourseDetail({
 
 function LessonRow({
   href,
-  minutes,
+  minutesLabel,
   title,
   types,
   position,
+  lockedLabel,
 }: {
   href: string | null;
-  minutes: number;
+  minutesLabel: string;
   title: string;
   types: readonly string[];
   position: number;
+  lockedLabel: string;
 }) {
   const content = (
     <>
@@ -161,10 +196,10 @@ function LessonRow({
         })}
       </span>
       <span className="text-xs text-muted-foreground tabular-nums">
-        {minutes} min
+        {minutesLabel}
       </span>
       {href === null ? (
-        <Lock aria-label="Enroll to open" className="size-3.5 text-muted-foreground" />
+        <Lock aria-label={lockedLabel} className="size-3.5 text-muted-foreground" />
       ) : null}
     </>
   );

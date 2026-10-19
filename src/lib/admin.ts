@@ -16,11 +16,12 @@ import { prisma } from "@/lib/prisma";
  * model has no dedicated column, and the plan does not allow adding one.
  */
 
-export const COURSE_SOURCE_LABELS: Record<CourseSource, string> = {
-  SEED: "Seed",
-  AI_GENERATED: "AI generated",
-  INSTRUCTOR: "Authored",
-  LEARNER: "Learner-made",
+/** Dictionary keys for the source badge, rendered by the course table. */
+export const COURSE_SOURCE_KEYS: Record<CourseSource, string> = {
+  SEED: "courses.source.seed",
+  AI_GENERATED: "courses.source.ai",
+  INSTRUCTOR: "courses.source.instructor",
+  LEARNER: "courses.source.learner",
 };
 
 export type AdminUserRow = {

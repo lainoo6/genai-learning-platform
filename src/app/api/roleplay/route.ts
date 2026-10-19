@@ -2,8 +2,10 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { type ModelMessage, streamText } from "ai";
 import { z } from "zod";
 
+import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { blockListSchema } from "@/lib/blocks/schema";
+import { contentLanguageFromLocale } from "@/lib/llm/language";
 import { isMockMode, llmModel, openaiApiKey } from "@/lib/llm/provider";
 import {
   mockRoleplayReply,
@@ -60,12 +62,14 @@ function chunkedTextResponse(text: string): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const { locale, t } = await getI18n();
+  const language = contentLanguageFromLocale(locale);
   const body: unknown = await request.json().catch(() => null);
   const parsed = requestSchema.safeParse(body);
 
   if (!parsed.success) {
     return Response.json(
-      { error: "Send a lesson id, a block id and a message." },
+      { error: t("server.roleplay.invalidRequest") },
       { status: 400, headers: NO_STORE },
     );
   }
@@ -73,7 +77,7 @@ export async function POST(request: Request): Promise<Response> {
   const session = await auth();
   if (session?.user?.id === undefined) {
     return Response.json(
-      { error: "Sign in to take part in the role play." },
+      { error: t("server.roleplay.signInChat") },
       { status: 401, headers: NO_STORE },
     );
   }
@@ -85,7 +89,7 @@ export async function POST(request: Request): Promise<Response> {
 
   if (lesson === null) {
     return Response.json(
-      { error: "Lesson not found." },
+      { error: t("server.roleplay.lessonNotFound") },
       { status: 404, headers: NO_STORE },
     );
   }
@@ -100,7 +104,7 @@ export async function POST(request: Request): Promise<Response> {
 
   if (block === undefined || block.type !== "roleplay") {
     return Response.json(
-      { error: "This lesson has no role play with that id." },
+      { error: t("server.roleplay.blockNotFound") },
       { status: 404, headers: NO_STORE },
     );
   }
@@ -111,13 +115,13 @@ export async function POST(request: Request): Promise<Response> {
     const assistantTurns = history.filter(
       (turn) => turn.role === "assistant",
     ).length;
-    return chunkedTextResponse(mockRoleplayReply(assistantTurns));
+    return chunkedTextResponse(mockRoleplayReply(assistantTurns, language));
   }
 
   const apiKey = openaiApiKey();
   if (apiKey === null) {
     return Response.json(
-      { error: "The role play is unavailable." },
+      { error: t("server.roleplay.unavailable") },
       { status: 503, headers: NO_STORE },
     );
   }
@@ -132,7 +136,7 @@ export async function POST(request: Request): Promise<Response> {
   const openai = createOpenAI({ apiKey });
   const result = streamText({
     model: openai.chat(llmModel()),
-    system: roleplaySystemPrompt(block),
+    system: roleplaySystemPrompt(block, language),
     messages,
     temperature: TEMPERATURE,
   });

@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 import { deleteGeneratedCourse } from "@/server/generate";
 
@@ -31,13 +32,14 @@ export function GeneratedCourseList({
 }: {
   courses: GeneratedCourseItem[];
 }) {
+  const t = useT();
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function remove(course: GeneratedCourseItem): Promise<void> {
     const confirmed = window.confirm(
-      `Delete "${course.title}"? Its lessons and your progress in it will be removed.`,
+      t("generate.history.deleteConfirm", { title: course.title }),
     );
     if (!confirmed) {
       return;
@@ -57,7 +59,7 @@ export function GeneratedCourseList({
       setError(
         cause instanceof Error
           ? cause.message
-          : "The course could not be deleted. Try again.",
+          : t("generate.history.deleteFailed"),
       );
     } finally {
       setPendingId(null);
@@ -85,25 +87,27 @@ export function GeneratedCourseList({
               <p className="text-sm font-medium">{course.title}</p>
               <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span>{course.createdAt}</span>
-                <Badge variant="secondary">{course.lessonCount} lessons</Badge>
+                <Badge variant="secondary">
+                  {t("generate.history.lessons", { count: course.lessonCount })}
+                </Badge>
               </p>
             </div>
 
             <div className="mt-auto flex items-center gap-2">
               {course.firstLessonId === null ? (
-                <Badge variant="outline">No lessons</Badge>
+                <Badge variant="outline">{t("generate.history.noLessons")}</Badge>
               ) : (
                 <Link
                   className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
                   href={`/learn/${course.id}/${course.firstLessonId}`}
                 >
-                  Open
+                  {t("generate.history.open")}
                   <ArrowRight aria-hidden="true" />
                 </Link>
               )}
 
               <Button
-                aria-label={`Delete ${course.title}`}
+                aria-label={t("generate.history.deleteAria", { title: course.title })}
                 className="ml-auto"
                 disabled={pendingId === course.id}
                 onClick={() => {
@@ -117,7 +121,7 @@ export function GeneratedCourseList({
                 ) : (
                   <Trash2 aria-hidden="true" />
                 )}
-                Delete
+                {t("generate.history.delete")}
               </Button>
             </div>
           </li>

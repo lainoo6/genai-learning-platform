@@ -3,7 +3,8 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ROLE_LABELS, ROLE_OPTIONS } from "@/lib/roles";
+import { getI18n } from "@/i18n/server";
+import { ROLE_KEYS, ROLE_OPTIONS } from "@/lib/roles";
 
 /**
  * Search and role filter for the Users tab (P5.4).
@@ -16,13 +17,14 @@ import { ROLE_LABELS, ROLE_OPTIONS } from "@/lib/roles";
 const SELECT_CLASS =
   "h-8 w-40 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-export function UserFilters({
+export async function UserFilters({
   search,
   role,
 }: {
   search: string;
   role: Role | null;
 }) {
+  const { t } = await getI18n();
   const hasFilters = search.length > 0 || role !== null;
 
   return (
@@ -31,20 +33,20 @@ export function UserFilters({
 
       <div className="min-w-56 flex-1 space-y-1.5">
         <label className="text-xs font-medium" htmlFor="admin-user-search">
-          Search
+          {t("admin.filter.search")}
         </label>
         <Input
           defaultValue={search}
           id="admin-user-search"
           name="q"
-          placeholder="Name or email"
+          placeholder={t("admin.filter.searchPlaceholder")}
           type="search"
         />
       </div>
 
       <div className="space-y-1.5">
         <label className="text-xs font-medium" htmlFor="admin-user-role">
-          Role
+          {t("admin.filter.role")}
         </label>
         <select
           className={SELECT_CLASS}
@@ -52,17 +54,17 @@ export function UserFilters({
           id="admin-user-role"
           name="role"
         >
-          <option value="">All roles</option>
+          <option value="">{t("admin.filter.allRoles")}</option>
           {ROLE_OPTIONS.map((option) => (
             <option key={option} value={option}>
-              {ROLE_LABELS[option]}
+              {t(ROLE_KEYS[option])}
             </option>
           ))}
         </select>
       </div>
 
       <Button type="submit" variant="outline">
-        Apply
+        {t("admin.filter.apply")}
       </Button>
 
       {hasFilters ? (
@@ -70,7 +72,7 @@ export function UserFilters({
           className="pb-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline"
           href="/admin?tab=users"
         >
-          Reset
+          {t("admin.filter.reset")}
         </Link>
       ) : null}
     </form>

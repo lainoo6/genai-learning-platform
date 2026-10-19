@@ -2,12 +2,14 @@
 
 import { z } from "zod";
 
+import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import {
   blockListSchema,
   type Block,
   type QuizQuestion,
 } from "@/lib/blocks/schema";
+import { contentLanguageFromLocale } from "@/lib/llm/language";
 import { registerLlmMocks } from "@/lib/llm/mocks";
 import {
   explainResultSchema,
@@ -36,8 +38,7 @@ const overrideInputSchema = explainInputSchema.extend({
   markdown: z.string().trim().min(1).max(20000),
 });
 
-const GENERIC_FAILURE =
-  "The explanation could not be generated right now. Please try again.";
+const GENERIC_FAILURE_KEY = "server.explain.failed";
 
 /** How many recent attempts are scanned for the learner's wrong questions. */
 const RECENT_ATTEMPT_SCAN = 10;
@@ -105,15 +106,17 @@ export async function explainBlock(
   lessonId: string,
   blockId: string,
 ): Promise<ExplainBlockResult> {
+  const { locale, t } = await getI18n();
+  const language = contentLanguageFromLocale(locale);
   const parsedInput = explainInputSchema.safeParse({ lessonId, blockId });
   if (!parsedInput.success) {
-    return { ok: false, error: "This block cannot be explained." };
+    return { ok: false, error: t("server.explain.notExplainable") };
   }
 
   const session = await auth();
   const userId = session?.user?.id;
   if (userId === undefined) {
-    return { ok: false, error: "Sign in to personalise this block." };
+    return { ok: false, error: t("server.explain.signIn") };
   }
 
   const lesson = await prisma.lesson.findUnique({
@@ -129,17 +132,17 @@ export async function explainBlock(
   });
 
   if (lesson === null) {
-    return { ok: false, error: "Lesson not found." };
+    return { ok: false, error: t("server.explain.lessonNotFound") };
   }
 
   const parsedBlocks = blockListSchema.safeParse(lesson.blocks);
   if (!parsedBlocks.success) {
-    return { ok: false, error: "This lesson contains invalid blocks." };
+    return { ok: false, error: t("server.explain.invalidBlocks") };
   }
 
   const block = parsedBlocks.data.find((entry) => entry.id === blockId);
   if (block === undefined) {
-    return { ok: false, error: "Unknown block for this lesson." };
+    return { ok: false, error: t("server.explain.unknownBlock") };
   }
 
   const profile = await loadLearnerProfile(userId);
@@ -149,6 +152,7 @@ export async function explainBlock(
   registerLlmMocks();
 
   const prompt = explainUserPrompt({
+    language,
     profile,
     courseTitle: lesson.module.course.title,
     lessonTitle: lesson.title,
@@ -159,7 +163,7 @@ export async function explainBlock(
   try {
     const result = await generateJson(explainResultSchema, prompt, {
       usage: "explain-block",
-      system: explainSystemPrompt(profile),
+      system: explainSystemPrompt(profile, language),
       temperature: 0.5,
       userId,
       courseId: lesson.module.courseId,
@@ -180,7 +184,7 @@ export async function explainBlock(
     };
   } catch (error: unknown) {
     console.error("[personalize] explainBlock failed", error);
-    return { ok: false, error: GENERIC_FAILURE };
+    return { ok: false, error: t(GENERIC_FAILURE_KEY) };
   }
 }
 
@@ -195,15 +199,16 @@ export async function saveBlockOverride(
   blockId: string,
   markdown: string,
 ): Promise<ActionResult> {
+  const { t } = await getI18n();
   const parsedInput = overrideInputSchema.safeParse({ lessonId, blockId, markdown });
   if (!parsedInput.success) {
-    return { ok: false, error: "This explanation cannot be saved." };
+    return { ok: false, error: t("server.explain.cannotSave") };
   }
 
   const session = await auth();
   const userId = session?.user?.id;
   if (userId === undefined) {
-    return { ok: false, error: "Sign in to personalise this block." };
+    return { ok: false, error: t("server.explain.signIn") };
   }
 
   const lesson = await prisma.lesson.findUnique({
@@ -212,7 +217,7 @@ export async function saveBlockOverride(
   });
 
   if (lesson === null) {
-    return { ok: false, error: "Lesson not found." };
+    return { ok: false, error: t("server.explain.lessonNotFound") };
   }
 
   const parsedBlocks = blockListSchema.safeParse(lesson.blocks);
@@ -221,7 +226,7 @@ export async function saveBlockOverride(
     : undefined;
 
   if (block === undefined || block.type !== "reading") {
-    return { ok: false, error: "Only reading blocks can be replaced." };
+    return { ok: false, error: t("server.explain.onlyReading") };
   }
 
   await prisma.userBlockOverride.upsert({
@@ -243,15 +248,16 @@ export async function clearBlockOverride(
   lessonId: string,
   blockId: string,
 ): Promise<ActionResult> {
+  const { t } = await getI18n();
   const parsedInput = explainInputSchema.safeParse({ lessonId, blockId });
   if (!parsedInput.success) {
-    return { ok: false, error: "This block cannot be restored." };
+    return { ok: false, error: t("server.explain.cannotRestore") };
   }
 
   const session = await auth();
   const userId = session?.user?.id;
   if (userId === undefined) {
-    return { ok: false, error: "Sign in to restore this block." };
+    return { ok: false, error: t("server.explain.signIn") };
   }
 
   await prisma.userBlockOverride.deleteMany({

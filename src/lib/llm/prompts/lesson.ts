@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import { blockSchema } from "@/lib/blocks/schema";
+import {
+  CONTENT_LANGUAGE_LABEL,
+  contentLanguageLine,
+  readContentLanguage,
+  type ContentLanguage,
+} from "@/lib/llm/language";
 import { mockText } from "@/lib/llm/mock";
 import type { Audience, AuthoringDifficulty } from "@/lib/llm/prompts/outline";
 
@@ -77,6 +83,8 @@ export type LessonRequest = {
   /** 1-based position of the lesson in the whole course. */
   lessonNumber: number;
   lessonCount: number;
+  /** Language of the generated content; defaults to English. */
+  language?: ContentLanguage;
 };
 
 /** Compact reference for every renderable block. One line each, wrapped by hand. */
@@ -127,6 +135,7 @@ const BLOCK_REFERENCE: readonly string[] = [
 export function lessonPrompt(request: LessonRequest): string {
   const notes =
     request.notes.trim().length === 0 ? "None." : request.notes.trim();
+  const language = request.language ?? "en";
 
   return [
     "You write one lesson of an interactive mini-course as structured JSON.",
@@ -138,6 +147,7 @@ export function lessonPrompt(request: LessonRequest): string {
     `Topic: ${request.topic}`,
     `Audience: ${request.audience}`,
     `Difficulty: ${request.difficulty}`,
+    contentLanguageLine(language),
     `Module: ${request.moduleTitle}`,
     `Lesson number: ${request.lessonNumber} of ${request.lessonCount}`,
     `Lesson title: ${request.lessonTitle}`,
@@ -171,7 +181,7 @@ export function lessonPrompt(request: LessonRequest): string {
     "  negative.",
     "- Roleplay: a scenario, the persona the AI plays, the learner's goal and a",
     "  rubric of three or four criteria.",
-    "- Write in English, use no emoji, and do not wrap the reply in code fences.",
+    `- Write every learner-visible string in ${CONTENT_LANGUAGE_LABEL[language]}, use no emoji, and do not wrap the reply in code fences.`,
     "",
     "Reply with one JSON object of this exact shape:",
     '{"title": string, "estimatedMinutes": number, "blocks": Block[]}',
@@ -224,6 +234,10 @@ export function mockLesson(prompt: string): unknown {
   const summary = readField(prompt, "Lesson summary") ?? "";
   const index = readLessonNumber(prompt);
   const id = `l${index}`;
+
+  if (readContentLanguage(prompt) === "zh") {
+    return mockChineseLesson({ title, summary, index, id });
+  }
 
   if (title === "Why version control exists" && index === 1) {
     return mockVersionControlLesson(index);
@@ -776,6 +790,475 @@ function mockPlaceholderLesson(input: {
         type: "reflection",
         payload: {
           prompt: `In two or three sentences, explain ${title} to somebody who has never studied it.`,
+          minWords: 25,
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * Chinese demo lessons used when the interface language is Chinese.
+ *
+ * Same course as the English demo (three Git lessons), written from scratch
+ * rather than translated line by line, so the prose reads naturally. A lesson
+ * whose title was edited in step 2 falls back to a Chinese placeholder built
+ * from its own title and summary.
+ */
+function mockChineseLesson(input: {
+  title: string;
+  summary: string;
+  index: number;
+  id: string;
+}): GeneratedLesson {
+  const { title, summary, index, id } = input;
+
+  if (index === 1) {
+    return mockChineseVersionControlLesson(id);
+  }
+  if (index === 2) {
+    return mockChineseFirstCommitLesson(id);
+  }
+  if (index === 3) {
+    return mockChineseBranchLesson(id);
+  }
+
+  return mockChinesePlaceholderLesson({ title, summary, id });
+}
+
+function mockChineseVersionControlLesson(indexId: string): GeneratedLesson {
+  return {
+    title: "为什么需要版本控制",
+    estimatedMinutes: 9,
+    blocks: [
+      {
+        id: `blk_${indexId}_reading`,
+        title: "项目需要一份记忆",
+        type: "reading",
+        payload: {
+          markdown: mockReading(
+            [
+              "# 一份比个人电脑还年轻的历史",
+              "",
+              "想象一个叫「结课报告」的文件夹，里面躺着 `报告.doc`、`报告-最终版.doc`、"
+                + "`报告-最终版-v2.doc`，以及 `报告-最终版-v2-用这个.doc`。没有人确定哪一份是"
+                + "最新的，没有人记得它们之间改了什么，唯一记得的人正在休假。",
+              "",
+              "这就是没有版本控制的项目的样子。问题不在文件本身，而在于缺失的历史。"
+                + "Git 存在的意义，就是把这段历史记录下来，让团队不必再从文件名里做考古。",
+              "",
+              "## 一个仓库记录了什么",
+              "",
+              "Git 仓库就是一个普通文件夹，旁边多了一个隐藏的 `.git` 目录。这个目录保存每个"
+                + "被跟踪文件的每一个版本、谁改的、什么时候改的，以及他写下的原因。工作文件仍然是"
+                + "普通文件，历史就放在它们旁边。",
+              "",
+              "## 提交是一张快照，不是一份差异",
+              "",
+              "把提交想成给整个项目拍一张照片，再贴上一张标签，会容易得多。Git 存得很省空间"
+                + "——没有变化的文件与上一张照片共用——但心智模型就是快照。正因如此，你才能"
+                + "跳回任何一个提交，看到项目当时的样子。",
+              "",
+              "## 一个具体的例子",
+              "",
+              "你花了一个下午，把十二个文件里的一个函数改了名字。两周后出现了一个缺陷。"
+                + "有历史记录时，你可以问「谁动过这个函数」，读到那次重命名的提交，从提交信息里"
+                + "看到原因。没有历史记录时，你只能打开十二个文件去猜。",
+              "",
+              "## 为什么团队离不开它",
+              "",
+              "两个人同时改一个文件，不是存储问题，而是协作问题。Git 让每个人先在自己的副本上"
+                + "工作，再把结果合并；它还会明确告诉你两处修改在哪里撞车，而不是悄悄保留最后"
+                + "保存的那一份。下一课我们来做第一次提交。",
+            ].join("\n"),
+          ),
+        },
+      },
+      {
+        id: `blk_${indexId}_slides`,
+        title: "每个仓库背后的四个想法",
+        type: "slides",
+        payload: {
+          autoPlay: false,
+          slides: [
+            {
+              title: "问题不在文件",
+              bullets: ["版本藏在文件名里", "没人记得改了什么", "缺的是历史"],
+              narration:
+                "大多数团队其实都留着文件的每一个版本，麻烦在于版本藏在文件名里，每次改动背后的原因就丢了。版本控制把这份知识搬进一个全团队都能读懂的结构里。",
+            },
+            {
+              title: "仓库负责保存历史",
+              bullets: ["一个文件夹加一个隐藏的 .git 目录", "每个被跟踪的版本都被保存", "工作文件仍然是普通文件"],
+              narration:
+                "仓库就是项目文件夹旁边多了一个 .git 目录。工作文件仍然可以用任何编辑器打开，而历史、作者和提交信息都存在那个隐藏目录里，跟着文件夹一起走。",
+            },
+            {
+              title: "提交是一张快照",
+              bullets: ["给整个项目拍一张照片", "存得省，并与上一张共享", "带着信息与作者"],
+              narration:
+                "每次提交都记录下项目在某一刻的样子。Git 通过与上一个提交共享未变化的文件来省空间，但真正有用的心智模型是「可以回去的快照」。贴在上面的提交信息，是后来的人真正会读的部分。",
+            },
+            {
+              title: "历史会回答问题",
+              bullets: ["谁动过这个函数", "为什么改这里", "谁审阅过"],
+              narration:
+                "有了历史，调试的方式就变了。你不必在文件之间猜，而是直接问哪次提交动过这段代码，再读作者写下的原因。这正是接下来整门课要养成的习惯。",
+            },
+          ],
+        },
+      },
+      {
+        id: `blk_${indexId}_quiz`,
+        title: "检查一下理解",
+        type: "quiz",
+        payload: {
+          passScore: 0.7,
+          questions: [
+            {
+              id: `q_${indexId}_1`,
+              kind: "single",
+              prompt: "把版本保存成一个个文件，最大的问题是什么？",
+              options: [
+                "历史以及每次改动的原因都丢了",
+                "文件太占磁盘空间",
+                "只有一个人能打开它们",
+                "它们无法重命名",
+              ],
+              answer: [0],
+              explanation:
+                "副本留住了内容，却留不住理由，团队因此失去了「改了什么、为什么改」的记录。",
+            },
+            {
+              id: `q_${indexId}_2`,
+              kind: "single",
+              prompt: "Git 仓库把历史保存在哪里？",
+              options: [
+                "项目里的隐藏 .git 目录",
+                "Git 网站上的数据库",
+                "每个文件的开头",
+                "桌面上的另一个文件夹",
+              ],
+              answer: [0],
+              explanation:
+                ".git 目录就在工作文件旁边，保存着每一个被记录的版本。",
+            },
+            {
+              id: `q_${indexId}_3`,
+              kind: "single",
+              prompt: "为什么说提交是一张快照？",
+              options: [
+                "它记录下整个项目在某一刻的状态",
+                "它只保存发生变化的那几行",
+                "它会删除上一个版本",
+                "它把项目复制到服务器上",
+              ],
+              answer: [0],
+              explanation:
+                "「快照」这个模型解释了为什么你能回到任意一个提交，看到项目当时完整的样子。",
+            },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+function mockChineseFirstCommitLesson(indexId: string): GeneratedLesson {
+  return {
+    title: "完成你的第一次提交",
+    estimatedMinutes: 10,
+    blocks: [
+      {
+        id: `blk_${indexId}_reading`,
+        title: "一次改动可能待着的三个地方",
+        type: "reading",
+        payload: {
+          markdown: mockReading(
+            [
+              "# 一次改动可能待着的三个地方",
+              "",
+              "在敲命令之前，先弄清楚 Git 认为你的工作在哪里，会省下很多困惑。一次改动会"
+                + "经过三个地方，每一步都有一个命令把它往前推。",
+              "",
+              "## 工作区",
+              "",
+              "工作区就是你正在编辑的文件夹。被修改的文件首先出现在这里，暂时还没有别的地方。"
+                + "`git status` 用来看有哪些文件处于这个状态。",
+              "",
+              "## 暂存区",
+              "",
+              "暂存区是「下一次提交要包含哪些改动」的清单。`git add 笔记.md` 把一处改动放进去。"
+                + "它存在的意义是：一个下午的零散修改，可以被拆成两次清楚的提交——一次修问题，"
+                + "一次做重构。",
+              "",
+              "## 仓库",
+              "",
+              "`git commit -m \"加上第一章\"` 会把暂存区里的内容写成一张新的快照。只有被暂存的"
+                + "改动才会进入这次提交，所以同一条命令，加上不同的 `git add`，结果会完全不同。",
+              "",
+              "## 一个具体的例子",
+              "",
+              "你修好了 `引言.md` 里的一个错别字，又开始起草 `第二章.md`。先 `git add 引言.md`，"
+                + "提交信息写「修正引言错别字」；然后再 `git add 第二章.md`，单独提交一次。两条"
+                + "读得懂的记录，而不是一条含混的记录。",
+              "",
+              "## 把历史读回来",
+              "",
+              "`git log --oneline` 每个提交打印一行：一个短标识、一句信息，仅此而已。那份列表"
+                + "就是你攒下来的记忆。如果某个提交看着不对，你可以先去查看它，再决定怎么办——"
+                + "但之前的状态永远不会丢。",
+            ].join("\n"),
+          ),
+        },
+      },
+      {
+        id: `blk_${indexId}_cards`,
+        title: "一次提交的词汇表",
+        type: "flashcards",
+        payload: {
+          cards: [
+            { front: "工作区", back: "你正在编辑的文件夹。这里的改动能被 Git 看到，但还没有被记录。" },
+            { front: "暂存区", back: "下一次提交要包含的改动清单，用 git add 填充。" },
+            { front: "提交", back: "项目在某一刻被记录下来的快照，带着作者、时间和一条信息。" },
+            { front: "提交信息", back: "解释这次改动为什么存在的那句话。后来的读者更依赖它，而不是代码本身。" },
+            { front: "git add", back: "把改动从工作区放进暂存区。" },
+            { front: "git status", back: "显示哪些文件被修改、哪些已暂存、哪些还没有被跟踪。" },
+          ],
+        },
+      },
+      {
+        id: `blk_${indexId}_quiz`,
+        title: "检查一下理解",
+        type: "quiz",
+        payload: {
+          passScore: 0.7,
+          questions: [
+            {
+              id: `q_${indexId}_1`,
+              kind: "single",
+              prompt: "`git add` 到底做了什么？",
+              options: [
+                "把一处改动放进暂存区，等待下一次提交",
+                "立刻生成一条提交",
+                "把文件上传到服务器",
+                "删除未被跟踪的文件",
+              ],
+              answer: [0],
+              explanation: "add 只是填充暂存区；在提交之前，什么都不会被记录。",
+            },
+            {
+              id: `q_${indexId}_2`,
+              kind: "single",
+              prompt: "一次提交会包含哪些改动？",
+              options: [
+                "只有被暂存的那些改动",
+                "文件夹里的每一个改动",
+                "只有新增的文件",
+                "只有被删除的文件",
+              ],
+              answer: [0],
+              explanation: "暂存区恰好就是这次提交会包含的改动集合。",
+            },
+            {
+              id: `q_${indexId}_3`,
+              kind: "single",
+              prompt: "为什么要把一个混乱的下午拆成两次提交？",
+              options: [
+                "这样每条提交都有清楚的理由",
+                "这样仓库会变小",
+                "Git 不允许过大的提交",
+                "这样就不需要写提交信息了",
+              ],
+              answer: [0],
+              explanation: "理由单一的小提交，更容易审阅、回退，也更容易被后来的人读懂。",
+            },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+function mockChineseBranchLesson(indexId: string): GeneratedLesson {
+  return {
+    title: "不再害怕分支",
+    estimatedMinutes: 9,
+    blocks: [
+      {
+        id: `blk_${indexId}_reading`,
+        title: "分支只是一个指针",
+        type: "reading",
+        payload: {
+          markdown: mockReading(
+            [
+              "# 分支只是一个指针",
+              "",
+              "「分支」听起来像是把项目复制了一份，其实它小得多：分支就是一个可以移动的、"
+                + "指向某个提交的指针。创建一个分支几乎不花代价，所以 Git 期待你随手就建。",
+              "",
+              "## 创建与切换",
+              "",
+              "`git switch -c feature/login` 一步就创建分支并切过去。新的提交会让这个分支的"
+                + "指针向前走；你原来的分支仍然指在你离开时的那个提交上。没有复制，也没有丢失。",
+              "",
+              "## 合并回来",
+              "",
+              "工作完成后，切回 `main` 并运行 `git merge feature/login`。如果 `main` 在你"
+                + "分支出去之后没有动过，Git 只是把指针往前滑一格——这叫快进。如果两边都有"
+                + "新提交，Git 会生成一个有两个父提交的合并提交。",
+              "",
+              "## 冲突到底是什么",
+              "",
+              "冲突不是错误。它意味着两次提交改了同一个文件的同一批行，Git 不愿意替你猜"
+                + "你想要哪一个版本。它会在文件里标出这一段，然后停下来等你。你留下想要的"
+                + "文字，删掉标记，把文件暂存，再结束这次合并。",
+              "",
+              "## 一个具体的例子",
+              "",
+              "两个人改了 `引言.md` 里同一个标题。后合并的那个人会在这一个标题上看到冲突，"
+                + "决定保留哪种说法，然后提交这次解决结果。两个分支的其余部分都会自动合并。",
+              "",
+              "## 值得养成的习惯",
+              "",
+              "只要一件事需要超过几分钟，就为它开一个分支：修问题、做实验、加功能。`main` "
+                + "始终保持可用，而放弃一个实验的代价只有一条命令，而不是一个下午的撤销。",
+            ].join("\n"),
+          ),
+        },
+      },
+      {
+        id: `blk_${indexId}_match`,
+        title: "把术语和它的含义配对",
+        type: "game",
+        payload: {
+          variant: "match",
+          pairs: [
+            { left: "分支", right: "指向某个提交、可以移动的指针" },
+            { left: "main", right: "始终保持可发布的那个分支" },
+            { left: "合并", right: "把另一个分支的提交接进你的分支" },
+            { left: "快进", right: "不生成合并提交、只移动指针" },
+            { left: "冲突", right: "两次提交改了同一批行" },
+          ],
+        },
+      },
+      {
+        id: `blk_${indexId}_quiz`,
+        title: "检查一下理解",
+        type: "quiz",
+        payload: {
+          passScore: 0.7,
+          questions: [
+            {
+              id: `q_${indexId}_1`,
+              kind: "single",
+              prompt: "从技术上说，分支是什么？",
+              options: [
+                "一个指向提交的指针",
+                "项目文件夹的完整副本",
+                "远程服务器上的备份",
+                "一个永远不会移动的标签",
+              ],
+              answer: [0],
+              explanation: "分支之所以廉价，是因为它只是引用，不是文件的副本。",
+            },
+            {
+              id: `q_${indexId}_2`,
+              kind: "single",
+              prompt: "什么时候合并会产生冲突？",
+              options: [
+                "两个分支改了同一批行的时候",
+                "只要合并两个分支就会",
+                "只在文件被删除时",
+                "分支名字不一样的时候",
+              ],
+              answer: [0],
+              explanation: "互不重叠的改动 Git 会自动合并，只在改动重叠的地方才请人来决定。",
+            },
+            {
+              id: `q_${indexId}_3`,
+              kind: "single",
+              prompt: "快进合并发生了什么？",
+              options: [
+                "分支指针向前移动，不生成合并提交",
+                "Git 创建了一条空提交",
+                "功能分支被自动删除",
+                "所有冲突被自动解决",
+              ],
+              answer: [0],
+              explanation: "如果目标分支没有动过，指针直接前进到新的提交就可以了。",
+            },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+function mockChinesePlaceholderLesson(input: {
+  title: string;
+  summary: string;
+  id: string;
+}): GeneratedLesson {
+  const { title, summary, id } = input;
+  const slug = idSlug(title);
+  const summaryLine =
+    summary.length === 0 ? "这节课是手动添加的，还没有写摘要。" : summary;
+
+  return {
+    title,
+    estimatedMinutes: 8,
+    blocks: [
+      {
+        id: `blk_${id}_${slug}_reading`,
+        title: `关于「${title}」`,
+        type: "reading",
+        payload: {
+          markdown: mockReading(
+            [
+              `# ${title}`,
+              "",
+              summaryLine,
+              "",
+              "## 怎么用这一课",
+              "",
+              "先读上面的摘要，写下你期待学完之后能做什么。然后过一遍卡片和反思：它们刻意"
+                + "做得很短，几分钟就能完成，也更容易看出哪里还没想清楚。",
+              "",
+              "## 一个具体的例子",
+              "",
+              `找一个「${title}」真正起作用的小场景，描述你第一步会做什么，再和摘要对照。`
+                + "两者不一致的地方，就是值得去问导师的问题。",
+              "",
+              "## 需要记住的",
+              "",
+              "- 这一课的目标，就是摘要里写的那个结果。",
+              "- 复习时，一个具体的例子比一条定义更有用。",
+              "- 如果你没法用两句话讲清楚，就回去再看一遍卡片。",
+            ].join("\n"),
+          ),
+        },
+      },
+      {
+        id: `blk_${id}_${slug}_cards`,
+        title: "本课速览",
+        type: "flashcards",
+        payload: {
+          cards: [
+            { front: "本课重点", back: title },
+            { front: "为什么重要", back: summaryLine },
+            { front: "第一步", back: "先写下你已经知道的，再和摘要对照。" },
+            { front: "复习技巧", back: "不看笔记，用两句话把这个重点讲出来。" },
+            { front: "完成之后", back: "把反思写完，下一课才能接着往上搭。" },
+          ],
+        },
+      },
+      {
+        id: `blk_${id}_${slug}_reflection`,
+        title: "用你自己的话说一遍",
+        type: "reflection",
+        payload: {
+          prompt: `用两三句话，把「${title}」讲给一个从没学过它的人听。`,
           minWords: 25,
         },
       },

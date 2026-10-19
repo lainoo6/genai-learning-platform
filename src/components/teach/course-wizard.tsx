@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 import {
   generateCourseOutline,
@@ -40,15 +41,16 @@ import {
  */
 
 const STEPS = [
-  { id: 1, label: "Basics" },
-  { id: 2, label: "Outline" },
-  { id: 3, label: "Lessons" },
-  { id: 4, label: "Review" },
+  { id: 1, labelKey: "wizard.steps.basics" },
+  { id: 2, labelKey: "wizard.steps.outline" },
+  { id: 3, labelKey: "wizard.steps.lessons" },
+  { id: 4, labelKey: "wizard.steps.review" },
 ] as const;
 
 type Step = (typeof STEPS)[number]["id"];
 
 export function CourseWizard({ mockMode }: { mockMode: boolean }) {
+  const t = useT();
   const router = useRouter();
 
   const [step, setStep] = useState<Step>(1);
@@ -86,9 +88,7 @@ export function CourseWizard({ mockMode }: { mockMode: boolean }) {
       // Only transport failures reach here; the action reports its own errors
       // as `{ ok: false }`. Keep the brief on screen so a retry is one click.
       console.error("[teach] outline request failed", cause);
-      setOutlineError(
-        "The outline could not be generated. Your topic is still here — check the connection and try again.",
-      );
+      setOutlineError(t("wizard.outlineFailed"));
     } finally {
       setIsGeneratingOutline(false);
     }
@@ -142,8 +142,7 @@ export function CourseWizard({ mockMode }: { mockMode: boolean }) {
           ...previous,
           [key]: {
             status: "error",
-            error:
-              "This lesson could not be generated. Check the connection and try again.",
+            error: t("wizard.lessonFailed"),
             lesson: previous[key]?.lesson ?? null,
           },
         }));
@@ -190,7 +189,7 @@ export function CourseWizard({ mockMode }: { mockMode: boolean }) {
 
     const modules = toDraftModules(outline, jobs);
     if (modules === null) {
-      setSaveError("Generate every lesson before saving the course.");
+      setSaveError(t("wizard.generateAllFirst"));
       return;
     }
 
@@ -215,9 +214,7 @@ export function CourseWizard({ mockMode }: { mockMode: boolean }) {
       router.push(`/teach?created=${encodeURIComponent(result.title)}`);
     } catch (cause: unknown) {
       console.error("[teach] save request failed", cause);
-      setSaveError(
-        "The course could not be saved. Your work is still on screen — check the connection and try again.",
-      );
+      setSaveError(t("wizard.saveFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -228,18 +225,22 @@ export function CourseWizard({ mockMode }: { mockMode: boolean }) {
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs font-medium uppercase tracking-wide text-primary">
-            Course wizard
+            {t("wizard.eyebrow")}
           </p>
-          {mockMode ? <Badge variant="outline">Mock mode · canned content</Badge> : null}
+          {mockMode ? (
+            <Badge variant="outline">{t("wizard.mockBadge")}</Badge>
+          ) : null}
         </div>
-        <h1 className="text-2xl font-semibold">New course with AI</h1>
+        <h1 className="text-2xl font-semibold">{t("wizard.title")}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Describe the course, review the plan, then let the generator write one
-          lesson at a time. Nothing is saved until you approve the last step.
+          {t("wizard.subtitle")}
         </p>
       </header>
 
-      <ol aria-label="Wizard steps" className="flex flex-wrap items-center gap-2 text-xs">
+      <ol
+        aria-label={t("wizard.stepsAria")}
+        className="flex flex-wrap items-center gap-2 text-xs"
+      >
         {STEPS.map((entry) => {
           const isCurrent = entry.id === step;
           const isDone = entry.id < step;
@@ -257,7 +258,7 @@ export function CourseWizard({ mockMode }: { mockMode: boolean }) {
                 {isDone ? <Check aria-hidden="true" className="size-3" /> : entry.id}
               </span>
               <span className={isCurrent ? "font-medium" : "text-muted-foreground"}>
-                {entry.label}
+                {t(entry.labelKey)}
               </span>
               {entry.id === STEPS.length ? null : (
                 <span aria-hidden="true" className="text-muted-foreground/40">

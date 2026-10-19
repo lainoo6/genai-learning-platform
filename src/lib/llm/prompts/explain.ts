@@ -2,6 +2,12 @@ import { z } from "zod";
 
 import { blockDigest } from "@/lib/blocks/digest";
 import type { Block, QuizQuestion } from "@/lib/blocks/schema";
+import {
+  CONTENT_LANGUAGE_LABEL,
+  contentLanguageLine,
+  readContentLanguage,
+  type ContentLanguage,
+} from "@/lib/llm/language";
 import { mockText } from "@/lib/llm/mock";
 import {
   BACKGROUND_LABELS,
@@ -33,6 +39,8 @@ export type ExplainResultData = z.infer<typeof explainResultSchema>;
 /** Everything the rewrite needs to know. */
 export type ExplainContext = {
   profile: LearnerProfile | null;
+  /** Interface language of the learner; the rewrite is produced in it. */
+  language?: ContentLanguage;
   courseTitle: string;
   lessonTitle: string;
   block: Block;
@@ -57,7 +65,10 @@ const STYLE_RULES: Record<Background, string> = {
     "The learner's background is unknown. Use plain language, define terms the first time they appear, and stay concrete.",
 };
 
-export function explainSystemPrompt(profile: LearnerProfile | null): string {
+export function explainSystemPrompt(
+  profile: LearnerProfile | null,
+  language: ContentLanguage = "en",
+): string {
   return [
     PERSONA,
     "",
@@ -68,6 +79,7 @@ export function explainSystemPrompt(profile: LearnerProfile | null): string {
     "- `title`: at most 8 words, naming what the explanation covers.",
     "- `markdown`: the explanation itself — short paragraphs and bullet lists, no HTML, no code fences.",
     "- Keep every fact that appears in the material. Never reveal a quiz answer key as a bare answer; explain the reasoning instead.",
+    `- Write everything in ${CONTENT_LANGUAGE_LABEL[language]}.`,
   ].join("\n");
 }
 
@@ -99,6 +111,7 @@ function taskFor(context: ExplainContext): string {
 
 export function explainUserPrompt(context: ExplainContext): string {
   const { profile } = context;
+  const language = context.language ?? "en";
   const goals = profile === null
     ? "unknown"
     : profile.goals.map((goal) => GOAL_LABELS[goal]).join(", ") || "not stated";
@@ -112,6 +125,7 @@ export function explainUserPrompt(context: ExplainContext): string {
     `Block type: ${context.block.type}`,
     `Block title: ${context.block.title}`,
     `Block digest: ${blockDigest(context.block)}`,
+    contentLanguageLine(language),
   ];
 
   if (context.wrongQuestions.length > 0) {
@@ -163,6 +177,10 @@ export function mockExplain(prompt: string): unknown {
   const blockTitle = readField(prompt, "Block title") ?? "this block";
   const wrongQuestions = readBullets(prompt, "Wrong questions");
 
+  if (readContentLanguage(prompt) === "zh") {
+    return mockChineseExplain({ background, blockType, blockTitle, wrongQuestions });
+  }
+
   const forNewcomer = background !== "CS_STUDENT" && background !== "PRO_DEV";
 
   const body = forNewcomer
@@ -202,6 +220,60 @@ export function mockExplain(prompt: string): unknown {
 
   return {
     title: `Explained: ${blockTitle}`,
+    markdown: `${body}${quizSection}`,
+  };
+}
+
+/**
+ * Chinese "explain for me" fallback, built from the same prompt fields as the
+ * English one so a newcomer and a computing student still get different text.
+ */
+function mockChineseExplain(input: {
+  background: string | null;
+  blockType: string;
+  blockTitle: string;
+  wrongQuestions: string[];
+}): unknown {
+  const { background, blockType, blockTitle, wrongQuestions } = input;
+  const forNewcomer = background !== "CS_STUDENT" && background !== "PRO_DEV";
+
+  const body = forNewcomer
+    ? [
+        mockText(`用大白话讲讲「${blockTitle}」。`),
+        "",
+        "可以把它想成做饭前先写菜谱：把该发生的事按顺序写下来，之后任何人照着做，都能得到同样的结果。",
+        "",
+        `- 核心想法：**${blockTitle}** 就是这份菜谱里的一小步。`,
+        "- 为什么重要：少了这一步，下一个人只能靠猜，而猜出来的东西最后会变成缺陷。",
+        "- 记住什么：先描述结果，再检查你做出来的东西是否符合它。",
+        "",
+        "_模拟讲解：配置 API key（或关掉 LLM_MOCK）即可获得为你生成的版本。_",
+      ].join("\n")
+    : [
+        mockText(`讲讲「${blockTitle}」，技术细节保留。`),
+        "",
+        "从机制上看，这是系统两部分之间的一份约定：一侧声明什么条件必须成立，另一侧要在其他逻辑运行之前满足它。",
+        "",
+        `- **结构**：这个 ${blockType} 块固定了输入、期望状态和可观察的结果——形状上相当于一个类型签名加一条不变式。`,
+        "- **取舍**：显式表达要在前期花时间，换来的是廉价的失败，而不是昂贵的失败。",
+        "- **失败模式**：真正有趣的缺陷不是输出错了，而是某个假设没有被验证——永远先问这一步在检验哪个假设。",
+        "",
+        "_模拟讲解：配置 API key（或关掉 LLM_MOCK）即可获得为你生成的版本。_",
+      ].join("\n");
+
+  const quizSection = wrongQuestions.length === 0
+    ? ""
+    : [
+        "",
+        "### 你答错的题目",
+        ...wrongQuestions.map(
+          (question, index) =>
+            `${index + 1}. **${question}** —— 先读清题目到底在问什么，再看选项；干扰项通常是听起来合理、但少走了一步推理的那个答案。`,
+        ),
+      ].join("\n");
+
+  return {
+    title: `讲解：${blockTitle}`,
     markdown: `${body}${quizSection}`,
   };
 }

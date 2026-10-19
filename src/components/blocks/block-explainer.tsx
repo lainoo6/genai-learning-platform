@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { MarkdownView } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useT } from "@/i18n/client";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +56,7 @@ export function BlockExplainer({
   canReplace,
   replaced,
 }: BlockExplainerProps) {
+  const t = useT();
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
@@ -115,7 +117,7 @@ export function BlockExplainer({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          aria-label="Block options"
+          aria-label={t("block.explain.options")}
           render={<Button size="icon-sm" variant="ghost" />}
         >
           <Sparkles aria-hidden="true" />
@@ -123,12 +125,12 @@ export function BlockExplainer({
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={request}>
             <Sparkles aria-hidden="true" />
-            Explain for me
+            {t("block.explain.title")}
           </DropdownMenuItem>
           {isReplaced ? (
             <DropdownMenuItem onClick={restore}>
               <Undo2 aria-hidden="true" />
-              Restore original text
+              {t("block.explain.restore")}
             </DropdownMenuItem>
           ) : null}
         </DropdownMenuContent>
@@ -143,18 +145,21 @@ export function BlockExplainer({
         <DialogContent className="max-h-[85vh] w-full overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {explanation === null ? "Explaining this block…" : explanation.title}
+              {explanation === null
+                ? t("block.explain.loading")
+                : explanation.title}
             </DialogTitle>
             <DialogDescription>
-              Rewritten for your profile. Nothing is changed until you switch on
-              “Replace content”.
+              {t("block.explain.description")}
             </DialogDescription>
           </DialogHeader>
 
           {explanation === null ? (
             <p className="flex items-center gap-2 py-6 text-muted-foreground">
               <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-              {isPending ? "Asking the tutor…" : "Nothing to show."}
+              {isPending
+                ? t("block.explain.asking")
+                : t("block.explain.nothing")}
             </p>
           ) : (
             <MarkdownView>{explanation.markdown}</MarkdownView>
@@ -170,10 +175,9 @@ export function BlockExplainer({
                 }}
               />
               <span className="text-sm">
-                Replace content
+                {t("block.explain.replace")}
                 <span className="block text-xs text-muted-foreground">
-                  Only you see this version. You can restore the original at any
-                  time.
+                  {t("block.explain.replaceHint")}
                 </span>
               </span>
             </label>

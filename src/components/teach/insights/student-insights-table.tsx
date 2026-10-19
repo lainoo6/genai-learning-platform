@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { Fragment, useState } from "react";
 
 import { Progress } from "@/components/ui/progress";
+import { useT } from "@/i18n/client";
 import {
   Table,
   TableBody,
@@ -45,10 +46,10 @@ export type StudentInsightRow = {
   lessons: StudentInsightLessonView[];
 };
 
-const STATUS_LABEL: Record<StudentInsightLessonView["status"], string> = {
-  COMPLETED: "Completed",
-  IN_PROGRESS: "In progress",
-  NOT_STARTED: "Not started",
+const STATUS_KEYS: Record<StudentInsightLessonView["status"], string> = {
+  COMPLETED: "insights.status.completed",
+  IN_PROGRESS: "insights.status.inProgress",
+  NOT_STARTED: "insights.status.notStarted",
 };
 
 const STATUS_CLASS: Record<StudentInsightLessonView["status"], string> = {
@@ -58,6 +59,7 @@ const STATUS_CLASS: Record<StudentInsightLessonView["status"], string> = {
 };
 
 export function StudentInsightsTable({ students }: { students: StudentInsightRow[] }) {
+  const t = useT();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   function toggle(userId: string): void {
@@ -69,11 +71,11 @@ export function StudentInsightsTable({ students }: { students: StudentInsightRow
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="pl-4">Student</TableHead>
-            <TableHead>Progress</TableHead>
-            <TableHead>Quiz average</TableHead>
-            <TableHead>Blocks done</TableHead>
-            <TableHead className="pr-4">Last active</TableHead>
+            <TableHead className="pl-4">{t("insights.table.student")}</TableHead>
+            <TableHead>{t("insights.table.progress")}</TableHead>
+            <TableHead>{t("insights.table.quizAverage")}</TableHead>
+            <TableHead>{t("insights.table.blocksDone")}</TableHead>
+            <TableHead className="pr-4">{t("insights.table.lastActive")}</TableHead>
           </TableRow>
         </TableHeader>
 
@@ -113,7 +115,9 @@ export function StudentInsightsTable({ students }: { students: StudentInsightRow
 
                   <TableCell>
                     <Progress
-                      aria-label={`${student.name} progress`}
+                      aria-label={t("students.roster.progressAria", {
+                        name: student.name,
+                      })}
                       className="w-44 items-center gap-2"
                       value={student.completionPercent}
                     >
@@ -141,22 +145,30 @@ export function StudentInsightsTable({ students }: { students: StudentInsightRow
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableCell className="px-4 py-3" colSpan={5}>
                       <p className="text-xs font-medium">
-                        Lesson breakdown for {student.name}
+                        {t("insights.table.breakdown", { name: student.name })}
                       </p>
 
                       {student.lessons.length === 0 ? (
                         <p className="mt-2 text-xs text-muted-foreground">
-                          This course has no lessons yet.
+                          {t("insights.lessons.empty")}
                         </p>
                       ) : (
                         <div className="mt-2 overflow-hidden rounded-lg ring-1 ring-foreground/10">
                           <table className="w-full text-xs">
                             <thead>
                               <tr className="border-b bg-background/60 text-left text-muted-foreground">
-                                <th className="px-3 py-1.5 font-medium">Lesson</th>
-                                <th className="px-3 py-1.5 font-medium">Status</th>
-                                <th className="px-3 py-1.5 font-medium">Blocks</th>
-                                <th className="px-3 py-1.5 font-medium">Score</th>
+                                <th className="px-3 py-1.5 font-medium">
+                                  {t("insights.table.lesson")}
+                                </th>
+                                <th className="px-3 py-1.5 font-medium">
+                                  {t("insights.table.status")}
+                                </th>
+                                <th className="px-3 py-1.5 font-medium">
+                                  {t("insights.table.blocks")}
+                                </th>
+                                <th className="px-3 py-1.5 font-medium">
+                                  {t("insights.table.score")}
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -180,7 +192,7 @@ export function StudentInsightsTable({ students }: { students: StudentInsightRow
                                         STATUS_CLASS[lesson.status],
                                       )}
                                     >
-                                      {STATUS_LABEL[lesson.status]}
+                                      {t(STATUS_KEYS[lesson.status])}
                                     </span>
                                   </td>
                                   <td className="px-3 py-1.5 tabular-nums text-muted-foreground">

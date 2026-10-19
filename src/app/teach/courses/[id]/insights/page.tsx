@@ -24,23 +24,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { completionPercent } from "@/lib/students";
 import { loadCourseInsights } from "@/lib/insights";
-import { COURSE_STATUS_LABELS } from "@/lib/teach";
+import { EDITOR_STATUS_KEYS } from "@/lib/teach-editor";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = {
-  title: "Insights",
-};
-
-const DATE_TIME_FORMAT = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("insights.metaTitle") };
+}
 
 type InsightsPageProps = {
   params: Promise<{ id: string }>;
@@ -115,7 +109,7 @@ async function InsightsContent({ params }: InsightsPageProps) {
   await connection();
   const { id } = await params;
 
-  const session = await auth();
+  const [session, { locale, t }] = await Promise.all([auth(), getI18n()]);
   const user = session?.user;
 
   if (user === undefined) {
@@ -136,6 +130,16 @@ async function InsightsContent({ params }: InsightsPageProps) {
 
   const { course, students } = insights;
   const isPublished = course.status === "PUBLISHED";
+  const dateTimeFormat = new Intl.DateTimeFormat(
+    locale === "zh" ? "zh-CN" : "en-GB",
+    {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  );
 
   const rows: StudentInsightRow[] = students.map((student) => ({
     userId: student.userId,
@@ -152,7 +156,7 @@ async function InsightsContent({ params }: InsightsPageProps) {
     lastActiveLabel:
       student.lastActiveAt === null
         ? "—"
-        : DATE_TIME_FORMAT.format(student.lastActiveAt),
+        : dateTimeFormat.format(student.lastActiveAt),
     lessons: student.lessons.map((lesson) => ({
       lessonId: lesson.lessonId,
       title: lesson.title,
@@ -172,7 +176,7 @@ async function InsightsContent({ params }: InsightsPageProps) {
         href="/teach"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
-        All courses
+        {t("students.page.back")}
       </Link>
 
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -183,16 +187,15 @@ async function InsightsContent({ params }: InsightsPageProps) {
 
           <div className="space-y-1.5">
             <p className="text-xs font-medium uppercase tracking-wide text-primary">
-              Insights
+              {t("insights.eyebrow")}
             </p>
             <h1 className="text-2xl font-semibold">{course.title}</h1>
             <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <Badge variant={isPublished ? "default" : "secondary"}>
-                {COURSE_STATUS_LABELS[course.status]}
+                {t(EDITOR_STATUS_KEYS[course.status])}
               </Badge>
               <span>
-                {insights.totalStudents} student
-                {insights.totalStudents === 1 ? "" : "s"}
+                {t("insights.students", { count: insights.totalStudents })}
               </span>
             </p>
           </div>
@@ -204,41 +207,48 @@ async function InsightsContent({ params }: InsightsPageProps) {
             href={`/teach/courses/${course.id}/students`}
           >
             <Users aria-hidden="true" />
-            Students
+            {t("teach.students")}
           </Link>
           <Link
             className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
             href={`/teach/courses/${course.id}/edit`}
           >
             <Pencil aria-hidden="true" />
-            Edit course
+            {t("teach.edit")}
           </Link>
         </div>
       </header>
 
-      <section aria-label="Key numbers" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section
+        aria-label={t("insights.keyNumbers")}
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+      >
         <StatCard
-          hint={`${insights.activeLast7Days} active in the last 7 days`}
+          hint={t("insights.enrolledHint", {
+            count: insights.activeLast7Days,
+          })}
           icon={Users}
-          label="Enrolled"
+          label={t("insights.enrolled")}
           value={String(insights.totalStudents)}
         />
         <StatCard
-          hint="Distinct learners with any activity"
+          hint={t("insights.activeHint")}
           icon={Activity}
-          label="Active (7 days)"
+          label={t("insights.active")}
           value={String(insights.activeLast7Days)}
         />
         <StatCard
-          hint={`${insights.totalBlocksCompleted} blocks completed in total`}
+          hint={t("insights.completionHint", {
+            count: insights.totalBlocksCompleted,
+          })}
           icon={Gauge}
-          label="Average completion"
+          label={t("insights.averageCompletion")}
           value={`${insights.averageCompletion}%`}
         />
         <StatCard
-          hint="Mean of each learner's lesson scores"
+          hint={t("insights.quizHint")}
           icon={Trophy}
-          label="Quiz average"
+          label={t("insights.quizAverage")}
           value={
             insights.quizAverage === null
               ? "—"
@@ -250,24 +260,23 @@ async function InsightsContent({ params }: InsightsPageProps) {
       {insights.totalStudents === 0 ? (
         <section className="rounded-xl border border-dashed border-border px-6 py-14 text-center">
           <EmptyInsightsIllustration />
-          <p className="mt-4 text-sm font-medium">No learners yet</p>
+          <p className="mt-4 text-sm font-medium">{t("insights.empty.title")}</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            Charts fill in as soon as somebody starts this course. Import a
-            roster to give your class an account, or share the course page.
+            {t("insights.empty.hint")}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Link
               className={buttonVariants()}
               href={`/teach/courses/${course.id}/students`}
             >
-              Import students
+              {t("insights.empty.import")}
             </Link>
             {isPublished ? (
               <Link
                 className={buttonVariants({ variant: "outline" })}
                 href={`/courses/${course.slug}`}
               >
-                View public page
+                {t("teach.viewPublic")}
               </Link>
             ) : null}
           </div>
@@ -282,14 +291,16 @@ async function InsightsContent({ params }: InsightsPageProps) {
                     aria-hidden="true"
                     className="size-4 text-muted-foreground"
                   />
-                  Daily active learners
+                  {t("insights.daily.title")}
                 </h2>
-                <p className="text-xs text-muted-foreground">Last 30 days</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("insights.daily.range")}
+                </p>
               </div>
               <div className="mt-3">
                 <ActivityLineChart
                   data={insights.dailyActivity}
-                  seriesLabel="Active learners"
+                  seriesLabel={t("insights.daily.series")}
                 />
               </div>
             </div>
@@ -301,16 +312,18 @@ async function InsightsContent({ params }: InsightsPageProps) {
                     aria-hidden="true"
                     className="size-4 text-muted-foreground"
                   />
-                  Activity mix
+                  {t("insights.mix.title")}
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  {insights.totalBlocksCompleted} completions
+                  {t("insights.mix.completions", {
+                    count: insights.totalBlocksCompleted,
+                  })}
                 </p>
               </div>
 
               {insights.blockMix.length === 0 ? (
                 <p className="mt-8 text-center text-xs text-muted-foreground">
-                  No blocks completed yet.
+                  {t("insights.mix.empty")}
                 </p>
               ) : (
                 <div className="mt-3">
@@ -327,22 +340,24 @@ async function InsightsContent({ params }: InsightsPageProps) {
                   aria-hidden="true"
                   className="size-4 text-muted-foreground"
                 />
-                Lesson completions
+                {t("insights.lessons.title")}
               </h2>
               <p className="text-xs text-muted-foreground">
-                Completed by how many of {insights.totalStudents} learners
+                {t("insights.lessons.hint", {
+                  count: insights.totalStudents,
+                })}
               </p>
             </div>
 
             {insights.lessonCompletion.length === 0 ? (
               <p className="mt-8 text-center text-xs text-muted-foreground">
-                This course has no lessons yet.
+                {t("insights.lessons.empty")}
               </p>
             ) : (
               <div className="mt-3">
                 <LessonCompletionChart
                   data={insights.lessonCompletion}
-                  seriesLabel="Learners who completed"
+                  seriesLabel={t("insights.lessons.series")}
                 />
               </div>
             )}
@@ -351,10 +366,10 @@ async function InsightsContent({ params }: InsightsPageProps) {
           <section aria-labelledby="students-heading" className="space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-lg font-medium" id="students-heading">
-                Student breakdown
+                {t("insights.breakdown.title")}
               </h2>
               <p className="text-xs text-muted-foreground">
-                Select a name to see every lesson
+                {t("insights.breakdown.hint")}
               </p>
             </div>
 

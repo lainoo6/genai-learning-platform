@@ -4,6 +4,7 @@ import { ArrowRight, Check, RotateCcw, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 import type {
   BlockRenderProps,
   SimulationBlock as SimulationBlockData,
@@ -29,10 +30,10 @@ const MAX_STEPS = 20;
 /** Why a run stopped, shown on the summary panel. */
 type EndReason = "end" | "broken-link" | "too-many-steps";
 
-const END_REASON_TEXT: Record<EndReason, string> = {
-  end: "You reached the end of the scenario.",
-  "broken-link": "That path leads nowhere, so the scenario stops here.",
-  "too-many-steps": `The scenario stopped after ${MAX_STEPS} decisions.`,
+const END_REASON_KEYS: Record<EndReason, string> = {
+  end: "block.sim.end.end",
+  "broken-link": "block.sim.end.broken",
+  "too-many-steps": "block.sim.end.steps",
 };
 
 /** One decision the learner has already made. */
@@ -58,6 +59,7 @@ export function SimulationBlock({
   context,
   onComplete,
 }: BlockRenderProps<SimulationBlockData>) {
+  const t = useT();
   const { intro, start, end, nodes } = block.payload;
 
   const [current, setCurrent] = useState(start);
@@ -69,6 +71,10 @@ export function SimulationBlock({
   const node = nodes[current];
   const endNode = nodes[end];
   const score = history.reduce((total, step) => total + step.score, 0);
+  const endReasonText =
+    endReason === "too-many-steps"
+      ? t(END_REASON_KEYS[endReason], { steps: MAX_STEPS })
+      : t(END_REASON_KEYS[endReason]);
 
   function choose(option: SimulationOption): void {
     if (node === undefined || pending !== null || finished) {
@@ -139,8 +145,7 @@ export function SimulationBlock({
     return (
       <p className="flex items-start gap-2 text-sm text-amber-600">
         <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-        This scenario points at a step that does not exist, so it cannot be
-        played.
+        {t("block.sim.brokenNode")}
       </p>
     );
   }
@@ -153,12 +158,15 @@ export function SimulationBlock({
         <div className="space-y-4 rounded-xl bg-muted/50 px-4 py-4 ring-1 ring-foreground/10">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Summary
+              {t("block.sim.summary")}
             </p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{score}</p>
             <p className="text-xs text-muted-foreground">
-              points across {history.length} decision
-              {history.length === 1 ? "" : "s"} · {END_REASON_TEXT[endReason]}
+              {t("block.sim.points", {
+                points: score,
+                count: history.length,
+                reason: endReasonText,
+              })}
             </p>
           </div>
 
@@ -176,7 +184,7 @@ export function SimulationBlock({
                   <p className="text-muted-foreground">{step.feedback}</p>
                   <p className="tabular-nums text-muted-foreground">
                     {step.score >= 0 ? "+" : ""}
-                    {step.score} point{Math.abs(step.score) === 1 ? "" : "s"}
+                    {t("block.sim.stepScore", { score: step.score })}
                   </p>
                 </li>
               ))}
@@ -186,7 +194,7 @@ export function SimulationBlock({
       ) : (
         <div className="space-y-4 rounded-xl bg-muted/50 px-4 py-4 ring-1 ring-foreground/10">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Decision {history.length + 1}
+            {t("block.sim.decision", { index: history.length + 1 })}
           </p>
           <p className="text-sm leading-relaxed">{node.text}</p>
 
@@ -209,13 +217,13 @@ export function SimulationBlock({
           ) : (
             <div className="space-y-3">
               <p className="text-xs font-medium">
-                You chose: {pending.step.optionLabel}
+                {t("block.sim.youChose", { option: pending.step.optionLabel })}
               </p>
               <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm leading-relaxed">
                 {pending.step.feedback}
               </p>
               <Button onClick={continueAfterFeedback}>
-                Continue
+                {t("common.continue")}
                 <ArrowRight aria-hidden="true" />
               </Button>
             </div>
@@ -234,22 +242,22 @@ export function SimulationBlock({
           {completed ? (
             <>
               <Check aria-hidden="true" />
-              Completed
+              {t("common.completed")}
             </>
           ) : (
-            "Mark as complete"
+            t("common.markComplete")
           )}
         </Button>
 
         <Button onClick={startOver} variant="ghost">
           <RotateCcw aria-hidden="true" />
-          Start over
+          {t("common.startOver")}
         </Button>
 
         <p className="text-xs text-muted-foreground">
           {finished || completed
-            ? "Play it again to try the other branches."
-            : "Pick the option you would really take — there is no single right path."}
+            ? t("block.sim.again")
+            : t("block.sim.hint")}
         </p>
       </div>
     </div>

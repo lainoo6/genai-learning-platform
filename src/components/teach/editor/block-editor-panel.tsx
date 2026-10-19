@@ -5,6 +5,7 @@ import { Trash2, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/i18n/client";
 import { blockMetaFor } from "@/lib/blocks/meta";
 import type { Block } from "@/lib/blocks/schema";
 import { BlockForm } from "./block-form";
@@ -27,13 +28,14 @@ export type BlockEditorPanelProps = {
 
 export function BlockEditorPanel(props: BlockEditorPanelProps) {
   const { block, errors, onChange, onProblem, onDelete } = props;
+  const t = useT();
 
   if (block === null) {
     return (
       <aside className="self-start rounded-xl p-4 ring-1 ring-foreground/10">
-        <p className="text-sm font-medium">Nothing selected</p>
+        <p className="text-sm font-medium">{t("editor.blockEditor.nothing")}</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Select a block in the middle column to edit its content.
+          {t("editor.blockEditor.nothingHint")}
         </p>
       </aside>
     );
@@ -45,16 +47,16 @@ export function BlockEditorPanel(props: BlockEditorPanelProps) {
     <aside className="space-y-3 self-start rounded-xl p-3 ring-1 ring-foreground/10 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Block editor
+          {t("editor.blockEditor.title")}
         </p>
-        <Badge variant="outline">{meta.label}</Badge>
+        <Badge variant="outline">{t(meta.labelKey)}</Badge>
       </div>
 
       {errors.length === 0 ? null : (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-700">
           <p className="flex items-center gap-1 font-medium">
             <TriangleAlert aria-hidden="true" className="size-3.5" />
-            This block is not valid yet
+            {t("editor.blockEditor.invalid")}
           </p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4">
             {errors.map((error) => (
@@ -65,11 +67,11 @@ export function BlockEditorPanel(props: BlockEditorPanelProps) {
       )}
 
       <Input
-        aria-label="Block title"
+        aria-label={t("editor.blockEditor.titleAria")}
         onChange={(event) => {
           onChange({ ...block, title: event.target.value });
         }}
-        placeholder="Block title"
+        placeholder={t("editor.blockEditor.titlePlaceholder")}
         value={block.title}
       />
 
@@ -83,7 +85,7 @@ export function BlockEditorPanel(props: BlockEditorPanelProps) {
       <div className="border-t pt-2">
         <Button onClick={onDelete} size="sm" variant="ghost">
           <Trash2 aria-hidden="true" />
-          Delete block
+          {t("editor.blockEditor.delete")}
         </Button>
       </div>
     </aside>

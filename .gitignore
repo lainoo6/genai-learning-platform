@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# agent scratch space (local memory, not part of the project)
+.workbuddy/
+
+# local-only planning & agent working docs (kept on disk, never published)
+/docs/
+/AGENTS.md
+/TASKS.md

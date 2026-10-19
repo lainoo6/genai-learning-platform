@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 
 import { MarkdownView } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 import type {
   BlockRenderProps,
   ReadingBlock as ReadingBlockData,
@@ -15,6 +16,7 @@ export function ReadingBlock({
   completed,
   onComplete,
 }: BlockRenderProps<ReadingBlockData>) {
+  const t = useT();
   const imageUrl = block.payload.imageUrl;
 
   return (
@@ -41,15 +43,15 @@ export function ReadingBlock({
           {completed ? (
             <>
               <Check aria-hidden="true" />
-              Marked as read
+              {t("block.reading.marked")}
             </>
           ) : (
-            "Mark as read"
+            t("block.reading.mark")
           )}
         </Button>
         {completed ? (
           <span className="text-xs text-muted-foreground">
-            Saved to your lesson progress.
+            {t("block.reading.saved")}
           </span>
         ) : null}
       </div>

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { getI18n } from "@/i18n/server";
+import type { Translator } from "@/i18n/translate";
 import { auth } from "@/lib/auth";
 import { MAX_IMPORT_BYTES } from "@/lib/csv";
 import { prisma } from "@/lib/prisma";
@@ -25,21 +27,24 @@ const userIdSchema = z.string().min(1).max(100);
 
 type OwnerGuard = { ok: true } | { ok: false; error: string };
 
-async function requireCourseOwner(rawCourseId: string): Promise<OwnerGuard> {
+async function requireCourseOwner(
+  rawCourseId: string,
+  t: Translator,
+): Promise<OwnerGuard> {
   const parsedCourseId = courseIdSchema.safeParse(rawCourseId);
   if (!parsedCourseId.success) {
-    return { ok: false, error: "This course could not be found." };
+    return { ok: false, error: t("server.students.courseMissing") };
   }
 
   const session = await auth();
   const user = session?.user;
 
   if (user === undefined) {
-    return { ok: false, error: "Sign in to manage students." };
+    return { ok: false, error: t("server.students.signIn") };
   }
 
   if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") {
-    return { ok: false, error: "Only instructors can manage students." };
+    return { ok: false, error: t("server.students.instructorOnly") };
   }
 
   const course = await prisma.course.findUnique({
@@ -48,13 +53,13 @@ async function requireCourseOwner(rawCourseId: string): Promise<OwnerGuard> {
   });
 
   if (course === null) {
-    return { ok: false, error: "This course no longer exists." };
+    return { ok: false, error: t("server.students.courseGone") };
   }
 
   if (course.createdById !== user.id) {
     return {
       ok: false,
-      error: "You can only manage students in courses you created.",
+      error: t("server.students.notOwner"),
     };
   }
 
@@ -72,32 +77,33 @@ export async function importStudents(
   courseId: string,
   formData: FormData,
 ): Promise<ImportStudentsResult> {
-  const guard = await requireCourseOwner(courseId);
+  const { t } = await getI18n();
+  const guard = await requireCourseOwner(courseId, t);
   if (!guard.ok) {
     return { ok: false, error: guard.error };
   }
 
   if (!(formData instanceof FormData)) {
-    return { ok: false, error: "Choose a CSV file to import." };
+    return { ok: false, error: t("server.students.chooseFile") };
   }
 
   const file = formData.get("file");
   if (!(file instanceof File)) {
-    return { ok: false, error: "Choose a CSV file to import." };
+    return { ok: false, error: t("server.students.chooseFile") };
   }
 
   if (!file.name.toLowerCase().endsWith(".csv")) {
-    return { ok: false, error: "Upload a .csv file, not another file type." };
+    return { ok: false, error: t("server.students.notCsv") };
   }
 
   if (file.size === 0) {
-    return { ok: false, error: "That file is empty." };
+    return { ok: false, error: t("server.students.emptyFile") };
   }
 
   if (file.size > MAX_IMPORT_BYTES) {
     return {
       ok: false,
-      error: "The file is larger than 1 MB. Split it into smaller files.",
+      error: t("server.students.tooLarge"),
     };
   }
 
@@ -108,11 +114,11 @@ export async function importStudents(
     console.error("[students] failed to read the uploaded file", error);
     return {
       ok: false,
-      error: "That file could not be read. Save it as UTF-8 CSV and try again.",
+      error: t("server.students.unreadable"),
     };
   }
 
-  const result = await importStudentsFromCsv(courseId, text);
+  const result = await importStudentsFromCsv(courseId, text, t);
 
   if (result.ok) {
     revalidatePath(`/teach/courses/${courseId}/students`);
@@ -126,7 +132,8 @@ export async function removeStudent(
   courseId: string,
   userId: string,
 ): Promise<StudentActionResult> {
-  const guard = await requireCourseOwner(courseId);
+  const { t } = await getI18n();
+  const guard = await requireCourseOwner(courseId, t);
   if (!guard.ok) {
     return { ok: false, error: guard.error };
   }

@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useT } from "@/i18n/client";
 import { setCourseStatus } from "@/server/admin";
 
 /**
@@ -30,6 +31,7 @@ export function CourseStatusButton({
   title: string;
   nextStatus: "PUBLISHED" | "ARCHIVED";
 }) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -63,7 +65,7 @@ export function CourseStatusButton({
         size="xs"
         variant={archiving ? "destructive" : "outline"}
       >
-        {archiving ? "Archive" : "Restore"}
+        {archiving ? t("admin.course.archive") : t("admin.course.restore")}
       </Button>
 
       <Dialog
@@ -81,12 +83,14 @@ export function CourseStatusButton({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {archiving ? `Archive “${title}”?` : `Restore “${title}”?`}
+              {archiving
+                ? t("admin.course.archiveTitle", { title })
+                : t("admin.course.restoreTitle", { title })}
             </DialogTitle>
             <DialogDescription>
               {archiving
-                ? "The course disappears from the public catalog. Enrollments, progress and the course itself are kept."
-                : "The course becomes visible in the public catalog again. Learners who already enrolled keep their progress."}
+                ? t("admin.course.archiveDescription")
+                : t("admin.course.restoreDescription")}
             </DialogDescription>
           </DialogHeader>
 
@@ -102,7 +106,7 @@ export function CourseStatusButton({
               }}
               variant="outline"
             >
-              Cancel
+              {t("editor.delete.cancel")}
             </Button>
             <Button
               disabled={pending}
@@ -112,10 +116,10 @@ export function CourseStatusButton({
               variant={archiving ? "destructive" : "default"}
             >
               {pending
-                ? "Saving…"
+                ? t("admin.role.saving")
                 : archiving
-                  ? "Archive course"
-                  : "Publish again"}
+                  ? t("admin.course.archiveConfirm")
+                  : t("admin.course.restoreConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

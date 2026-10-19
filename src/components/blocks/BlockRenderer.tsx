@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { type ComponentType, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { useT } from "@/i18n/client";
 import type { Block, BlockRenderProps } from "@/lib/blocks/schema";
 import { completeBlock } from "@/server/progress";
 import { BlockExplainer } from "./block-explainer";
@@ -39,6 +40,7 @@ export function BlockRenderer(props: BlockRendererProps) {
     overridden = false,
     onComplete,
   } = props;
+  const t = useT();
   const router = useRouter();
 
   const [isPending, startTransition] = useTransition();
@@ -69,12 +71,14 @@ export function BlockRenderer(props: BlockRendererProps) {
       <header className="flex items-center gap-2 border-b px-4 py-3">
         <h2 className="text-sm font-medium">{block.title}</h2>
         <Badge variant="secondary">{block.type}</Badge>
-        {overridden ? <Badge variant="outline">Personalised</Badge> : null}
+        {overridden ? (
+          <Badge variant="outline">{t("block.renderer.personalised")}</Badge>
+        ) : null}
         <span className="ml-auto flex items-center gap-2">
           {completed ? (
             <span className="flex items-center gap-1 text-xs text-emerald-600">
               <Check aria-hidden="true" className="size-3.5" />
-              Done
+              {t("block.renderer.done")}
             </span>
           ) : null}
           <BlockExplainer
@@ -96,7 +100,9 @@ export function BlockRenderer(props: BlockRendererProps) {
       </div>
 
       {isPending ? (
-        <p className="px-4 pb-3 text-xs text-muted-foreground">Saving progress…</p>
+        <p className="px-4 pb-3 text-xs text-muted-foreground">
+          {t("block.renderer.saving")}
+        </p>
       ) : null}
       {error === null ? null : (
         <p className="px-4 pb-3 text-xs text-red-600">{error}</p>

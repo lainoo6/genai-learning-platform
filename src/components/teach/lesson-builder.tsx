@@ -12,6 +12,8 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
+import { blockMetaFor } from "@/lib/blocks/meta";
 import {
   countWizardLessons,
   flattenWizardLessons,
@@ -50,6 +52,7 @@ export function LessonBuilder(props: LessonBuilderProps) {
     onContinue,
   } = props;
 
+  const t = useT();
   const total = countWizardLessons(outline);
   const flattened = flattenWizardLessons(outline);
   const ready = flattened.filter(
@@ -63,14 +66,13 @@ export function LessonBuilder(props: LessonBuilderProps) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="text-lg font-medium">Write the lessons</h2>
+          <h2 className="text-lg font-medium">{t("wizard.lessons.title")}</h2>
           <p className="text-sm text-muted-foreground">
-            Each lesson becomes a sequence of interactive blocks, validated
-            against the block schema before it appears here.
+            {t("wizard.lessons.subtitle")}
           </p>
         </div>
         <p className="text-xs text-muted-foreground tabular-nums">
-          {ready} of {total} lessons ready
+          {t("wizard.lessons.ready", { ready, total })}
         </p>
       </div>
 
@@ -79,7 +81,7 @@ export function LessonBuilder(props: LessonBuilderProps) {
           <section className="space-y-2" key={courseModule.key}>
             <h3 className="flex items-baseline gap-2 text-sm font-medium">
               <span className="text-xs text-muted-foreground tabular-nums">
-                Module {moduleIndex + 1}
+                {t("editor.structure.moduleNumber", { index: moduleIndex + 1 })}
               </span>
               {courseModule.title}
             </h3>
@@ -109,13 +111,13 @@ export function LessonBuilder(props: LessonBuilderProps) {
                         <p className="text-sm font-medium">{lesson.title}</p>
                         <p className="line-clamp-2 text-xs text-muted-foreground">
                           {lesson.summary.length === 0
-                            ? "No summary yet."
+                            ? t("wizard.lessons.noSummary")
                             : lesson.summary}
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {lesson.suggestedBlocks.map((type) => (
                             <Badge key={type} variant="outline">
-                              {type}
+                              {t(blockMetaFor(type).labelKey)}
                             </Badge>
                           ))}
                         </div>
@@ -123,7 +125,7 @@ export function LessonBuilder(props: LessonBuilderProps) {
                         {isRunning ? (
                           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
-                            Writing blocks…
+                            {t("wizard.lessons.writing")}
                           </p>
                         ) : null}
 
@@ -138,7 +140,7 @@ export function LessonBuilder(props: LessonBuilderProps) {
                             />
                             <span>
                               {job.error}
-                              {hasLesson ? " The previous version is kept." : ""}
+                              {hasLesson ? t("wizard.lessons.previousKept") : ""}
                             </span>
                           </p>
                         ) : null}
@@ -146,15 +148,19 @@ export function LessonBuilder(props: LessonBuilderProps) {
                         {hasLesson && job.status !== "running" ? (
                           <p className="flex items-center gap-1.5 text-xs text-emerald-600">
                             <Check aria-hidden="true" className="size-3.5" />
-                            {job.lesson?.blocks.length ?? 0} blocks ·{" "}
-                            {job.lesson?.estimatedMinutes ?? 0} min
+                            {t("editor.course.blocksCount", {
+                              count: job.lesson?.blocks.length ?? 0,
+                            })}{" "}
+                            · {t("lesson.minutes", {
+                              count: job.lesson?.estimatedMinutes ?? 0,
+                            })}
                           </p>
                         ) : null}
 
                         {!hasLesson && job.status === "idle" ? (
                           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Circle aria-hidden="true" className="size-2" />
-                            Not written yet
+                            {t("wizard.lessons.notWritten")}
                           </p>
                         ) : null}
                       </div>
@@ -170,12 +176,14 @@ export function LessonBuilder(props: LessonBuilderProps) {
                         {isRunning ? (
                           <>
                             <Loader2 aria-hidden="true" className="animate-spin" />
-                            Writing…
+                            {t("wizard.lessons.writing")}
                           </>
                         ) : (
                           <>
                             <Sparkles aria-hidden="true" />
-                            {hasLesson ? "Regenerate" : "Generate lesson"}
+                            {hasLesson
+                              ? t("wizard.lessons.regenerate")
+                              : t("wizard.lessons.generate")}
                           </>
                         )}
                       </Button>
@@ -191,7 +199,7 @@ export function LessonBuilder(props: LessonBuilderProps) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
         <Button onClick={onBack} variant="outline">
           <ArrowLeft aria-hidden="true" />
-          Back to outline
+          {t("wizard.lessons.back")}
         </Button>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -203,17 +211,17 @@ export function LessonBuilder(props: LessonBuilderProps) {
             {isBatchRunning ? (
               <>
                 <Loader2 aria-hidden="true" className="animate-spin" />
-                Writing…
+                {t("wizard.lessons.writing")}
               </>
             ) : (
               <>
                 <Sparkles aria-hidden="true" />
-                Generate the rest
+                {t("wizard.lessons.generateRest")}
               </>
             )}
           </Button>
           <Button disabled={ready < total} onClick={onContinue}>
-            Review course
+            {t("wizard.lessons.review")}
             <ArrowRight aria-hidden="true" />
           </Button>
         </div>

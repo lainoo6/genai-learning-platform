@@ -6,6 +6,7 @@ import { type ComponentType, useState } from "react";
 import { blockRegistry } from "@/components/blocks/registry";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 import type { Block, BlockRenderProps } from "@/lib/blocks/schema";
 import type {
   Audience,
@@ -39,10 +40,6 @@ export type CoursePreviewProps = {
   onSave: () => void;
 };
 
-function capitalise(value: string): string {
-  return value.length === 0 ? value : value[0].toUpperCase() + value.slice(1);
-}
-
 function PreviewBlock({ block, lessonId }: { block: Block; lessonId: string }) {
   const Component = blockRegistry[block.type] as unknown as ComponentType<
     BlockRenderProps<Block>
@@ -72,6 +69,7 @@ export function CoursePreview(props: CoursePreviewProps) {
   const { outline, jobs, audience, difficulty, isSaving, error, onBack, onSave } =
     props;
 
+  const t = useT();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const flattened = flattenWizardLessons(outline);
@@ -84,19 +82,24 @@ export function CoursePreview(props: CoursePreviewProps) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="text-lg font-medium">Review the course</h2>
+          <h2 className="text-lg font-medium">{t("wizard.preview.title")}</h2>
           <p className="text-sm text-muted-foreground">
-            Exactly what a learner will see. Pick a lesson on the left to read it.
+            {t("wizard.preview.subtitle")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline">{audience}</Badge>
-          <Badge variant="outline">{capitalise(difficulty)}</Badge>
-          <Badge variant="secondary">
-            {countWizardLessons(outline)} lessons
+          <Badge variant="outline">
+            {t(`courses.difficulty.${difficulty}`)}
           </Badge>
           <Badge variant="secondary">
-            <Clock aria-hidden="true" />~{totalMinutes} min
+            {t("editor.course.lessonsCount", {
+              count: countWizardLessons(outline),
+            })}
+          </Badge>
+          <Badge variant="secondary">
+            <Clock aria-hidden="true" />
+            {t("courses.card.minutes", { count: totalMinutes })}
           </Badge>
         </div>
       </div>
@@ -109,11 +112,14 @@ export function CoursePreview(props: CoursePreviewProps) {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <nav aria-label="Course outline" className="space-y-4">
+        <nav aria-label={t("wizard.preview.outlineAria")} className="space-y-4">
           {outline.modules.map((courseModule, moduleIndex) => (
             <div className="space-y-1.5" key={courseModule.key}>
               <p className="text-xs font-medium text-muted-foreground">
-                Module {moduleIndex + 1} · {courseModule.title}
+                {t("wizard.preview.module", {
+                  index: moduleIndex + 1,
+                  title: courseModule.title,
+                })}
               </p>
               <ul className="space-y-1">
                 {courseModule.lessons.map((lesson) => {
@@ -152,24 +158,31 @@ export function CoursePreview(props: CoursePreviewProps) {
         <div className="min-w-0 space-y-4">
           {selected === undefined || selectedJob?.lesson == null ? (
             <p className="rounded-xl px-4 py-8 text-sm text-muted-foreground ring-1 ring-foreground/10">
-              This lesson has not been written yet. Go back and generate it.
+              {t("wizard.preview.notWritten")}
             </p>
           ) : (
             <>
               <header className="space-y-2 border-b pb-4">
                 <p className="text-xs text-muted-foreground">
-                  {selected.moduleTitle} · lesson {selected.index + 1} of{" "}
-                  {flattened.length}
+                  {t("wizard.preview.position", {
+                    module: selected.moduleTitle,
+                    current: selected.index + 1,
+                    total: flattened.length,
+                  })}
                 </p>
                 <h3 className="text-xl font-semibold">
                   {selectedJob.lesson.title}
                 </h3>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">
-                    {selectedJob.lesson.estimatedMinutes} min
+                    {t("lesson.minutes", {
+                      count: selectedJob.lesson.estimatedMinutes,
+                    })}
                   </Badge>
                   <Badge variant="outline">
-                    {selectedJob.lesson.blocks.length} blocks
+                    {t("wizard.preview.blocks", {
+                      count: selectedJob.lesson.blocks.length,
+                    })}
                   </Badge>
                 </div>
               </header>
@@ -200,12 +213,12 @@ export function CoursePreview(props: CoursePreviewProps) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
         <Button disabled={isSaving} onClick={onBack} variant="outline">
           <ArrowLeft aria-hidden="true" />
-          Back to lessons
+          {t("wizard.preview.back")}
         </Button>
 
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-xs text-muted-foreground">
-            Saved as a draft owned by you. The full editor arrives in P5.1.
+            {t("wizard.preview.note")}
           </p>
           <Button
             disabled={isSaving}
@@ -214,7 +227,7 @@ export function CoursePreview(props: CoursePreviewProps) {
             }}
           >
             <Save aria-hidden="true" />
-            {isSaving ? "Saving…" : "Save as draft"}
+            {isSaving ? t("wizard.preview.saving") : t("wizard.preview.save")}
           </Button>
         </div>
       </div>

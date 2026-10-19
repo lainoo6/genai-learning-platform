@@ -1,3 +1,4 @@
+import { readContentLanguage } from "@/lib/llm/language";
 import { registerMock } from "@/lib/llm/mock";
 import { mockLearnerCourse } from "@/lib/llm/prompts/course";
 import { mockExplain } from "@/lib/llm/prompts/explain";
@@ -15,7 +16,9 @@ import { mockRoleplayFeedback } from "@/lib/llm/prompts/roleplay";
 export function registerLlmMocks(): void {
   registerMock("explain-block", ({ prompt }) => mockExplain(prompt));
   registerMock("roleplay-feedback", ({ prompt }) => mockRoleplayFeedback(prompt));
-  registerMock("course-outline", () => mockCourseOutline());
+  registerMock("course-outline", ({ prompt }) => mockCourseOutline(prompt));
   registerMock("course-lesson", ({ prompt }) => mockLesson(prompt));
-  registerMock("learner-course", () => mockLearnerCourse());
+  registerMock("learner-course", ({ prompt }) =>
+    mockLearnerCourse(readContentLanguage(prompt)),
+  );
 }

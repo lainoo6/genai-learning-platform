@@ -24,6 +24,7 @@ import {
   type Goal,
   type LearnerProfile,
 } from "@/lib/profile";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 import type { OnboardingState } from "@/server/onboarding";
 
@@ -35,8 +36,12 @@ import type { OnboardingState } from "@/server/onboarding";
  * radio group keeps its keyboard navigation.
  */
 
-const STEP_TITLES = ["Your background", "Your goals", "One last thing"] as const;
-const LAST_STEP = STEP_TITLES.length - 1;
+const STEP_TITLE_KEYS = [
+  "onboarding.step.background",
+  "onboarding.step.goals",
+  "onboarding.step.final",
+] as const;
+const LAST_STEP = STEP_TITLE_KEYS.length - 1;
 
 const INITIAL_STATE: OnboardingState = { error: null };
 
@@ -55,6 +60,7 @@ export function OnboardingForm({
   initialProfile,
   nextHref = "/dashboard",
 }: OnboardingFormProps) {
+  const t = useT();
   const [state, formAction, isPending] = useActionState(action, INITIAL_STATE);
   const formRef = useRef<HTMLFormElement>(null);
   const [step, setStep] = useState(0);
@@ -128,21 +134,25 @@ export function OnboardingForm({
     <Card className="w-full max-w-2xl">
       <CardHeader className="gap-3">
         <div aria-hidden="true" className="flex gap-1.5">
-          {STEP_TITLES.map((title, index) => (
+          {STEP_TITLE_KEYS.map((titleKey, index) => (
             <span
               className={cn(
                 "h-1.5 flex-1 rounded-full transition-colors",
                 index <= step ? "bg-primary" : "bg-muted",
               )}
-              key={title}
+              key={titleKey}
             />
           ))}
         </div>
         <CardTitle className="text-lg">
-          {isEditing ? "Update your learning profile" : "Let us tailor your courses"}
+          {isEditing ? t("onboarding.title.edit") : t("onboarding.title.new")}
         </CardTitle>
         <CardDescription>
-          Step {step + 1} of {STEP_TITLES.length} · {STEP_TITLES[step]}
+          {t("onboarding.stepPosition", {
+            step: step + 1,
+            total: STEP_TITLE_KEYS.length,
+            title: t(STEP_TITLE_KEYS[step]),
+          })}
         </CardDescription>
       </CardHeader>
 
@@ -151,7 +161,7 @@ export function OnboardingForm({
           <div className={cn("space-y-4", step === 0 ? undefined : "hidden")}>
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium">
-                Which of these describes you best?
+                {t("onboarding.background.legend")}
               </legend>
 
               {BACKGROUND_OPTIONS.map((option) => (
@@ -173,9 +183,9 @@ export function OnboardingForm({
                     value={option.value}
                   />
                   <span>
-                    <span className="block font-medium">{option.label}</span>
+                    <span className="block font-medium">{t(option.labelKey)}</span>
                     <span className="block text-xs text-muted-foreground">
-                      {option.hint}
+                      {t(option.hintKey)}
                     </span>
                   </span>
                 </label>
@@ -184,13 +194,13 @@ export function OnboardingForm({
 
             <div className="space-y-1.5">
               <Label htmlFor="backgroundNote">
-                Anything else about your background? (optional)
+                {t("onboarding.background.note.label")}
               </Label>
               <Input
                 id="backgroundNote"
                 name="backgroundNote"
                 onChange={(event) => setBackgroundNote(event.target.value)}
-                placeholder="I studied biology and now work with data."
+                placeholder={t("onboarding.background.note.placeholder")}
                 value={backgroundNote}
               />
             </div>
@@ -199,7 +209,7 @@ export function OnboardingForm({
           <div className={cn("space-y-4", step === 1 ? undefined : "hidden")}>
             <fieldset className="space-y-2">
               <legend className="text-sm font-medium">
-                What do you want to get out of these courses?
+                {t("onboarding.goals.legend")}
               </legend>
 
               {GOAL_OPTIONS.map((option) => (
@@ -213,20 +223,20 @@ export function OnboardingForm({
                       toggleGoal(option.value, checked === true)
                     }
                   />
-                  <span className="font-medium">{option.label}</span>
+                  <span className="font-medium">{t(option.labelKey)}</span>
                 </label>
               ))}
             </fieldset>
 
             <div className="space-y-1.5">
               <Label htmlFor="goalNote">
-                Tell us more about your goals (optional)
+                {t("onboarding.goals.note.label")}
               </Label>
               <Input
                 id="goalNote"
                 name="goalNote"
                 onChange={(event) => setGoalNote(event.target.value)}
-                placeholder="I want to use Copilot in my daily work."
+                placeholder={t("onboarding.goals.note.placeholder")}
                 value={goalNote}
               />
             </div>
@@ -235,19 +245,18 @@ export function OnboardingForm({
           <div className={cn("space-y-4", step === 2 ? undefined : "hidden")}>
             <div className="space-y-1.5">
               <Label htmlFor="statement">
-                In one sentence, what would make this worth your time?
+                {t("onboarding.statement.label")}
               </Label>
               <Textarea
                 id="statement"
                 name="statement"
                 onChange={(event) => setStatement(event.target.value)}
-                placeholder="I want to understand what my engineering teammates are talking about."
+                placeholder={t("onboarding.statement.placeholder")}
                 value={statement}
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              You can skip this — we only use it to pitch the material at the
-              right level.
+              {t("onboarding.statement.hint")}
             </p>
           </div>
 
@@ -259,8 +268,8 @@ export function OnboardingForm({
           {showError && !stepComplete[step] ? (
             <p className="text-sm text-destructive" role="alert">
               {step === 0
-                ? "Pick the option that describes you best."
-                : "Pick at least one goal."}
+                ? t("onboarding.error.background")
+                : t("onboarding.error.goals")}
             </p>
           ) : null}
 
@@ -280,14 +289,14 @@ export function OnboardingForm({
                 variant="ghost"
               >
                 <ArrowLeft aria-hidden="true" />
-                Back
+                {t("onboarding.button.back")}
               </Button>
             ) : isEditing ? (
               <Link
                 className={buttonVariants({ variant: "ghost" })}
                 href="/dashboard"
               >
-                Cancel
+                {t("onboarding.button.cancel")}
               </Link>
             ) : null}
           </div>
@@ -298,24 +307,24 @@ export function OnboardingForm({
                 className={buttonVariants({ variant: "outline" })}
                 href="/dashboard"
               >
-                Skip
+                {t("onboarding.button.skip")}
               </Link>
             ) : null}
 
             <Button disabled={isPending} onClick={handlePrimaryAction} type="button">
               {step < LAST_STEP ? (
                 <>
-                  Next
+                  {t("onboarding.button.next")}
                   <ArrowRight aria-hidden="true" />
                 </>
               ) : (
                 <>
                   <Sparkles aria-hidden="true" />
                   {isPending
-                    ? "Saving…"
+                    ? t("onboarding.button.saving")
                     : isEditing
-                      ? "Save changes"
-                      : "Start learning"}
+                      ? t("onboarding.button.save")
+                      : t("onboarding.button.start")}
                 </>
               )}
             </Button>

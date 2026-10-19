@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { getI18n } from "@/i18n/server";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,10 +13,10 @@ import { cn } from "@/lib/utils";
 
 export type AdminTab = "overview" | "users" | "courses";
 
-const TABS: ReadonlyArray<{ id: AdminTab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "users", label: "Users" },
-  { id: "courses", label: "Courses" },
+const TABS: ReadonlyArray<{ id: AdminTab; labelKey: string }> = [
+  { id: "overview", labelKey: "admin.tabs.overview" },
+  { id: "users", labelKey: "admin.tabs.users" },
+  { id: "courses", labelKey: "admin.tabs.courses" },
 ];
 
 /** Unknown or missing `?tab=` values fall back to the overview. */
@@ -24,10 +25,12 @@ export function parseAdminTab(value: string | undefined): AdminTab {
   return match?.id ?? "overview";
 }
 
-export function AdminTabs({ active }: { active: AdminTab }) {
+export async function AdminTabs({ active }: { active: AdminTab }) {
+  const { t } = await getI18n();
+
   return (
     <nav
-      aria-label="Admin sections"
+      aria-label={t("admin.tabs.aria")}
       className="inline-flex w-fit items-center gap-1 rounded-lg bg-muted p-1"
     >
       {TABS.map((tab) => {
@@ -45,7 +48,7 @@ export function AdminTabs({ active }: { active: AdminTab }) {
             href={`/admin?tab=${tab.id}`}
             key={tab.id}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </Link>
         );
       })}

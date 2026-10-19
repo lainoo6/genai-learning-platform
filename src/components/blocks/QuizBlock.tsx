@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/i18n/client";
 import {
   gradeQuestion,
   gradeQuiz,
@@ -31,14 +32,14 @@ import { trackBlockEvent } from "@/server/progress";
  * contains any keyword (case-insensitive). See lib/blocks/scoring.ts.
  */
 
-const TRUE_FALSE_OPTIONS = ["True", "False"];
+const TRUE_FALSE_KEYS = ["block.quiz.true", "block.quiz.false"];
 
 /** Options to display, or an empty list for free-text questions. */
-function optionsOf(question: QuizQuestion): string[] {
+function optionsOf(question: QuizQuestion, t: (key: string) => string): string[] {
   if (question.kind === "short") {
     return [];
   }
-  return question.options ?? TRUE_FALSE_OPTIONS;
+  return question.options ?? TRUE_FALSE_KEYS.map((key) => t(key));
 }
 
 export function QuizBlock({
@@ -47,6 +48,7 @@ export function QuizBlock({
   context,
   onComplete,
 }: BlockRenderProps<QuizBlockData>) {
+  const t = useT();
   const { questions, passScore } = block.payload;
 
   const [index, setIndex] = useState(0);
@@ -120,7 +122,7 @@ export function QuizBlock({
     setIndex(0);
   }
 
-  const options = optionsOf(question);
+  const options = optionsOf(question, t);
   const canCheck =
     !isRevealed
     && currentResponse !== undefined
@@ -129,7 +131,10 @@ export function QuizBlock({
   return (
     <div className="space-y-5">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Question {index + 1} of {questions.length}
+        {t("block.quiz.question", {
+          current: index + 1,
+          total: questions.length,
+        })}
       </p>
 
       <div>
@@ -142,7 +147,7 @@ export function QuizBlock({
             onChange={(event) => {
               setResponse(question.id, { kind: "text", text: event.target.value });
             }}
-            placeholder="Type your answer"
+            placeholder={t("block.quiz.placeholder")}
             value={currentResponse?.kind === "text" ? currentResponse.text : ""}
           />
         ) : (
@@ -184,12 +189,12 @@ export function QuizBlock({
             {isCorrect ? (
               <>
                 <Check aria-hidden="true" className="size-4 text-emerald-600" />
-                Correct
+                {t("block.quiz.correct")}
               </>
             ) : (
               <>
                 <X aria-hidden="true" className="size-4 text-red-600" />
-                Not quite
+                {t("block.quiz.incorrect")}
               </>
             )}
           </p>
@@ -206,11 +211,11 @@ export function QuizBlock({
             }}
             variant="secondary"
           >
-            Next question
+            {t("block.quiz.next")}
           </Button>
         ) : (
           <Button disabled={!canCheck} onClick={checkAnswer}>
-            Check answer
+            {t("block.quiz.check")}
           </Button>
         )}
 
@@ -221,7 +226,7 @@ export function QuizBlock({
             }}
             variant="ghost"
           >
-            Previous
+            {t("block.quiz.previous")}
           </Button>
         ) : null}
       </div>
@@ -229,13 +234,16 @@ export function QuizBlock({
       {allRevealed ? (
         <div className="rounded-lg border bg-muted/40 px-3 py-3">
           <p className="text-sm font-medium">
-            Score: {result.correct} / {result.total} (
-            {Math.round(result.score * 100)}%)
+            {t("block.quiz.score", {
+              correct: result.correct,
+              total: result.total,
+              percent: Math.round(result.score * 100),
+            })}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {result.passed
-              ? `You reached the pass mark of ${Math.round(passScore * 100)}%.`
-              : `You need ${Math.round(passScore * 100)}% to pass. Review the explanations and try again.`}
+              ? t("block.quiz.passed", { percent: Math.round(passScore * 100) })
+              : t("block.quiz.failed", { percent: Math.round(passScore * 100) })}
           </p>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -248,15 +256,15 @@ export function QuizBlock({
               {completed ? (
                 <>
                   <Check aria-hidden="true" />
-                  Completed
+                  {t("common.completed")}
                 </>
               ) : (
-                "Mark complete"
+                t("common.markComplete")
               )}
             </Button>
             <Button onClick={tryAgain} variant="outline">
               <RotateCcw aria-hidden="true" />
-              Try again
+              {t("block.quiz.tryAgain")}
             </Button>
           </div>
         </div>

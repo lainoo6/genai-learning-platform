@@ -5,8 +5,10 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { blockSchema } from "@/lib/blocks/schema";
+import { contentLanguageFromLocale } from "@/lib/llm/language";
 import { registerLlmMocks } from "@/lib/llm/mocks";
 import {
   generateJson,
@@ -27,6 +29,7 @@ import {
   lessonPrompt,
   type GeneratedLesson,
 } from "@/lib/llm/prompts/lesson";
+import type { Translator } from "@/i18n/translate";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -112,16 +115,16 @@ type InstructorCheck =
   | { ok: false; error: string };
 
 /** Resolves the caller and confirms they are allowed to author courses. */
-async function requireInstructor(): Promise<InstructorCheck> {
+async function requireInstructor(t: Translator): Promise<InstructorCheck> {
   const session = await auth();
   const user = session?.user;
 
   if (user === undefined) {
-    return { ok: false, error: "Sign in to generate a course." };
+    return { ok: false, error: t("server.teach.signIn") };
   }
 
   if (user.role !== "INSTRUCTOR" && user.role !== "ADMIN") {
-    return { ok: false, error: "Only instructors can generate courses." };
+    return { ok: false, error: t("server.teach.instructorOnly") };
   }
 
   return { ok: true, userId: user.id };
@@ -134,19 +137,29 @@ async function requireInstructor(): Promise<InstructorCheck> {
  * key or a network error is worth surfacing verbatim (truncated) so the person
  * running the demo can see what is wrong.
  */
-function describeFailure(step: string, error: unknown): string {
+function describeFailure(
+  step: "outline" | "lesson",
+  error: unknown,
+  t: Translator,
+): string {
   if (error instanceof LlmValidationError) {
-    return `The ${step} came back in the wrong format. Try again, or add a note saying what to change.`;
+    return step === "outline"
+      ? t("server.teach.outlineFormat")
+      : t("server.teach.lessonFormat");
   }
 
   if (error instanceof LlmError) {
-    return `The ${step} failed: ${error.message}`;
+    return step === "outline"
+      ? t("server.teach.outlineFailed", { detail: error.message })
+      : t("server.teach.lessonFailed", { detail: error.message });
   }
 
   const detail = error instanceof Error ? error.message : "unknown error";
   console.error(`[teach] ${step} failed`, error);
 
-  return `The ${step} could not be generated (${detail.slice(0, 200)}). Check the API key, or set LLM_MOCK=true for canned content.`;
+  return step === "outline"
+    ? t("server.teach.outlineError", { detail: detail.slice(0, 200) })
+    : t("server.teach.lessonError", { detail: detail.slice(0, 200) });
 }
 
 /** URL-safe stub of the title plus a random suffix, so slugs never collide. */
@@ -205,23 +218,24 @@ async function recordMockJob(entry: {
 export async function generateCourseOutline(
   input: OutlineInput,
 ): Promise<OutlineResult> {
+  const { locale, t } = await getI18n();
+  const language = contentLanguageFromLocale(locale);
   const parsedInput = outlineInputSchema.safeParse(input);
   if (!parsedInput.success) {
     return {
       ok: false,
-      error:
-        "Fill in a topic of at least three characters, choose an audience and a difficulty, and pick 3 to 8 lessons.",
+      error: t("server.teach.outlineInvalid"),
     };
   }
 
-  const instructor = await requireInstructor();
+  const instructor = await requireInstructor(t);
   if (!instructor.ok) {
     return { ok: false, error: instructor.error };
   }
 
   registerLlmMocks();
 
-  const prompt = courseOutlinePrompt(parsedInput.data);
+  const prompt = courseOutlinePrompt({ ...parsedInput.data, language });
 
   try {
     const outline = await generateJson(courseOutlineSchema, prompt, {
@@ -241,7 +255,7 @@ export async function generateCourseOutline(
 
     return { ok: true, outline };
   } catch (error: unknown) {
-    return { ok: false, error: describeFailure("outline", error) };
+    return { ok: false, error: describeFailure("outline", error, t) };
   }
 }
 
@@ -249,15 +263,17 @@ export async function generateCourseOutline(
 export async function generateLessonBlocks(
   input: LessonInput,
 ): Promise<LessonResult> {
+  const { locale, t } = await getI18n();
+  const language = contentLanguageFromLocale(locale);
   const parsedInput = lessonInputSchema.safeParse(input);
   if (!parsedInput.success) {
     return {
       ok: false,
-      error: "This lesson is missing a title or a valid plan. Go back to the outline and fix it.",
+      error: t("server.teach.lessonInvalid"),
     };
   }
 
-  const instructor = await requireInstructor();
+  const instructor = await requireInstructor(t);
   if (!instructor.ok) {
     return { ok: false, error: instructor.error };
   }
@@ -266,7 +282,7 @@ export async function generateLessonBlocks(
 
   registerLlmMocks();
 
-  const prompt = lessonPrompt(request);
+  const prompt = lessonPrompt({ ...request, language });
   const jobInput = {
     courseTitle: request.courseTitle,
     lessonTitle: request.lessonTitle,
@@ -291,7 +307,7 @@ export async function generateLessonBlocks(
 
     return { ok: true, lesson };
   } catch (error: unknown) {
-    return { ok: false, error: describeFailure("lesson", error) };
+    return { ok: false, error: describeFailure("lesson", error, t) };
   }
 }
 
@@ -305,16 +321,17 @@ export async function generateLessonBlocks(
 export async function saveCourseDraft(
   input: DraftCourseInput,
 ): Promise<SaveDraftResult> {
+  const { locale, t } = await getI18n();
+  const language = contentLanguageFromLocale(locale);
   const parsedInput = draftInputSchema.safeParse(input);
   if (!parsedInput.success) {
     return {
       ok: false,
-      error:
-        "This course is not ready to save: check the title, description and every lesson's blocks.",
+      error: t("server.teach.draftInvalid"),
     };
   }
 
-  const instructor = await requireInstructor();
+  const instructor = await requireInstructor(t);
   if (!instructor.ok) {
     return { ok: false, error: instructor.error };
   }
@@ -331,6 +348,7 @@ export async function saveCourseDraft(
         audience: draft.audience,
         difficulty: draft.difficulty,
         coverEmoji: "✨",
+        language,
         status: "DRAFT",
         source: "AI_GENERATED",
         createdById: instructor.userId,
@@ -357,7 +375,7 @@ export async function saveCourseDraft(
     console.error("[teach] failed to save the draft", error);
     return {
       ok: false,
-      error: "The course could not be saved. Your work is still on screen — try again.",
+      error: t("server.teach.saveFailed"),
     };
   }
 }

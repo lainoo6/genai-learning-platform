@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/i18n/client";
 import { blockMetaFor } from "@/lib/blocks/meta";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ export type CourseCardData = {
   coverEmoji: string;
   sourceLabel: string;
   difficultyLabel: string;
+  languageLabel: string;
   lessonCount: number;
   minutes: number;
   blockTypes: string[];
@@ -36,10 +38,10 @@ export type CourseCardData = {
 };
 
 const DIFFICULTY_FILTERS = [
-  { value: "all", label: "All levels" },
-  { value: "beginner", label: "Beginner" },
-  { value: "intermediate", label: "Intermediate" },
-  { value: "advanced", label: "Advanced" },
+  { value: "all", labelKey: "courses.filter.all" },
+  { value: "beginner", labelKey: "courses.filter.beginner" },
+  { value: "intermediate", labelKey: "courses.filter.intermediate" },
+  { value: "advanced", labelKey: "courses.filter.advanced" },
 ] as const;
 
 /**
@@ -49,6 +51,7 @@ const DIFFICULTY_FILTERS = [
  * locally and applies as the learner types — no round trip per keystroke.
  */
 export function CourseCatalog({ courses }: { courses: CourseCardData[] }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [difficulty, setDifficulty] = useState<string>("all");
 
@@ -81,18 +84,18 @@ export function CourseCatalog({ courses }: { courses: CourseCardData[] }) {
             className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            aria-label="Search courses"
+            aria-label={t("courses.search.label")}
             className="pl-8"
             onChange={(event) => {
               setQuery(event.target.value);
             }}
-            placeholder="Search by title or description"
+            placeholder={t("courses.search.placeholder")}
             type="search"
             value={query}
           />
         </div>
 
-        <div aria-label="Filter by difficulty" className="flex flex-wrap gap-1.5">
+        <div aria-label={t("courses.filter.label")} className="flex flex-wrap gap-1.5">
           {DIFFICULTY_FILTERS.map((option) => (
             <button
               className={cn(
@@ -107,20 +110,20 @@ export function CourseCatalog({ courses }: { courses: CourseCardData[] }) {
               }}
               type="button"
             >
-              {option.label}
+              {t(option.labelKey)}
             </button>
           ))}
         </div>
       </div>
 
       <p aria-live="polite" className="text-xs text-muted-foreground">
-        {visible.length} of {courses.length} courses
+        {t("courses.count", { visible: visible.length, total: courses.length })}
       </p>
 
       {visible.length === 0 ? (
         <Card className="items-center py-10 text-center">
           <CardContent className="text-sm text-muted-foreground">
-            No course matches this search. Try a shorter keyword or another level.
+            {t("courses.empty")}
           </CardContent>
         </Card>
       ) : (
@@ -146,10 +149,11 @@ export function CourseCatalog({ courses }: { courses: CourseCardData[] }) {
                   <Badge variant="secondary">{course.difficultyLabel}</Badge>
                   <Badge variant="outline">{course.audience}</Badge>
                   <Badge variant="outline">{course.sourceLabel}</Badge>
+                  <Badge variant="outline">{course.languageLabel}</Badge>
                   {course.enrolled ? (
                     <Badge className="gap-1">
                       <Check aria-hidden="true" />
-                      Enrolled
+                      {t("courses.badge.enrolled")}
                     </Badge>
                   ) : null}
                 </CardContent>
@@ -158,23 +162,23 @@ export function CourseCatalog({ courses }: { courses: CourseCardData[] }) {
                   <p className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <BookOpen aria-hidden="true" className="size-3.5" />
-                      {course.lessonCount} lessons
+                      {t("courses.card.lessons", { count: course.lessonCount })}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock aria-hidden="true" className="size-3.5" />
-                      ~{course.minutes} min
+                      {t("courses.card.minutes", { count: course.minutes })}
                     </span>
                   </p>
                   <p className="flex flex-wrap gap-1.5">
                     {course.blockTypes.map((type) => {
-                      const { icon: Icon, label } = blockMetaFor(type);
+                      const { icon: Icon, labelKey } = blockMetaFor(type);
                       return (
                         <span
                           className="flex items-center gap-1 text-xs text-muted-foreground"
                           key={type}
                         >
                           <Icon aria-hidden="true" className="size-3.5" />
-                          {label}
+                          {t(labelKey)}
                         </span>
                       );
                     })}

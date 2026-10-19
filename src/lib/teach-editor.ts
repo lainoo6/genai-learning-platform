@@ -14,10 +14,11 @@ import { blockListSchema, type Block } from "@/lib/blocks/schema";
 export const EDITOR_STATUSES = ["DRAFT", "PUBLISHED", "ARCHIVED"] as const;
 export type EditorStatus = (typeof EDITOR_STATUSES)[number];
 
-export const EDITOR_STATUS_LABELS: Record<EditorStatus, string> = {
-  DRAFT: "Draft",
-  PUBLISHED: "Published",
-  ARCHIVED: "Archived",
+/** Dictionary keys: the editor renders these badges in the UI language. */
+export const EDITOR_STATUS_KEYS: Record<EditorStatus, string> = {
+  DRAFT: "editor.status.draft",
+  PUBLISHED: "editor.status.published",
+  ARCHIVED: "editor.status.archived",
 };
 
 export const EDITOR_DIFFICULTIES = [
@@ -27,10 +28,10 @@ export const EDITOR_DIFFICULTIES = [
 ] as const;
 export type EditorDifficulty = (typeof EDITOR_DIFFICULTIES)[number];
 
-export const EDITOR_DIFFICULTY_LABELS: Record<EditorDifficulty, string> = {
-  beginner: "Beginner",
-  intermediate: "Intermediate",
-  advanced: "Advanced",
+export const EDITOR_DIFFICULTY_KEYS: Record<EditorDifficulty, string> = {
+  beginner: "courses.difficulty.beginner",
+  intermediate: "courses.difficulty.intermediate",
+  advanced: "courses.difficulty.advanced",
 };
 
 /**
@@ -45,6 +46,13 @@ export const AUDIENCE_SUGGESTIONS = [
   "Non-CS beginners",
   "CS students",
   "All learners",
+] as const;
+
+/** Suggestions offered when the editor runs in Chinese. */
+export const AUDIENCE_SUGGESTIONS_ZH = [
+  "非计算机专业学习者",
+  "计算机专业学生",
+  "所有学习者",
 ] as const;
 
 export type EditorSource = "SEED" | "AI_GENERATED" | "INSTRUCTOR" | "LEARNER";

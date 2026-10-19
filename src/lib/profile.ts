@@ -28,46 +28,55 @@ export const goalSchema = z.enum(GOAL_VALUES);
 
 export type BackgroundOption = {
   value: Background;
-  label: string;
-  hint: string;
+  /** Dictionary key: the questionnaire is rendered in the UI language. */
+  labelKey: string;
+  hintKey: string;
 };
 
 export type GoalOption = {
   value: Goal;
-  label: string;
+  labelKey: string;
 };
 
 /** Background answers shown on step 1 of the questionnaire. */
 export const BACKGROUND_OPTIONS: ReadonlyArray<BackgroundOption> = [
   {
     value: "NON_CS",
-    label: "New to computing",
-    hint: "I have little or no programming experience.",
+    labelKey: "onboarding.background.nonCs.label",
+    hintKey: "onboarding.background.nonCs.hint",
   },
   {
     value: "CS_STUDENT",
-    label: "Computing student",
-    hint: "I am studying computer science or a related subject.",
+    labelKey: "onboarding.background.csStudent.label",
+    hintKey: "onboarding.background.csStudent.hint",
   },
   {
     value: "PRO_DEV",
-    label: "Working developer",
-    hint: "I already write software as part of my job.",
+    labelKey: "onboarding.background.proDev.label",
+    hintKey: "onboarding.background.proDev.hint",
   },
   {
     value: "OTHER",
-    label: "Something else",
-    hint: "Add a line below so we can pitch things at the right level.",
+    labelKey: "onboarding.background.other.label",
+    hintKey: "onboarding.background.other.hint",
   },
 ];
 
 /** Learning goals offered on step 2 of the questionnaire. */
 export const GOAL_OPTIONS: ReadonlyArray<GoalOption> = [
-  { value: "UNDERSTAND_SOFTWARE", label: "Understand how software is built" },
-  { value: "USE_AI_TOOLS", label: "Use AI coding tools" },
-  { value: "PREPARE_INTERVIEWS", label: "Prepare for interviews" },
-  { value: "OTHER", label: "Something else" },
+  { value: "UNDERSTAND_SOFTWARE", labelKey: "onboarding.goal.understand" },
+  { value: "USE_AI_TOOLS", labelKey: "onboarding.goal.useAi" },
+  { value: "PREPARE_INTERVIEWS", labelKey: "onboarding.goal.interviews" },
+  { value: "OTHER", labelKey: "onboarding.goal.other" },
 ];
+
+/** Dictionary keys for the goal labels quoted in a recommendation reason. */
+export const GOAL_LABEL_KEYS: Record<Goal, string> = {
+  UNDERSTAND_SOFTWARE: "onboarding.goal.understand",
+  USE_AI_TOOLS: "onboarding.goal.useAi",
+  PREPARE_INTERVIEWS: "onboarding.goal.interviews",
+  OTHER: "onboarding.goal.other",
+};
 
 export const BACKGROUND_LABELS: Record<Background, string> = {
   NON_CS: "New to computing",

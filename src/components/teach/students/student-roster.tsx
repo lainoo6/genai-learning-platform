@@ -7,6 +7,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { getI18n } from "@/i18n/server";
 import { completionPercent, type CourseStudent } from "@/lib/students";
 
 import { RemoveStudentButton } from "./remove-student-button";
@@ -37,19 +38,21 @@ type StudentRosterProps = {
   students: CourseStudent[];
 };
 
-export function StudentRoster({ courseId, students }: StudentRosterProps) {
+export async function StudentRoster({ courseId, students }: StudentRosterProps) {
+  const { t } = await getI18n();
+
   return (
     <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="pl-4">Student</TableHead>
-            <TableHead>Joined</TableHead>
-            <TableHead>Progress</TableHead>
-            <TableHead>Quiz average</TableHead>
-            <TableHead>Last active</TableHead>
+            <TableHead className="pl-4">{t("students.roster.student")}</TableHead>
+            <TableHead>{t("students.roster.joined")}</TableHead>
+            <TableHead>{t("students.roster.progress")}</TableHead>
+            <TableHead>{t("students.roster.quizAverage")}</TableHead>
+            <TableHead>{t("students.roster.lastActive")}</TableHead>
             <TableHead className="pr-4 text-right">
-              <span className="sr-only">Actions</span>
+              <span className="sr-only">{t("students.roster.actions")}</span>
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -73,7 +76,9 @@ export function StudentRoster({ courseId, students }: StudentRosterProps) {
 
                 <TableCell>
                   <Progress
-                    aria-label={`${student.name} progress`}
+                    aria-label={t("students.roster.progressAria", {
+                      name: student.name,
+                    })}
                     className="w-44 items-center gap-2"
                     value={percent}
                   >

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 import { generateLearnerCourse } from "@/server/generate";
 
@@ -21,16 +22,16 @@ import { generateLearnerCourse } from "@/server/generate";
 
 const STEPS = [
   {
-    label: "Planning the outline",
-    detail: "Course title, three lesson titles and the arc between them.",
+    labelKey: "generate.steps.outline.label",
+    detailKey: "generate.steps.outline.detail",
   },
   {
-    label: "Writing the lessons",
-    detail: "A reading block for each lesson, grounded in the topic.",
+    labelKey: "generate.steps.lessons.label",
+    detailKey: "generate.steps.lessons.detail",
   },
   {
-    label: "Building interactive blocks",
-    detail: "Flashcards or a game, plus a quiz to check understanding.",
+    labelKey: "generate.steps.blocks.label",
+    detailKey: "generate.steps.blocks.detail",
   },
 ] as const;
 
@@ -38,6 +39,7 @@ const STEP_INTERVAL_MS = 1100;
 const MIN_VISIBLE_MS = 2400;
 
 export function GeneratorForm() {
+  const t = useT();
   const router = useRouter();
 
   const [topic, setTopic] = useState("");
@@ -62,7 +64,7 @@ export function GeneratorForm() {
       return;
     }
     if (trimmedTopic.length < 3) {
-      setError("Give the course a topic of at least three characters.");
+      setError(t("generate.error.topic"));
       return;
     }
 
@@ -100,7 +102,7 @@ export function GeneratorForm() {
       setError(
         cause instanceof Error
           ? cause.message
-          : "The course could not be generated. Try again in a moment.",
+          : t("generate.error.failed"),
       );
       setStage(-1);
     } finally {
@@ -117,7 +119,7 @@ export function GeneratorForm() {
       <div className="space-y-4 px-4 py-4 sm:px-5">
         <div className="space-y-1.5">
           <label className="text-sm font-medium" htmlFor="topic">
-            What do you want to learn about?
+            {t("generate.form.topic.label")}
           </label>
           <Input
             disabled={isRunning}
@@ -126,18 +128,20 @@ export function GeneratorForm() {
             onChange={(event) => {
               setTopic(event.target.value);
             }}
-            placeholder="K-pop fandom economics"
+            placeholder={t("generate.form.topic.placeholder")}
             value={topic}
           />
           <p className="text-xs text-muted-foreground">
-            Any topic works — the generator builds a three-lesson mini-course
-            around it.
+            {t("generate.form.topic.hint")}
           </p>
         </div>
 
         <div className="space-y-1.5">
           <label className="text-sm font-medium" htmlFor="goal">
-            Your goal <span className="font-normal text-muted-foreground">(optional)</span>
+            {t("generate.form.goal.label")}{" "}
+            <span className="font-normal text-muted-foreground">
+              {t("generate.form.optional")}
+            </span>
           </label>
           <Textarea
             disabled={isRunning}
@@ -146,7 +150,7 @@ export function GeneratorForm() {
             onChange={(event) => {
               setGoal(event.target.value);
             }}
-            placeholder="I want to understand why fans spend money on merchandise."
+            placeholder={t("generate.form.goal.placeholder")}
             rows={2}
             value={goal}
           />
@@ -162,17 +166,17 @@ export function GeneratorForm() {
             {isRunning ? (
               <>
                 <Loader2 aria-hidden="true" className="animate-spin" />
-                Generating…
+                {t("generate.form.pending")}
               </>
             ) : (
               <>
                 <Sparkles aria-hidden="true" />
-                Generate my course
+                {t("generate.form.submit")}
               </>
             )}
           </Button>
           <p className="text-xs text-muted-foreground">
-            You will be enrolled automatically and taken to the first lesson.
+            {t("generate.form.note")}
           </p>
         </div>
       </div>
@@ -191,7 +195,7 @@ export function GeneratorForm() {
             const Icon = done ? Check : active ? Loader2 : Circle;
 
             return (
-              <li className="flex items-start gap-3" key={step.label}>
+              <li className="flex items-start gap-3" key={step.labelKey}>
                 <Icon
                   aria-hidden="true"
                   className={cn(
@@ -208,9 +212,9 @@ export function GeneratorForm() {
                       done || active ? "font-medium" : "text-muted-foreground",
                     )}
                   >
-                    {step.label}
+                    {t(step.labelKey)}
                   </p>
-                  <p className="text-xs text-muted-foreground">{step.detail}</p>
+                  <p className="text-xs text-muted-foreground">{t(step.detailKey)}</p>
                 </div>
               </li>
             );
@@ -219,7 +223,7 @@ export function GeneratorForm() {
 
         {stage >= STEPS.length ? (
           <p className="text-sm text-emerald-600">
-            Course ready — opening your first lesson…
+            {t("generate.steps.ready")}
           </p>
         ) : null}
       </div>

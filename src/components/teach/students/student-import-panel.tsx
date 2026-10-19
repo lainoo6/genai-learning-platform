@@ -10,6 +10,7 @@ import {
   MAX_IMPORT_ROWS,
   toCsvDocument,
 } from "@/lib/csv";
+import { useT } from "@/i18n/client";
 import type { ImportCredential, ImportStudentsResult } from "@/lib/students";
 import { importStudents } from "@/server/students";
 
@@ -89,6 +90,7 @@ export function StudentImportPanel({
   courseId,
   slug,
 }: StudentImportPanelProps) {
+  const t = useT();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -103,9 +105,7 @@ export function StudentImportPanel({
 
     if (file.size > MAX_IMPORT_BYTES) {
       setResult(null);
-      setError(
-        "The file is larger than 1 MB. Split it into smaller files and try again.",
-      );
+      setError(t("students.import.tooLarge"));
       return;
     }
 
@@ -129,9 +129,7 @@ export function StudentImportPanel({
     } catch (importError: unknown) {
       console.error("[students] import request failed", importError);
       setResult(null);
-      setError(
-        "The import could not be completed. Check the connection and try again.",
-      );
+      setError(t("students.import.failed"));
     } finally {
       setPending(false);
     }
@@ -149,24 +147,23 @@ export function StudentImportPanel({
             id="import-students-heading"
           >
             <Upload aria-hidden="true" className="size-4" />
-            Import students
+            {t("students.import.title")}
           </h2>
           <p className="max-w-xl text-sm text-muted-foreground">
-            Upload a CSV with <code className="font-mono">name</code> and{" "}
-            <code className="font-mono">email</code> columns. Existing accounts
-            are enrolled; new emails get a learner account with a temporary
-            password.
+            {t("students.import.description")}
           </p>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Max {MAX_IMPORT_ROWS.toLocaleString("en-GB")} rows · 1 MB
+          {t("students.import.limits", {
+            rows: MAX_IMPORT_ROWS.toLocaleString(),
+          })}
         </p>
       </div>
 
       <details className="text-xs text-muted-foreground">
         <summary className="cursor-pointer font-medium text-foreground">
-          Show the CSV template
+          {t("students.import.template")}
         </summary>
         <pre className="mt-2 overflow-x-auto rounded-lg bg-muted/60 p-3 font-mono text-xs">
           {TEMPLATE}
@@ -175,7 +172,7 @@ export function StudentImportPanel({
 
       <div className="flex flex-wrap items-center gap-3">
         <label className="sr-only" htmlFor="student-csv">
-          Student CSV file
+          {t("students.import.fileLabel")}
         </label>
         <input
           accept=".csv,text/csv"
@@ -197,7 +194,7 @@ export function StudentImportPanel({
           }}
         >
           <FileUp aria-hidden="true" />
-          {pending ? "Importing…" : "Import CSV"}
+          {pending ? t("students.import.pending") : t("students.import.submit")}
         </Button>
       </div>
 
@@ -212,8 +209,11 @@ export function StudentImportPanel({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-medium">
               {result.imported > 0
-                ? `Imported ${result.imported} of ${result.total} rows.`
-                : `No rows were enrolled (${result.total} read).`}
+                ? t("students.import.done", {
+                    imported: result.imported,
+                    total: result.total,
+                  })
+                : t("students.import.none", { total: result.total })}
             </p>
 
             {result.credentials.length === 0 ? null : (
@@ -226,17 +226,29 @@ export function StudentImportPanel({
                 variant="outline"
               >
                 <Download aria-hidden="true" />
-                Download credentials ({result.credentials.length})
+                {t("students.import.download", {
+                  count: result.credentials.length,
+                })}
               </Button>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="Imported" tone="success" value={result.imported} />
-            <Stat label="New accounts" value={result.newAccounts} />
-            <Stat label="Already enrolled" value={result.alreadyEnrolled} />
             <Stat
-              label="Failed"
+              label={t("students.import.stat.imported")}
+              tone="success"
+              value={result.imported}
+            />
+            <Stat
+              label={t("students.import.stat.newAccounts")}
+              value={result.newAccounts}
+            />
+            <Stat
+              label={t("students.import.stat.alreadyEnrolled")}
+              value={result.alreadyEnrolled}
+            />
+            <Stat
+              label={t("students.import.stat.failed")}
               tone={result.failed.length > 0 ? "danger" : "default"}
               value={result.failed.length}
             />
@@ -244,20 +256,18 @@ export function StudentImportPanel({
 
           {result.credentials.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No new accounts were created — every imported row belonged to an
-              existing user.
+              {t("students.import.noNewAccounts")}
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Temporary passwords are shown only in this download. Save the file
-              before leaving the page.
+              {t("students.import.credentialsNote")}
             </p>
           )}
 
           {result.failed.length === 0 ? null : (
             <div className="space-y-1.5">
               <p className="text-xs font-medium uppercase tracking-wide text-destructive">
-                Failed rows
+                {t("students.import.failedRows")}
               </p>
               <ul className="max-h-44 space-y-1 overflow-y-auto rounded-lg bg-background p-2 text-xs ring-1 ring-foreground/10">
                 {result.failed.map((failure) => (
@@ -266,7 +276,7 @@ export function StudentImportPanel({
                     key={`${failure.row}-${failure.email}`}
                   >
                     <span className="font-medium tabular-nums">
-                      Row {failure.row}
+                      {t("students.import.row", { row: failure.row })}
                     </span>
                     {failure.email.length === 0 ? null : (
                       <span className="text-muted-foreground">

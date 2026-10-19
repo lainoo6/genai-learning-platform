@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 
+import { useT } from "@/i18n/client";
 import { signOutAction } from "@/server/auth";
 
 type UserMenuProps = {
@@ -35,6 +36,8 @@ function initialsOf(name: string): string {
 }
 
 export function UserMenu({ name, email, role }: UserMenuProps) {
+  const t = useT();
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-full p-1 pr-2 outline-none transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
@@ -55,14 +58,14 @@ export function UserMenu({ name, email, role }: UserMenuProps) {
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <Link className="w-full cursor-pointer" href="/onboarding">
-            Learning profile
+            {t("user.menu.profile")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <form action={signOutAction} className="w-full">
             <button type="submit" className="w-full cursor-pointer text-left">
-              Log out
+              {t("user.menu.logout")}
             </button>
           </form>
         </DropdownMenuItem>

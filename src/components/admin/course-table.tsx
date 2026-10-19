@@ -9,8 +9,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { COURSE_SOURCE_LABELS, type AdminCourseRow } from "@/lib/admin";
-import { COURSE_STATUS_LABELS } from "@/lib/teach";
+import { getI18n } from "@/i18n/server";
+import { COURSE_SOURCE_KEYS, type AdminCourseRow } from "@/lib/admin";
+import { EDITOR_STATUS_KEYS } from "@/lib/teach-editor";
 
 import { CourseStatusButton } from "./course-status-button";
 
@@ -21,12 +22,6 @@ import { CourseStatusButton } from "./course-status-button";
  * the point of the tab is to see what the public catalog hides.
  */
 
-const DATE_FORMAT = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
-
 const STATUS_BADGE_VARIANT: Record<
   CourseStatus,
   "default" | "secondary" | "outline"
@@ -36,21 +31,32 @@ const STATUS_BADGE_VARIANT: Record<
   ARCHIVED: "outline",
 };
 
-export function CourseTable({ courses }: { courses: AdminCourseRow[] }) {
+export async function CourseTable({ courses }: { courses: AdminCourseRow[] }) {
+  const { locale, t } = await getI18n();
+  const dateFormat = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
   return (
     <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="pl-4">Course</TableHead>
-            <TableHead>Creator</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Source</TableHead>
-            <TableHead className="text-right">Students</TableHead>
-            <TableHead className="text-right">Lessons</TableHead>
-            <TableHead>Updated</TableHead>
+            <TableHead className="pl-4">{t("admin.table.course")}</TableHead>
+            <TableHead>{t("admin.table.creator")}</TableHead>
+            <TableHead>{t("admin.table.status")}</TableHead>
+            <TableHead>{t("admin.table.source")}</TableHead>
+            <TableHead className="text-right">
+              {t("admin.table.students")}
+            </TableHead>
+            <TableHead className="text-right">
+              {t("admin.table.lessons")}
+            </TableHead>
+            <TableHead>{t("admin.table.updated")}</TableHead>
             <TableHead className="pr-4 text-right">
-              <span className="sr-only">Actions</span>
+              <span className="sr-only">{t("admin.table.actions")}</span>
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -79,12 +85,12 @@ export function CourseTable({ courses }: { courses: AdminCourseRow[] }) {
 
               <TableCell>
                 <Badge variant={STATUS_BADGE_VARIANT[course.status]}>
-                  {COURSE_STATUS_LABELS[course.status]}
+                  {t(EDITOR_STATUS_KEYS[course.status])}
                 </Badge>
               </TableCell>
 
               <TableCell className="text-sm text-muted-foreground">
-                {COURSE_SOURCE_LABELS[course.source]}
+                {t(COURSE_SOURCE_KEYS[course.source])}
               </TableCell>
 
               <TableCell className="text-right text-sm tabular-nums">
@@ -96,7 +102,7 @@ export function CourseTable({ courses }: { courses: AdminCourseRow[] }) {
               </TableCell>
 
               <TableCell className="text-sm text-muted-foreground">
-                {DATE_FORMAT.format(course.updatedAt)}
+                {dateFormat.format(course.updatedAt)}
               </TableCell>
 
               <TableCell className="pr-4 text-right">

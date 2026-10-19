@@ -10,14 +10,16 @@ import { StudentRoster } from "@/components/teach/students/student-roster";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { listCourseStudents, loadRosterCourse } from "@/lib/students";
-import { COURSE_STATUS_LABELS } from "@/lib/teach";
+import { EDITOR_STATUS_KEYS } from "@/lib/teach-editor";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = {
-  title: "Students",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("students.metaTitle") };
+}
 
 type StudentsPageProps = {
   params: Promise<{ id: string }>;
@@ -35,7 +37,7 @@ async function StudentsContent({ params }: StudentsPageProps) {
   await connection();
   const { id } = await params;
 
-  const session = await auth();
+  const [session, { t }] = await Promise.all([auth(), getI18n()]);
   const user = session?.user;
 
   if (user === undefined) {
@@ -64,7 +66,7 @@ async function StudentsContent({ params }: StudentsPageProps) {
         href="/teach"
       >
         <ArrowLeft aria-hidden="true" className="size-3.5" />
-        All courses
+        {t("students.page.back")}
       </Link>
 
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -75,16 +77,15 @@ async function StudentsContent({ params }: StudentsPageProps) {
 
           <div className="space-y-1.5">
             <p className="text-xs font-medium uppercase tracking-wide text-primary">
-              Students
+              {t("students.page.eyebrow")}
             </p>
             <h1 className="text-2xl font-semibold">{course.title}</h1>
             <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <Badge variant={isPublished ? "default" : "secondary"}>
-                {COURSE_STATUS_LABELS[course.status]}
+                {t(EDITOR_STATUS_KEYS[course.status])}
               </Badge>
               <span>
-                {students.length} student{students.length === 1 ? "" : "s"}{" "}
-                enrolled
+                {t("students.page.enrolled", { count: students.length })}
               </span>
             </p>
           </div>
@@ -95,7 +96,7 @@ async function StudentsContent({ params }: StudentsPageProps) {
           href={`/teach/courses/${course.id}/edit`}
         >
           <Pencil aria-hidden="true" />
-          Edit course
+          {t("teach.edit")}
         </Link>
       </header>
 
@@ -105,10 +106,10 @@ async function StudentsContent({ params }: StudentsPageProps) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-baseline gap-2">
             <h2 className="text-lg font-medium" id="roster-heading">
-              Roster
+              {t("students.page.roster")}
             </h2>
             <p className="text-xs text-muted-foreground">
-              {students.length} student{students.length === 1 ? "" : "s"}
+              {t("students.page.count", { count: students.length })}
             </p>
           </div>
 
@@ -121,7 +122,7 @@ async function StudentsContent({ params }: StudentsPageProps) {
             prefetch={false}
           >
             <Download aria-hidden="true" />
-            Export CSV
+            {t("students.page.export")}
           </Link>
         </div>
 
@@ -130,10 +131,11 @@ async function StudentsContent({ params }: StudentsPageProps) {
             <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-muted">
               <Users aria-hidden="true" className="size-6 text-muted-foreground" />
             </span>
-            <p className="mt-4 text-sm font-medium">No students yet</p>
+            <p className="mt-4 text-sm font-medium">{t("students.page.empty")}</p>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-              Import a CSV with names and emails above{isPublished ? ", or share the course page so learners can enrol" : ""}.
-              Progress and quiz scores appear here as they learn.
+              {t("students.page.emptyHint", {
+                extra: isPublished ? t("students.page.emptyExtra") : "",
+              })}
             </p>
           </div>
         ) : (

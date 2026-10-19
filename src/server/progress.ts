@@ -3,6 +3,7 @@
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import { getI18n } from "@/i18n/server";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
 import { blockListSchema } from "@/lib/blocks/schema";
@@ -140,15 +141,16 @@ export async function completeBlock(
   blockId: string,
   score?: number,
 ): Promise<ProgressActionResult> {
+  const { t } = await getI18n();
   const parsedInput = completeBlockSchema.safeParse({ lessonId, blockId, score });
   if (!parsedInput.success) {
-    return { ok: false, error: "Invalid progress payload." };
+    return { ok: false, error: t("server.progress.invalid") };
   }
 
   const session = await auth();
   const userId = session?.user?.id;
   if (userId === undefined) {
-    return { ok: false, error: "Sign in to save your progress." };
+    return { ok: false, error: t("server.progress.signIn") };
   }
 
   const lesson = await prisma.lesson.findUnique({
@@ -161,7 +163,7 @@ export async function completeBlock(
   });
 
   if (lesson === null) {
-    return { ok: false, error: "Lesson not found." };
+    return { ok: false, error: t("server.progress.lessonNotFound") };
   }
 
   const parsedBlocks = blockListSchema.safeParse(lesson.blocks);
@@ -169,7 +171,7 @@ export async function completeBlock(
     !parsedBlocks.success
     || !parsedBlocks.data.some((block) => block.id === blockId)
   ) {
-    return { ok: false, error: "Unknown block for this lesson." };
+    return { ok: false, error: t("server.progress.unknownBlock") };
   }
 
   const existing = await prisma.lessonProgress.findUnique({

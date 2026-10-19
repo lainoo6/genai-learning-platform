@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 import { enroll } from "@/server/courses";
 
@@ -20,7 +21,7 @@ export function EnrollButton({
   courseId,
   enrolled,
   firstLessonHref,
-  label = "Enroll and start",
+  label,
 }: {
   courseId: string;
   enrolled: boolean;
@@ -28,6 +29,7 @@ export function EnrollButton({
   firstLessonHref: string | null;
   label?: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +40,7 @@ export function EnrollButton({
         className={cn(buttonVariants({ size: "lg" }), "gap-1.5")}
         href={firstLessonHref}
       >
-        Continue learning
+        {t("enroll.button.continue")}
         <ArrowRight aria-hidden="true" />
       </Link>
     );
@@ -65,7 +67,7 @@ export function EnrollButton({
         size="lg"
       >
         {isPending ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
-        {isPending ? "Enrolling…" : label}
+        {isPending ? t("enroll.button.pending") : (label ?? t("enroll.button.submit"))}
       </Button>
       {error === null ? null : (
         <p className="text-xs text-red-600" role="status">

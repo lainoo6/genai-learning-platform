@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -43,22 +44,23 @@ export async function updateUserRole(
   userId: string,
   role: string,
 ): Promise<AdminActionResult> {
+  const { t } = await getI18n();
   const adminId = await requireAdminId();
   if (adminId === null) {
-    return { ok: false, error: "Only administrators can change roles." };
+    return { ok: false, error: t("server.admin.roleForbidden") };
   }
 
   const parsedUserId = idSchema.safeParse(userId);
   const parsedRole = roleSchema.safeParse(role);
 
   if (!parsedUserId.success || !parsedRole.success) {
-    return { ok: false, error: "That role change is not valid." };
+    return { ok: false, error: t("server.admin.roleInvalid") };
   }
 
   if (parsedUserId.data === adminId) {
     return {
       ok: false,
-      error: "You cannot change your own role. Ask another administrator.",
+      error: t("server.admin.selfRole"),
     };
   }
 
@@ -68,7 +70,7 @@ export async function updateUserRole(
   });
 
   if (updated.count === 0) {
-    return { ok: false, error: "That account no longer exists." };
+    return { ok: false, error: t("server.admin.userMissing") };
   }
 
   revalidatePath("/admin");
@@ -86,16 +88,17 @@ export async function setCourseStatus(
   courseId: string,
   status: string,
 ): Promise<AdminActionResult> {
+  const { t } = await getI18n();
   const adminId = await requireAdminId();
   if (adminId === null) {
-    return { ok: false, error: "Only administrators can change a course." };
+    return { ok: false, error: t("server.admin.courseForbidden") };
   }
 
   const parsedCourseId = idSchema.safeParse(courseId);
   const parsedStatus = courseStatusSchema.safeParse(status);
 
   if (!parsedCourseId.success || !parsedStatus.success) {
-    return { ok: false, error: "That course change is not valid." };
+    return { ok: false, error: t("server.admin.courseInvalid") };
   }
 
   const updated = await prisma.course.updateMany({
@@ -104,7 +107,7 @@ export async function setCourseStatus(
   });
 
   if (updated.count === 0) {
-    return { ok: false, error: "That course no longer exists." };
+    return { ok: false, error: t("server.admin.courseMissing") };
   }
 
   revalidatePath("/admin");

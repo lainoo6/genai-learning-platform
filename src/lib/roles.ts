@@ -9,10 +9,11 @@ import type { Role } from "@prisma/client";
  * database client into the browser bundle.
  */
 
-export const ROLE_LABELS: Record<Role, string> = {
-  LEARNER: "Learner",
-  INSTRUCTOR: "Instructor",
-  ADMIN: "Admin",
+/** Dictionary keys: client components render these in the UI language. */
+export const ROLE_KEYS: Record<Role, string> = {
+  LEARNER: "admin.role.learner",
+  INSTRUCTOR: "admin.role.instructor",
+  ADMIN: "admin.role.admin",
 };
 
 export const ROLE_OPTIONS: ReadonlyArray<Role> = [

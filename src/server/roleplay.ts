@@ -2,9 +2,11 @@
 
 import { z } from "zod";
 
+import { getI18n } from "@/i18n/server";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
 import { blockListSchema } from "@/lib/blocks/schema";
+import { contentLanguageFromLocale } from "@/lib/llm/language";
 import { registerLlmMocks } from "@/lib/llm/mocks";
 import { generateJson } from "@/lib/llm/provider";
 import {
@@ -44,21 +46,23 @@ type RoleplayFeedbackInput = z.input<typeof inputSchema>;
 export async function requestRoleplayFeedback(
   input: RoleplayFeedbackInput,
 ): Promise<RoleplayFeedbackResult> {
+  const { locale, t } = await getI18n();
+  const language = contentLanguageFromLocale(locale);
   const parsedInput = inputSchema.safeParse(input);
   if (!parsedInput.success) {
-    return { ok: false, error: "That conversation could not be submitted." };
+    return { ok: false, error: t("server.roleplay.submitFailed") };
   }
 
   const session = await auth();
   const userId = session?.user?.id;
   if (userId === undefined) {
-    return { ok: false, error: "Sign in to get feedback on the role play." };
+    return { ok: false, error: t("server.roleplay.signIn") };
   }
 
   const { lessonId, blockId, transcript } = parsedInput.data;
 
   if (!transcript.some((turn) => turn.role === "user")) {
-    return { ok: false, error: "Say something to the character before ending." };
+    return { ok: false, error: t("server.roleplay.empty") };
   }
 
   const lesson = await prisma.lesson.findUnique({
@@ -70,7 +74,7 @@ export async function requestRoleplayFeedback(
   });
 
   if (lesson === null) {
-    return { ok: false, error: "Lesson not found." };
+    return { ok: false, error: t("server.roleplay.lessonNotFound") };
   }
 
   const parsedBlocks = blockListSchema.safeParse(lesson.blocks);
@@ -81,7 +85,7 @@ export async function requestRoleplayFeedback(
     : undefined;
 
   if (block === undefined || block.type !== "roleplay") {
-    return { ok: false, error: "This lesson has no role play with that id." };
+    return { ok: false, error: t("server.roleplay.blockNotFound") };
   }
 
   const courseId = lesson.module.courseId;
@@ -90,7 +94,7 @@ export async function requestRoleplayFeedback(
   try {
     const report = await generateJson(
       roleplayFeedbackSchema,
-      roleplayFeedbackPrompt(block, transcript),
+      roleplayFeedbackPrompt(block, transcript, language),
       {
         usage: "roleplay-feedback",
         userId,
@@ -125,8 +129,7 @@ export async function requestRoleplayFeedback(
     console.error("[roleplay] feedback failed", error);
     return {
       ok: false,
-      error:
-        "The feedback report could not be generated. Your conversation is still here — try again.",
+      error: t("server.roleplay.failed"),
     };
   }
 }

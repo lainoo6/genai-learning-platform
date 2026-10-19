@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 import { blockMetaFor } from "@/lib/blocks/meta";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,7 @@ export function LessonOutline({
   currentLessonId: string;
   modules: OutlineModule[];
 }) {
+  const t = useT();
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
@@ -77,7 +79,7 @@ export function LessonOutline({
         variant="outline"
       >
         <Menu aria-hidden="true" />
-        Contents
+        {t("lesson.outline.contents")}
       </Button>
 
       <aside className="hidden lg:block lg:sticky lg:top-20 lg:self-start">
@@ -87,7 +89,7 @@ export function LessonOutline({
       {isDrawerOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
-            aria-label="Close contents"
+            aria-label={t("lesson.outline.close")}
             className="absolute inset-0 bg-background/70 backdrop-blur-sm"
             onClick={() => {
               setDrawerOpen(false);
@@ -95,7 +97,7 @@ export function LessonOutline({
             type="button"
           />
           <div
-            aria-label="Course contents"
+            aria-label={t("lesson.outline.courseContents")}
             aria-modal="true"
             className="absolute inset-y-0 left-0 w-80 max-w-[85%] overflow-y-auto border-r bg-background p-4"
             role="dialog"
@@ -109,7 +111,7 @@ export function LessonOutline({
               variant="ghost"
             >
               <X aria-hidden="true" />
-              <span className="sr-only">Close contents</span>
+              <span className="sr-only">{t("lesson.outline.close")}</span>
             </Button>
             {rail}
           </div>
@@ -130,10 +132,15 @@ function OutlineList({
   modules: OutlineModule[];
   onNavigate: () => void;
 }) {
+  const t = useT();
+
   return (
-    <nav aria-label="Course contents" className="space-y-4 text-sm">
+    <nav
+      aria-label={t("lesson.outline.courseContents")}
+      className="space-y-4 text-sm"
+    >
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Course contents
+        {t("lesson.outline.courseContents")}
       </p>
 
       {modules.map((courseModule) => (
@@ -181,7 +188,11 @@ function OutlineList({
                           const { icon: Icon } = blockMetaFor(type);
                           return <Icon aria-hidden="true" className="size-3" key={type} />;
                         })}
-                        <span>{lesson.minutes} min</span>
+                        <span>
+                          {t("lesson.outline.minutes", {
+                            count: lesson.minutes,
+                          })}
+                        </span>
                       </span>
                     </span>
                   </Link>

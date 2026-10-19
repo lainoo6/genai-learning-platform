@@ -7,10 +7,12 @@ import { CourseEditor } from "@/components/teach/editor/course-editor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { auth } from "@/lib/auth";
 import { loadEditorCourse } from "@/lib/teach";
+import { getI18n } from "@/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Edit course",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("courseEdit.metaTitle") };
+}
 
 type EditCoursePageProps = {
   params: Promise<{ id: string }>;

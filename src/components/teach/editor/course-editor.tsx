@@ -28,10 +28,11 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Block, BlockType } from "@/lib/blocks/schema";
 import {
   AUDIENCE_SUGGESTIONS,
+  AUDIENCE_SUGGESTIONS_ZH,
   EDITOR_DIFFICULTIES,
-  EDITOR_DIFFICULTY_LABELS,
+  EDITOR_DIFFICULTY_KEYS,
   EDITOR_STATUSES,
-  EDITOR_STATUS_LABELS,
+  EDITOR_STATUS_KEYS,
   editorCourseSchema,
   type EditorCourse,
   type EditorCourseInput,
@@ -43,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { saveCourse } from "@/server/editor";
 import { BlockEditorPanel } from "./block-editor-panel";
 import { BlockListPanel } from "./block-list-panel";
+import { useI18n } from "@/i18n/client";
 import { createBlock } from "./block-templates";
 import { StructurePanel } from "./structure-panel";
 
@@ -323,6 +325,7 @@ const SELECT_CLASS =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export function CourseEditor({ course }: { course: EditorCourse }) {
+  const { locale, t } = useI18n();
   const [draft, setDraft] = useState<EditorCourse>(course);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(
     course.modules[0]?.lessons[0]?.id ?? null,
@@ -544,7 +547,7 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
       return;
     }
 
-    const block = createBlock(type);
+    const block = createBlock(type, locale);
 
     commit((previous) =>
       updateLesson(previous, selectedLessonId, (lesson) => ({
@@ -732,11 +735,11 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
     <div className="space-y-4">
       <header className="space-y-3">
         <nav
-          aria-label="Breadcrumb"
+          aria-label={t("lesson.breadcrumb")}
           className="flex items-center gap-1 text-xs text-muted-foreground"
         >
           <Link className="hover:text-foreground" href="/teach">
-            Teaching
+            {t("nav.teach")}
           </Link>
           <ChevronRight aria-hidden="true" className="size-3" />
           <span className="truncate text-foreground">{draft.title}</span>
@@ -744,21 +747,23 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1.5">
-            <h1 className="text-2xl font-semibold">Edit course</h1>
+            <h1 className="text-2xl font-semibold">{t("editor.course.edit")}</h1>
             <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <Badge variant={draft.status === "PUBLISHED" ? "default" : "secondary"}>
-                {EDITOR_STATUS_LABELS[draft.status]}
+                {t(EDITOR_STATUS_KEYS[draft.status])}
               </Badge>
               <span>
-                {draft.modules.length} module{draft.modules.length === 1 ? "" : "s"}
+                {t("editor.course.modulesCount", {
+                  count: draft.modules.length,
+                })}
               </span>
               <span aria-hidden="true">·</span>
               <span>
-                {lessonCount} lesson{lessonCount === 1 ? "" : "s"}
+                {t("editor.course.lessonsCount", { count: lessonCount })}
               </span>
               <span aria-hidden="true">·</span>
               <span>
-                {blockCount} block{blockCount === 1 ? "" : "s"}
+                {t("editor.course.blocksCount", { count: blockCount })}
               </span>
             </p>
           </div>
@@ -771,7 +776,7 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
                 target="_blank"
               >
                 <ExternalLink aria-hidden="true" />
-                View public page
+                {t("editor.course.viewPublic")}
               </Link>
             ) : null}
 
@@ -784,12 +789,12 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
               {saveState === "saving" ? (
                 <>
                   <Loader2 aria-hidden="true" className="animate-spin" />
-                  Saving…
+                  {t("editor.course.saving")}
                 </>
               ) : (
                 <>
                   <Save aria-hidden="true" />
-                  Save changes
+                  {t("editor.course.save")}
                 </>
               )}
             </Button>
@@ -821,17 +826,16 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
             className="flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800"
           >
             <CircleCheck aria-hidden="true" className="size-4" />
-            Course saved.
+            {t("editor.course.saved")}
             {draft.status === "PUBLISHED"
-              ? " It is live in the public catalog."
-              : " It stays hidden from the catalog until you publish it."}
+              ? t("editor.course.savedLive")
+              : t("editor.course.savedHidden")}
           </p>
         ) : null}
 
         {isDirty && saveState !== "saving" ? (
           <p className="text-xs text-muted-foreground">
-            Unsaved changes — students see the last saved version until you press
-            Save.
+            {t("editor.course.unsaved")}
           </p>
         ) : null}
       </header>
@@ -846,7 +850,7 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
           type="button"
         >
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Course settings
+            {t("editor.course.settings")}
           </span>
           <ChevronDown
             aria-hidden="true"
@@ -859,9 +863,12 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
 
         {settingsOpen ? (
           <div className="grid gap-3 border-t px-3 py-3 sm:grid-cols-6">
-            <SettingsField className="sm:col-span-5" label="Title">
+            <SettingsField
+              className="sm:col-span-5"
+              label={t("editor.settings.title")}
+            >
               <Input
-                aria-label="Course title"
+                aria-label={t("editor.settings.titleAria")}
                 maxLength={90}
                 onChange={(event) => {
                   updateSettings({ title: event.target.value });
@@ -870,9 +877,12 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
               />
             </SettingsField>
 
-            <SettingsField hint="Emoji" label="Cover">
+            <SettingsField
+              hint={t("editor.settings.coverHint")}
+              label={t("editor.settings.cover")}
+            >
               <Input
-                aria-label="Cover emoji"
+                aria-label={t("editor.settings.coverAria")}
                 className="text-center text-lg"
                 maxLength={4}
                 onChange={(event) => {
@@ -882,9 +892,13 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
               />
             </SettingsField>
 
-            <SettingsField className="sm:col-span-6" hint="20–600 characters" label="Description">
+            <SettingsField
+              className="sm:col-span-6"
+              hint={t("editor.settings.descriptionHint")}
+              label={t("editor.settings.description")}
+            >
               <Textarea
-                aria-label="Course description"
+                aria-label={t("editor.settings.descriptionAria")}
                 maxLength={600}
                 onChange={(event) => {
                   updateSettings({ description: event.target.value });
@@ -894,9 +908,12 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
               />
             </SettingsField>
 
-            <SettingsField className="sm:col-span-2" label="Audience">
+            <SettingsField
+              className="sm:col-span-2"
+              label={t("editor.settings.audience")}
+            >
               <Input
-                aria-label="Audience"
+                aria-label={t("editor.settings.audienceAria")}
                 list="editor-audience-suggestions"
                 maxLength={80}
                 onChange={(event) => {
@@ -906,9 +923,12 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
               />
             </SettingsField>
 
-            <SettingsField className="sm:col-span-2" label="Difficulty">
+            <SettingsField
+              className="sm:col-span-2"
+              label={t("editor.settings.difficulty")}
+            >
               <select
-                aria-label="Difficulty"
+                aria-label={t("editor.settings.difficultyAria")}
                 className={SELECT_CLASS}
                 onChange={(event) => {
                   updateSettings({ difficulty: event.target.value });
@@ -917,7 +937,7 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
               >
                 {EDITOR_DIFFICULTIES.map((difficulty) => (
                   <option key={difficulty} value={difficulty}>
-                    {EDITOR_DIFFICULTY_LABELS[difficulty]}
+                    {t(EDITOR_DIFFICULTY_KEYS[difficulty])}
                   </option>
                 ))}
               </select>
@@ -925,11 +945,11 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
 
             <SettingsField
               className="sm:col-span-2"
-              hint="Publishing is live"
-              label="Status"
+              hint={t("editor.settings.statusHint")}
+              label={t("editor.settings.status")}
             >
               <select
-                aria-label="Course status"
+                aria-label={t("editor.settings.statusAria")}
                 className={SELECT_CLASS}
                 onChange={(event) => {
                   updateSettings({
@@ -940,7 +960,7 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
               >
                 {EDITOR_STATUSES.map((status) => (
                   <option key={status} value={status}>
-                    {EDITOR_STATUS_LABELS[status]}
+                    {t(EDITOR_STATUS_KEYS[status])}
                   </option>
                 ))}
               </select>
@@ -950,7 +970,7 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
       </section>
 
       <datalist id="editor-audience-suggestions">
-        {AUDIENCE_SUGGESTIONS.map((audience) => (
+        {(locale === "zh" ? AUDIENCE_SUGGESTIONS_ZH : AUDIENCE_SUGGESTIONS).map((audience) => (
           <option key={audience} value={audience} />
         ))}
       </datalist>
@@ -1058,11 +1078,14 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Delete {pendingDelete?.kind === "module" ? "module" : "lesson"}?
+              {pendingDelete?.kind === "module"
+                ? t("editor.delete.moduleTitle")
+                : t("editor.delete.lessonTitle")}
             </DialogTitle>
             <DialogDescription>
-              “{pendingDelete?.label ?? ""}” and its content are removed when you
-              save. Reload the page before saving to undo this.
+              {t("editor.delete.description", {
+                label: pendingDelete?.label ?? "",
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1072,10 +1095,10 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
               }}
               variant="outline"
             >
-              Cancel
+              {t("editor.delete.cancel")}
             </Button>
             <Button onClick={confirmDelete} variant="destructive">
-              Delete
+              {t("editor.delete.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

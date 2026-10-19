@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useT } from "@/i18n/client";
 import { removeStudent } from "@/server/students";
 
 type RemoveStudentButtonProps = {
@@ -31,6 +32,7 @@ export function RemoveStudentButton({
   userId,
   name,
 }: RemoveStudentButtonProps) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -56,7 +58,7 @@ export function RemoveStudentButton({
   return (
     <>
       <Button
-        aria-label={`Remove ${name} from this course`}
+        aria-label={t("students.remove.aria", { name })}
         className="text-muted-foreground hover:text-destructive"
         onClick={() => {
           setOpen(true);
@@ -64,7 +66,7 @@ export function RemoveStudentButton({
         size="xs"
         variant="ghost"
       >
-        Remove
+        {t("students.remove.button")}
       </Button>
 
       <Dialog
@@ -81,10 +83,9 @@ export function RemoveStudentButton({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove {name}?</DialogTitle>
+            <DialogTitle>{t("students.remove.title", { name })}</DialogTitle>
             <DialogDescription>
-              They will be unenrolled from this course. Their account and lesson
-              progress stay in place, so they can be imported again later.
+              {t("students.remove.description")}
             </DialogDescription>
           </DialogHeader>
 
@@ -100,7 +101,7 @@ export function RemoveStudentButton({
               }}
               variant="outline"
             >
-              Cancel
+              {t("editor.delete.cancel")}
             </Button>
             <Button
               disabled={pending}
@@ -109,7 +110,9 @@ export function RemoveStudentButton({
               }}
               variant="destructive"
             >
-              {pending ? "Removing…" : "Remove student"}
+              {pending
+                ? t("students.remove.pending")
+                : t("students.remove.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

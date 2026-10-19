@@ -9,8 +9,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getI18n } from "@/i18n/server";
 import type { AdminUserRow } from "@/lib/admin";
-import { ROLE_LABELS } from "@/lib/roles";
+import { ROLE_KEYS } from "@/lib/roles";
 
 import { RoleChangeDialog } from "./role-change-dialog";
 
@@ -22,46 +23,53 @@ import { RoleChangeDialog } from "./role-change-dialog";
  * fail.
  */
 
-const DATE_FORMAT = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
-
-const DATE_TIME_FORMAT = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
 const ROLE_BADGE_VARIANT: Record<Role, "default" | "secondary" | "outline"> = {
   ADMIN: "default",
   INSTRUCTOR: "secondary",
   LEARNER: "outline",
 };
 
-export function UserTable({
+export async function UserTable({
   users,
   currentUserId,
 }: {
   users: AdminUserRow[];
   currentUserId: string;
 }) {
+  const { locale, t } = await getI18n();
+  const dateFormat = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const dateTimeFormat = new Intl.DateTimeFormat(
+    locale === "zh" ? "zh-CN" : "en-GB",
+    {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  );
+
   return (
     <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="pl-4">User</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Joined</TableHead>
-            <TableHead>Last login</TableHead>
-            <TableHead className="text-right">Enrolled</TableHead>
-            <TableHead className="text-right">Authored</TableHead>
+            <TableHead className="pl-4">{t("admin.table.user")}</TableHead>
+            <TableHead>{t("admin.table.role")}</TableHead>
+            <TableHead>{t("admin.table.joined")}</TableHead>
+            <TableHead>{t("admin.table.lastLogin")}</TableHead>
+            <TableHead className="text-right">
+              {t("admin.table.enrolled")}
+            </TableHead>
+            <TableHead className="text-right">
+              {t("admin.table.authored")}
+            </TableHead>
             <TableHead className="pr-4 text-right">
-              <span className="sr-only">Actions</span>
+              <span className="sr-only">{t("admin.table.actions")}</span>
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -77,7 +85,7 @@ export function UserTable({
                     {user.name}
                     {isSelf ? (
                       <Badge className="text-[10px]" variant="outline">
-                        You
+                        {t("admin.table.you")}
                       </Badge>
                     ) : null}
                   </p>
@@ -86,18 +94,18 @@ export function UserTable({
 
                 <TableCell>
                   <Badge variant={ROLE_BADGE_VARIANT[user.role]}>
-                    {ROLE_LABELS[user.role]}
+                    {t(ROLE_KEYS[user.role])}
                   </Badge>
                 </TableCell>
 
                 <TableCell className="text-sm text-muted-foreground">
-                  {DATE_FORMAT.format(user.createdAt)}
+                  {dateFormat.format(user.createdAt)}
                 </TableCell>
 
                 <TableCell className="text-sm text-muted-foreground">
                   {user.lastLoginAt === null
-                    ? "Never"
-                    : DATE_TIME_FORMAT.format(user.lastLoginAt)}
+                    ? t("admin.table.never")
+                    : dateTimeFormat.format(user.lastLoginAt)}
                 </TableCell>
 
                 <TableCell className="text-right text-sm tabular-nums">
@@ -111,7 +119,7 @@ export function UserTable({
                 <TableCell className="pr-4 text-right">
                   {isSelf ? (
                     <span className="text-xs text-muted-foreground">
-                      Own account
+                      {t("admin.table.ownAccount")}
                     </span>
                   ) : (
                     <RoleChangeDialog

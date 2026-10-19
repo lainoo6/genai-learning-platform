@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 
+import type { Translator } from "@/i18n/translate";
 import { hashPassword, normaliseEmail } from "@/lib/auth";
 import { MAX_IMPORT_ROWS, parseCsv } from "@/lib/csv";
 import { prisma } from "@/lib/prisma";
@@ -68,7 +69,7 @@ type PreparedRoster =
  * Column positions come from the header instead of being hard-coded, so a file
  * exported from a spreadsheet with extra columns still imports.
  */
-function prepareRoster(text: string): PreparedRoster {
+function prepareRoster(text: string, t: Translator): PreparedRoster {
   const records = parseCsv(text);
   const headerIndex = records.findIndex((record) =>
     record.some((cell) => cell.trim().length > 0),
@@ -77,7 +78,7 @@ function prepareRoster(text: string): PreparedRoster {
   if (headerIndex === -1) {
     return {
       ok: false,
-      error: "That file is empty. Upload a CSV with a name,email header.",
+      error: t("server.import.emptyFile"),
     };
   }
 
@@ -88,7 +89,7 @@ function prepareRoster(text: string): PreparedRoster {
   if (nameIndex === -1 || emailIndex === -1) {
     return {
       ok: false,
-      error: "The header row must contain a name column and an email column.",
+      error: t("server.import.badHeader"),
     };
   }
 
@@ -100,16 +101,17 @@ function prepareRoster(text: string): PreparedRoster {
   if (nonEmptyIndexes.length === 0) {
     return {
       ok: false,
-      error: "That file only contains the header row. Add at least one student.",
+      error: t("server.import.headerOnly"),
     };
   }
 
   if (nonEmptyIndexes.length > MAX_IMPORT_ROWS) {
     return {
       ok: false,
-      error:
-        `That file has ${nonEmptyIndexes.length.toLocaleString("en-GB")} rows. `
-        + `Import at most ${MAX_IMPORT_ROWS.toLocaleString("en-GB")} at a time.`,
+      error: t("server.import.tooManyRows", {
+        count: nonEmptyIndexes.length.toLocaleString(),
+        max: MAX_IMPORT_ROWS.toLocaleString(),
+      }),
     };
   }
 
@@ -127,7 +129,7 @@ function prepareRoster(text: string): PreparedRoster {
       failures.push({
         row: rowNumber,
         email: rawEmail,
-        reason: "Name is missing.",
+        reason: t("server.import.nameMissing"),
       });
       continue;
     }
@@ -137,7 +139,7 @@ function prepareRoster(text: string): PreparedRoster {
       failures.push({
         row: rowNumber,
         email: rawEmail,
-        reason: "Enter a valid email address.",
+        reason: t("server.import.emailInvalid"),
       });
       continue;
     }
@@ -147,7 +149,7 @@ function prepareRoster(text: string): PreparedRoster {
       failures.push({
         row: rowNumber,
         email,
-        reason: `Duplicate email — already listed on row ${firstNameRow}.`,
+        reason: t("server.import.duplicate", { row: firstNameRow }),
       });
       continue;
     }
@@ -168,6 +170,7 @@ type RowOutcome =
 async function importRow(
   courseId: string,
   entry: PreparedRow,
+  t: Translator,
 ): Promise<RowOutcome> {
   try {
     const existing = await prisma.user.findUnique({
@@ -242,7 +245,7 @@ async function importRow(
       failure: {
         row: entry.row,
         email: entry.email,
-        reason: "Could not create the account. Try again.",
+        reason: t("server.import.createFailed"),
       },
     };
   }
@@ -279,8 +282,9 @@ async function mapWithConcurrency<T, R>(
 export async function importStudentsFromCsv(
   courseId: string,
   text: string,
+  t: Translator,
 ): Promise<ImportStudentsResult> {
-  const prepared = prepareRoster(text);
+  const prepared = prepareRoster(text, t);
   if (!prepared.ok) {
     return { ok: false, error: prepared.error };
   }
@@ -288,7 +292,7 @@ export async function importStudentsFromCsv(
   const outcomes = await mapWithConcurrency(
     prepared.rows,
     ROW_CONCURRENCY,
-    (entry) => importRow(courseId, entry),
+    (entry) => importRow(courseId, entry, t),
   );
 
   let imported = 0;

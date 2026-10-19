@@ -4,6 +4,7 @@ import { Loader2, SendHorizontal, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 import type { TutorMessageView } from "@/lib/tutor";
 import { cn } from "@/lib/utils";
 import { trackTutorOpen } from "@/server/tutor";
@@ -19,10 +20,10 @@ import { trackTutorOpen } from "@/server/tutor";
  * this lesson's TutorSession), so a reload keeps the conversation.
  */
 
-const SUGGESTIONS = [
-  "Explain this simply",
-  "Give me an example",
-  "Quiz me on this",
+const SUGGESTION_KEYS = [
+  "tutor.suggestion.simple",
+  "tutor.suggestion.example",
+  "tutor.suggestion.quiz",
 ] as const;
 
 export type TutorPanelProps = {
@@ -41,6 +42,7 @@ export function TutorPanel({
   initialMessages,
   mockMode,
 }: TutorPanelProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<TutorMessageView[]>(initialMessages);
   const [draft, setDraft] = useState("");
@@ -95,7 +97,7 @@ export function TutorPanel({
       });
 
       if (!response.ok || response.body === null) {
-        throw new Error(`The tutor is unavailable (${response.status}).`);
+        throw new Error(t("tutor.unavailable", { status: response.status }));
       }
 
       const reader = response.body.getReader();
@@ -138,7 +140,7 @@ export function TutorPanel({
       setError(
         cause instanceof Error
           ? cause.message
-          : "The tutor could not answer. Try again in a moment.",
+          : t("tutor.failed"),
       );
     } finally {
       setIsStreaming(false);
@@ -155,27 +157,27 @@ export function TutorPanel({
           onClick={openPanel}
         >
           <Sparkles aria-hidden="true" />
-          AI tutor
+          {t("tutor.open")}
         </Button>
       )}
 
       {open ? (
         <aside
-          aria-label="AI tutor"
+          aria-label={t("tutor.open")}
           className="fixed inset-x-0 bottom-0 z-50 flex h-[80vh] flex-col border-t bg-background shadow-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:h-full sm:w-96 sm:border-l sm:border-t-0"
         >
           <header className="flex items-start gap-2 border-b px-4 py-3">
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1.5 text-sm font-medium">
                 <Sparkles aria-hidden="true" className="size-4" />
-                AI tutor
+                {t("tutor.open")}
               </p>
               <p className="truncate text-xs text-muted-foreground">
                 {lessonTitle}
               </p>
             </div>
             <Button
-              aria-label="Close tutor"
+              aria-label={t("tutor.close")}
               onClick={() => {
                 setOpen(false);
               }}
@@ -191,13 +193,13 @@ export function TutorPanel({
             ref={scrollRef}
           >
             <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-              Ask about this lesson. I can see what you are working on
-              {mockMode ? " (answers are running in mock mode)." : "."}
+              {t("tutor.intro")}
+              {mockMode ? t("tutor.mock") : "."}
             </p>
 
             {messages.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                No conversation yet — start with one of the questions below.
+                {t("tutor.empty")}
               </p>
             ) : null}
 
@@ -217,7 +219,7 @@ export function TutorPanel({
                       aria-hidden="true"
                       className="size-3.5 animate-spin"
                     />
-                    Thinking…
+                    {t("tutor.thinking")}
                   </span>
                 ) : (
                   <p className="whitespace-pre-wrap">{message.content}</p>
@@ -233,19 +235,23 @@ export function TutorPanel({
           </div>
 
           <div className="flex flex-wrap gap-2 border-t px-4 py-2">
-            {SUGGESTIONS.map((suggestion) => (
-              <Button
-                disabled={isStreaming}
-                key={suggestion}
-                onClick={() => {
-                  void send(suggestion);
-                }}
-                size="sm"
-                variant="outline"
-              >
-                {suggestion}
-              </Button>
-            ))}
+            {SUGGESTION_KEYS.map((key) => {
+              const suggestion = t(key);
+
+              return (
+                <Button
+                  disabled={isStreaming}
+                  key={key}
+                  onClick={() => {
+                    void send(suggestion);
+                  }}
+                  size="sm"
+                  variant="outline"
+                >
+                  {suggestion}
+                </Button>
+              );
+            })}
           </div>
 
           <form
@@ -256,7 +262,7 @@ export function TutorPanel({
             }}
           >
             <textarea
-              aria-label="Ask the tutor"
+              aria-label={t("tutor.ask")}
               className="min-h-10 max-h-32 flex-1 resize-y rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring"
               disabled={isStreaming}
               onChange={(event) => {
@@ -268,12 +274,12 @@ export function TutorPanel({
                   void send(draft);
                 }
               }}
-              placeholder="Ask about this lesson…"
+              placeholder={t("tutor.placeholder")}
               rows={2}
               value={draft}
             />
             <Button
-              aria-label="Send message"
+              aria-label={t("tutor.send")}
               disabled={!canSend}
               size="icon"
               type="submit"
@@ -288,7 +294,7 @@ export function TutorPanel({
 
           {isTracking ? (
             <p className="px-4 pb-2 text-[11px] text-muted-foreground">
-              Opening tutor…
+              {t("tutor.tracking")}
             </p>
           ) : null}
         </aside>

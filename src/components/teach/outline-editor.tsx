@@ -15,6 +15,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useT } from "@/i18n/client";
+import { blockMetaFor } from "@/lib/blocks/meta";
 import type { BlockType } from "@/lib/blocks/schema";
 import { SUGGESTED_BLOCK_TYPES } from "@/lib/llm/prompts/outline";
 import {
@@ -61,6 +63,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
     error,
   } = props;
 
+  const t = useT();
   const [extraNotes, setExtraNotes] = useState("");
 
   const totalLessons = countWizardLessons(outline);
@@ -183,11 +186,13 @@ export function OutlineEditor(props: OutlineEditorProps) {
         ...outline.modules,
         {
           key: nextWizardKey("module"),
-          title: `Module ${outline.modules.length + 1}`,
+          title: t("wizard.outline.newModuleTitle", {
+            index: outline.modules.length + 1,
+          }),
           lessons: [
             {
               key: nextWizardKey("lesson"),
-              title: "New lesson",
+              title: t("wizard.outline.newLessonTitle"),
               summary: "",
               suggestedBlocks: ["reading", "quiz"],
             },
@@ -206,7 +211,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
         <div className="space-y-4 px-4 py-5 sm:px-5">
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="outline-title">
-              Course title
+              {t("wizard.outline.courseTitle")}
             </label>
             <Input
               id="outline-title"
@@ -220,7 +225,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="outline-description">
-              Description
+              {t("wizard.outline.description")}
             </label>
             <Textarea
               id="outline-description"
@@ -237,8 +242,10 @@ export function OutlineEditor(props: OutlineEditorProps) {
         <div className="space-y-3 border-t px-4 py-4 sm:px-5">
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="outline-revision">
-              Regenerate with a note{" "}
-              <span className="font-normal text-muted-foreground">(optional)</span>
+              {t("wizard.outline.revise")}{" "}
+              <span className="font-normal text-muted-foreground">
+                {t("generate.form.optional")}
+              </span>
             </label>
             <Textarea
               disabled={isRegenerating}
@@ -247,7 +254,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
               onChange={(event) => {
                 setExtraNotes(event.target.value);
               }}
-              placeholder="Fewer modules, and make the lessons more practical."
+              placeholder={t("wizard.outline.revisePlaceholder")}
               rows={2}
               value={extraNotes}
             />
@@ -264,17 +271,17 @@ export function OutlineEditor(props: OutlineEditorProps) {
               {isRegenerating ? (
                 <>
                   <Loader2 aria-hidden="true" className="animate-spin" />
-                  Replanning…
+                  {t("wizard.outline.replanning")}
                 </>
               ) : (
                 <>
                   <RefreshCw aria-hidden="true" />
-                  Regenerate outline
+                  {t("wizard.outline.regenerate")}
                 </>
               )}
             </Button>
             <p className="text-xs text-muted-foreground">
-              Replacing the outline discards any lessons you already generated.
+              {t("wizard.outline.discardNote")}
             </p>
           </div>
 
@@ -290,11 +297,12 @@ export function OutlineEditor(props: OutlineEditorProps) {
       </section>
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-medium">Modules and lessons</h2>
+        <h2 className="text-lg font-medium">{t("wizard.outline.modulesLessons")}</h2>
         <p className="text-xs text-muted-foreground">
-          {outline.modules.length} module
-          {outline.modules.length === 1 ? "" : "s"} · {totalLessons} lesson
-          {totalLessons === 1 ? "" : "s"}
+          {t("wizard.outline.summary", {
+            modules: outline.modules.length,
+            lessons: totalLessons,
+          })}
         </p>
       </div>
 
@@ -310,7 +318,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
                   className="sr-only"
                   htmlFor={`module-title-${courseModule.key}`}
                 >
-                  Module title
+                  {t("wizard.outline.moduleTitleAria")}
                 </label>
                 <Input
                   className="font-medium"
@@ -323,7 +331,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
                 />
               </div>
               <Button
-                aria-label="Delete module"
+                aria-label={t("wizard.outline.deleteModule")}
                 className="text-muted-foreground hover:text-destructive"
                 disabled={!canRemoveModule}
                 onClick={() => {
@@ -349,7 +357,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
                         className="sr-only"
                         htmlFor={`lesson-title-${lesson.key}`}
                       >
-                        Lesson title
+                        {t("wizard.outline.lessonTitleAria")}
                       </label>
                       <Input
                         id={`lesson-title-${lesson.key}`}
@@ -366,7 +374,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
                         className="sr-only"
                         htmlFor={`lesson-summary-${lesson.key}`}
                       >
-                        Lesson summary
+                        {t("wizard.outline.lessonSummaryAria")}
                       </label>
                       <Textarea
                         id={`lesson-summary-${lesson.key}`}
@@ -376,7 +384,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
                             summary: event.target.value,
                           });
                         }}
-                        placeholder="What can the learner do after this lesson?"
+                        placeholder={t("wizard.outline.lessonSummaryPlaceholder")}
                         rows={2}
                         value={lesson.summary}
                       />
@@ -399,7 +407,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
                               }}
                               type="button"
                             >
-                              {type}
+                              {t(blockMetaFor(type).labelKey)}
                             </button>
                           );
                         })}
@@ -408,7 +416,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
 
                     <div className="flex flex-col gap-1">
                       <Button
-                        aria-label="Move lesson up"
+                        aria-label={t("wizard.outline.moveLessonUp")}
                         disabled={lessonIndex === 0}
                         onClick={() => {
                           moveLesson(courseModule.key, lesson.key, -1);
@@ -419,7 +427,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
                         <ArrowUp aria-hidden="true" />
                       </Button>
                       <Button
-                        aria-label="Move lesson down"
+                        aria-label={t("wizard.outline.moveLessonDown")}
                         disabled={lessonIndex === courseModule.lessons.length - 1}
                         onClick={() => {
                           moveLesson(courseModule.key, lesson.key, 1);
@@ -430,7 +438,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
                         <ArrowDown aria-hidden="true" />
                       </Button>
                       <Button
-                        aria-label="Delete lesson"
+                        aria-label={t("wizard.outline.deleteLesson")}
                         className="text-muted-foreground hover:text-destructive"
                         disabled={!canRemoveLesson}
                         onClick={() => {
@@ -454,7 +462,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
                 variant="outline"
               >
                 <Plus aria-hidden="true" />
-                Add lesson
+                {t("editor.structure.addLesson")}
               </Button>
             </div>
           </section>
@@ -464,7 +472,7 @@ export function OutlineEditor(props: OutlineEditorProps) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
         <Button onClick={onBack} variant="outline">
           <ArrowLeft aria-hidden="true" />
-          Back to basics
+          {t("wizard.outline.back")}
         </Button>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -474,13 +482,13 @@ export function OutlineEditor(props: OutlineEditorProps) {
             variant="ghost"
           >
             <Plus aria-hidden="true" />
-            Add module
+            {t("editor.structure.addModule")}
           </Button>
           <Button
             disabled={totalLessons === 0 || outline.title.trim().length < 3}
             onClick={onContinue}
           >
-            Continue to lessons
+            {t("wizard.outline.continueToLessons")}
             <ArrowRight aria-hidden="true" />
           </Button>
         </div>

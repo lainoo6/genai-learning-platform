@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useT } from "@/i18n/client";
 import type {
   BlockRenderProps,
   RoleplayBlock as RoleplayBlockData,
@@ -42,6 +43,7 @@ export function RoleplayBlock({
   onComplete,
   context,
 }: BlockRenderProps<RoleplayBlockData>) {
+  const t = useT();
   const { scenario, persona, goal, rubric } = block.payload;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -104,7 +106,7 @@ export function RoleplayBlock({
       });
 
       if (!response.ok || response.body === null) {
-        throw new Error(`The role play is unavailable (${response.status}).`);
+        throw new Error(t("block.roleplay.unavailable", { status: response.status }));
       }
 
       const reader = response.body.getReader();
@@ -144,7 +146,7 @@ export function RoleplayBlock({
         setMessages((previous) =>
           previous.filter((message) => message.id !== replyId),
         );
-        setChatError("The character did not answer. Try sending that again.");
+        setChatError(t("block.roleplay.emptyAnswer"));
       }
     } catch (cause: unknown) {
       setMessages((previous) =>
@@ -153,7 +155,7 @@ export function RoleplayBlock({
       setChatError(
         cause instanceof Error
           ? cause.message
-          : "The role play could not answer. Try again in a moment.",
+          : t("block.roleplay.failedAnswer"),
       );
     } finally {
       setIsStreaming(false);
@@ -188,7 +190,7 @@ export function RoleplayBlock({
       setReportError(
         cause instanceof Error
           ? cause.message
-          : "The feedback report could not be generated. Try again.",
+          : t("block.roleplay.failedReport"),
       );
     } finally {
       setIsReporting(false);
@@ -210,23 +212,23 @@ export function RoleplayBlock({
       <div className="rounded-lg bg-muted/50 px-4 py-3 ring-1 ring-foreground/10">
         <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           <MessageSquare aria-hidden="true" className="size-3.5" />
-          Scenario
+          {t("block.roleplay.scenario")}
         </p>
         <p className="mt-1.5 text-sm leading-relaxed">{scenario}</p>
         <p className="mt-2 flex items-start gap-1.5 text-sm">
           <Target aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           <span>
-            <span className="font-medium">Your goal: </span>
+            <span className="font-medium">{t("block.roleplay.goal")}</span>
             {goal}
           </span>
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          You are talking to {persona}.
+          {t("block.roleplay.partner", { persona })}
         </p>
       </div>
 
       <div
-        aria-label="Role play conversation"
+        aria-label={t("block.roleplay.conversation")}
         aria-live="polite"
         className="max-h-96 min-h-44 space-y-2 overflow-y-auto rounded-lg border px-3 py-3"
         ref={scrollRef}
@@ -234,8 +236,7 @@ export function RoleplayBlock({
       >
         {messages.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            The conversation is empty. Open with a question — the character will
-            answer in role.
+            {t("block.roleplay.empty")}
           </p>
         ) : null}
 
@@ -252,7 +253,7 @@ export function RoleplayBlock({
             {message.content.length === 0 ? (
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
-                In character…
+                {t("block.roleplay.inCharacter")}
               </span>
             ) : (
               <p className="whitespace-pre-wrap">{message.content}</p>
@@ -272,7 +273,7 @@ export function RoleplayBlock({
 
       {atTurnLimit && !ended ? (
         <p className="text-xs text-muted-foreground">
-          This conversation has reached its limit. End it to get feedback.
+          {t("block.roleplay.limit")}
         </p>
       ) : null}
 
@@ -284,7 +285,7 @@ export function RoleplayBlock({
         }}
       >
         <Textarea
-          aria-label="Your message"
+          aria-label={t("block.roleplay.yourMessage")}
           className="min-h-10 flex-1"
           disabled={isStreaming || ended}
           onChange={(event) => {
@@ -298,13 +299,18 @@ export function RoleplayBlock({
           }}
           placeholder={
             ended
-              ? "This attempt is over — play again to keep practising."
-              : "Reply to the character…"
+              ? t("block.roleplay.overPlaceholder")
+              : t("block.roleplay.replyPlaceholder")
           }
           rows={2}
           value={draft}
         />
-        <Button aria-label="Send message" disabled={!canSend} size="icon" type="submit">
+        <Button
+          aria-label={t("block.roleplay.send")}
+          disabled={!canSend}
+          size="icon"
+          type="submit"
+        >
           {isStreaming ? (
             <Loader2 aria-hidden="true" className="animate-spin" />
           ) : (
@@ -317,7 +323,7 @@ export function RoleplayBlock({
         {ended ? (
           <Button onClick={playAgain} variant="outline">
             <RotateCcw aria-hidden="true" />
-            Play again
+            {t("block.roleplay.playAgain")}
           </Button>
         ) : (
           <>
@@ -330,14 +336,14 @@ export function RoleplayBlock({
               {isReporting ? (
                 <>
                   <Loader2 aria-hidden="true" className="animate-spin" />
-                  Marking your attempt…
+                  {t("block.roleplay.marking")}
                 </>
               ) : (
-                "End & get feedback"
+                t("block.roleplay.end")
               )}
             </Button>
             <p className="text-xs text-muted-foreground">
-              {rubric.length} criteria will be graded when you end the conversation.
+              {t("block.roleplay.criteriaNote", { count: rubric.length })}
             </p>
           </>
         )}
@@ -355,9 +361,11 @@ export function RoleplayBlock({
       {report === null ? null : (
         <div className="space-y-3 rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-4 py-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-medium">Feedback report</h3>
+            <h3 className="text-sm font-medium">{t("block.roleplay.report")}</h3>
             <Badge variant="secondary">
-              {report.criteria.length} criteria
+              {t("block.roleplay.criteriaCount", {
+                count: report.criteria.length,
+              })}
             </Badge>
           </div>
 
@@ -367,7 +375,9 @@ export function RoleplayBlock({
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-sm font-medium">{criterion.criterion}</p>
                   <Badge
-                    aria-label={`Score ${criterion.score} out of 5`}
+                    aria-label={t("block.roleplay.score", {
+                      score: criterion.score,
+                    })}
                     variant="outline"
                     className="shrink-0 tabular-nums"
                   >
@@ -381,7 +391,7 @@ export function RoleplayBlock({
 
           <div className="rounded-md bg-background/60 px-3 py-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Next time
+              {t("block.roleplay.nextTime")}
             </p>
             <p className="mt-1 text-sm">{report.suggestion}</p>
           </div>
@@ -397,10 +407,10 @@ export function RoleplayBlock({
               {completed ? (
                 <>
                   <Check aria-hidden="true" />
-                  Marked as done
+                  {t("block.roleplay.markedDone")}
                 </>
               ) : (
-                "Mark as done"
+                t("block.roleplay.markDone")
               )}
             </Button>
           </div>

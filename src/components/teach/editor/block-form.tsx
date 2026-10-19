@@ -7,6 +7,8 @@ import { MarkdownView } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useT } from "@/i18n/client";
+import type { Translator } from "@/i18n/translate";
 import type {
   Block,
   BlockOfType,
@@ -154,6 +156,7 @@ export function BlockForm({
 }
 
 function ReadingForm({ block, onChange }: FormProps<"reading">) {
+  const t = useT();
   const [view, setView] = useState<"write" | "preview">("write");
 
   return (
@@ -166,7 +169,7 @@ function ReadingForm({ block, onChange }: FormProps<"reading">) {
           size="xs"
           variant={view === "write" ? "secondary" : "ghost"}
         >
-          Write
+          {t("editor.form.write")}
         </Button>
         <Button
           onClick={() => {
@@ -175,7 +178,7 @@ function ReadingForm({ block, onChange }: FormProps<"reading">) {
           size="xs"
           variant={view === "preview" ? "secondary" : "ghost"}
         >
-          Preview
+          {t("editor.form.preview")}
         </Button>
       </div>
 
@@ -188,7 +191,7 @@ function ReadingForm({ block, onChange }: FormProps<"reading">) {
               payload: { ...block.payload, markdown: event.target.value },
             });
           }}
-          placeholder="## A heading&#10;&#10;Paragraph text with **markdown**."
+          placeholder={t("editor.form.markdownPlaceholder")}
           rows={16}
           spellCheck={false}
           value={block.payload.markdown}
@@ -196,14 +199,16 @@ function ReadingForm({ block, onChange }: FormProps<"reading">) {
       ) : (
         <div className="min-h-80 rounded-lg border bg-muted/30 p-3">
           {block.payload.markdown.trim().length === 0 ? (
-            <p className="text-xs text-muted-foreground">Nothing to preview yet.</p>
+            <p className="text-xs text-muted-foreground">
+              {t("editor.form.nothingToPreview")}
+            </p>
           ) : (
             <MarkdownView>{block.payload.markdown}</MarkdownView>
           )}
         </div>
       )}
 
-      <Field hint="Optional" label="Image URL">
+      <Field hint={t("editor.form.optional")} label={t("editor.form.imageUrl")}>
         <Input
           onChange={(event) => {
             const value = event.target.value;
@@ -215,7 +220,7 @@ function ReadingForm({ block, onChange }: FormProps<"reading">) {
               },
             });
           }}
-          placeholder="/images/lesson.png or https://…"
+          placeholder={t("editor.form.imageUrlPlaceholder")}
           value={block.payload.imageUrl ?? ""}
         />
       </Field>
@@ -225,17 +230,18 @@ function ReadingForm({ block, onChange }: FormProps<"reading">) {
 
 type ChoiceQuestion = Extract<QuizQuestion, { kind: "single" | "multi" }>;
 
-const QUESTION_KIND_LABELS: Record<QuestionKind, string> = {
-  single: "Single choice",
-  multi: "Multiple choice",
-  truefalse: "True / false",
-  short: "Short answer",
+const QUESTION_KIND_KEYS: Record<QuestionKind, string> = {
+  single: "editor.question.single",
+  multi: "editor.question.multi",
+  truefalse: "editor.question.truefalse",
+  short: "editor.question.short",
 };
 
 /** Rewrites a question into another kind, keeping what still applies. */
 function convertQuestion(
   question: QuizQuestion,
   kind: QuestionKind,
+  t: Translator,
 ): QuizQuestion {
   const base = {
     id: question.id,
@@ -259,14 +265,14 @@ function convertQuestion(
       return {
         ...base,
         kind,
-        options: options ?? ["Option 1", "Option 2"],
+        options: options ?? [t("editor.option.label", { index: 1 }), t("editor.option.label", { index: 2 })],
         answer: [0],
       };
     case "multi":
       return {
         ...base,
         kind,
-        options: options ?? ["Option 1", "Option 2"],
+        options: options ?? [t("editor.option.label", { index: 1 }), t("editor.option.label", { index: 2 })],
         answer: [0],
       };
     case "truefalse":
@@ -276,7 +282,7 @@ function convertQuestion(
   }
 }
 
-function newQuestion(kind: QuestionKind): QuizQuestion {
+function newQuestion(kind: QuestionKind, t: Translator): QuizQuestion {
   return convertQuestion(
     {
       id: crypto.randomUUID(),
@@ -287,6 +293,7 @@ function newQuestion(kind: QuestionKind): QuizQuestion {
       answer: [0],
     },
     kind,
+    t,
   );
 }
 
@@ -311,6 +318,7 @@ function ChoiceOptions({
   question: ChoiceQuestion;
   onChange: (next: QuizQuestion) => void;
 }) {
+  const t = useT();
   const emit = (options: string[], answer: number[]): void => {
     if (question.kind === "single") {
       onChange({ ...question, options, answer });
@@ -324,7 +332,7 @@ function ChoiceOptions({
       {question.options.map((option, index) => (
         <div className="flex items-center gap-1.5" key={`option-${String(index)}`}>
           <input
-            aria-label={`Mark option ${String(index + 1)} as correct`}
+            aria-label={t("editor.option.markCorrect", { index: index + 1 })}
             checked={question.answer.includes(index)}
             className="size-3.5 shrink-0 accent-primary"
             onChange={() => {
@@ -341,19 +349,19 @@ function ChoiceOptions({
             type={question.kind === "single" ? "radio" : "checkbox"}
           />
           <Input
-            aria-label={`Option ${String(index + 1)}`}
+            aria-label={t("editor.option.label", { index: index + 1 })}
             onChange={(event) => {
               const options = question.options.map((entry, position) =>
                 position === index ? event.target.value : entry,
               );
               emit(options, question.answer);
             }}
-            placeholder={`Option ${String(index + 1)}`}
+            placeholder={t("editor.option.label", { index: index + 1 })}
             value={option}
           />
           <IconButton
             disabled={question.options.length <= 2}
-            label="Remove option"
+            label={t("editor.option.remove")}
             onClick={() => {
               onChange(removeChoiceOption(question, index));
             }}
@@ -371,13 +379,14 @@ function ChoiceOptions({
         variant="ghost"
       >
         <Plus aria-hidden="true" />
-        Add option
+        {t("editor.option.add")}
       </Button>
     </div>
   );
 }
 
 function QuizForm({ block, onChange }: FormProps<"quiz">) {
+  const t = useT();
   const questions = block.payload.questions;
 
   function replaceQuestion(index: number, next: QuizQuestion): void {
@@ -394,7 +403,7 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
 
   return (
     <div className="space-y-3">
-      <Field hint="0–100%" label="Pass score">
+      <Field hint="0–100%" label={t("editor.quiz.passScore")}>
         <Input
           max={100}
           min={0}
@@ -420,28 +429,30 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
           key={question.id}
         >
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium">Question {index + 1}</p>
+            <p className="text-xs font-medium">
+              {t("editor.question.number", { index: index + 1 })}
+            </p>
             <div className="flex items-center gap-1">
               <select
-                aria-label={`Kind of question ${String(index + 1)}`}
+                aria-label={t("editor.question.kindAria", { index: index + 1 })}
                 className={SMALL_SELECT_CLASS}
                 onChange={(event) => {
                   replaceQuestion(
                     index,
-                    convertQuestion(question, event.target.value as QuestionKind),
+                    convertQuestion(question, event.target.value as QuestionKind, t),
                   );
                 }}
                 value={question.kind}
               >
-                {Object.entries(QUESTION_KIND_LABELS).map(([kind, label]) => (
+                {Object.entries(QUESTION_KIND_KEYS).map(([kind, key]) => (
                   <option key={kind} value={kind}>
-                    {label}
+                    {t(key)}
                   </option>
                 ))}
               </select>
               <IconButton
                 disabled={questions.length <= 1}
-                label="Remove question"
+                label={t("editor.question.remove")}
                 onClick={() => {
                   onChange({
                     ...block,
@@ -460,11 +471,11 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
           </div>
 
           <Textarea
-            aria-label={`Prompt of question ${String(index + 1)}`}
+            aria-label={t("editor.question.promptAria", { index: index + 1 })}
             onChange={(event) => {
               replaceQuestion(index, { ...question, prompt: event.target.value });
             }}
-            placeholder="Question prompt"
+            placeholder={t("editor.question.promptPlaceholder")}
             rows={2}
             value={question.prompt}
           />
@@ -480,7 +491,10 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
 
           {question.kind === "truefalse" ? (
             <div className="flex flex-wrap gap-3 text-xs">
-              {["True", "False"].map((label, value) => (
+              {[
+                { label: t("block.quiz.true"), value: 0 },
+                { label: t("block.quiz.false"), value: 1 },
+              ].map(({ label, value }) => (
                 <label className="flex items-center gap-1.5" key={label}>
                   <input
                     checked={question.answer[0] === value}
@@ -498,37 +512,37 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
 
           {question.kind === "short" ? (
             <Input
-              aria-label={`Keywords of question ${String(index + 1)}`}
+              aria-label={t("editor.question.keywordsAria", { index: index + 1 })}
               onChange={(event) => {
                 replaceQuestion(index, { ...question, answer: event.target.value });
               }}
-              placeholder="Keywords, separated by commas"
+              placeholder={t("editor.question.keywordsPlaceholder")}
               value={question.answer}
             />
           ) : null}
 
           <Input
-            aria-label={`Explanation of question ${String(index + 1)}`}
+            aria-label={t("editor.question.explanationAria", { index: index + 1 })}
             onChange={(event) => {
               replaceQuestion(index, {
                 ...question,
                 explanation: event.target.value,
               });
             }}
-            placeholder="Explanation shown after answering"
+            placeholder={t("editor.question.explanationPlaceholder")}
             value={question.explanation}
           />
         </div>
       ))}
 
       <AddRow
-        label="Add question"
+        label={t("editor.question.add")}
         onClick={() => {
           onChange({
             ...block,
             payload: {
               ...block.payload,
-              questions: [...questions, newQuestion("single")],
+              questions: [...questions, newQuestion("single", t)],
             },
           });
         }}
@@ -538,6 +552,7 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
 }
 
 function FlashcardsForm({ block, onChange }: FormProps<"flashcards">) {
+  const t = useT();
   const cards = block.payload.cards;
 
   function replaceCard(index: number, next: { front: string; back: string }): void {
@@ -556,25 +571,25 @@ function FlashcardsForm({ block, onChange }: FormProps<"flashcards">) {
         <div className="flex items-start gap-1.5" key={`card-${String(index)}`}>
           <div className="grid flex-1 gap-1.5">
             <Input
-              aria-label={`Front of card ${String(index + 1)}`}
+              aria-label={t("editor.card.frontAria", { index: index + 1 })}
               onChange={(event) => {
                 replaceCard(index, { ...card, front: event.target.value });
               }}
-              placeholder="Front (term)"
+              placeholder={t("editor.card.frontPlaceholder")}
               value={card.front}
             />
             <Input
-              aria-label={`Back of card ${String(index + 1)}`}
+              aria-label={t("editor.card.backAria", { index: index + 1 })}
               onChange={(event) => {
                 replaceCard(index, { ...card, back: event.target.value });
               }}
-              placeholder="Back (definition)"
+              placeholder={t("editor.card.backPlaceholder")}
               value={card.back}
             />
           </div>
           <IconButton
             disabled={cards.length <= 1}
-            label="Remove card"
+            label={t("editor.card.remove")}
             onClick={() => {
               onChange({
                 ...block,
@@ -591,7 +606,7 @@ function FlashcardsForm({ block, onChange }: FormProps<"flashcards">) {
       ))}
 
       <AddRow
-        label="Add card"
+        label={t("editor.card.add")}
         onClick={() => {
           onChange({
             ...block,
@@ -607,6 +622,7 @@ function FlashcardsForm({ block, onChange }: FormProps<"flashcards">) {
 }
 
 function SlidesForm({ block, onChange }: FormProps<"slides">) {
+  const t = useT();
   const slides = block.payload.slides;
 
   function replaceSlide(
@@ -638,16 +654,18 @@ function SlidesForm({ block, onChange }: FormProps<"slides">) {
           }}
           type="checkbox"
         />
-        Start narration automatically when a slide opens
+        {t("editor.slide.autoplay")}
       </label>
 
       {slides.map((slide, index) => (
         <div className="space-y-2 rounded-lg border p-2.5" key={`slide-${String(index)}`}>
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium">Slide {index + 1}</p>
+            <p className="text-xs font-medium">
+              {t("editor.slide.number", { index: index + 1 })}
+            </p>
             <IconButton
               disabled={slides.length <= 1}
-              label="Remove slide"
+              label={t("editor.slide.remove")}
               onClick={() => {
                 onChange({
                   ...block,
@@ -663,15 +681,15 @@ function SlidesForm({ block, onChange }: FormProps<"slides">) {
           </div>
 
           <Input
-            aria-label={`Title of slide ${String(index + 1)}`}
+            aria-label={t("editor.slide.titleAria", { index: index + 1 })}
             onChange={(event) => {
               replaceSlide(index, { ...slide, title: event.target.value });
             }}
-            placeholder="Slide title"
+            placeholder={t("editor.slide.titlePlaceholder")}
             value={slide.title}
           />
 
-          <Field hint="One per line" label="Bullets">
+          <Field hint={t("editor.slide.bulletsHint")} label={t("editor.slide.bullets")}>
             <Textarea
               onChange={(event) => {
                 replaceSlide(index, {
@@ -682,18 +700,18 @@ function SlidesForm({ block, onChange }: FormProps<"slides">) {
                     .filter((line) => line.length > 0),
                 });
               }}
-              placeholder={"First point\nSecond point"}
+              placeholder={t("editor.slide.bulletsPlaceholder")}
               rows={3}
               value={slide.bullets.join("\n")}
             />
           </Field>
 
-          <Field hint="Read out loud" label="Narration">
+          <Field hint={t("editor.slide.narrationHint")} label={t("editor.slide.narration")}>
             <Textarea
               onChange={(event) => {
                 replaceSlide(index, { ...slide, narration: event.target.value });
               }}
-              placeholder="What the narrator says while this slide is open."
+              placeholder={t("editor.slide.narrationPlaceholder")}
               rows={3}
               value={slide.narration}
             />
@@ -702,7 +720,7 @@ function SlidesForm({ block, onChange }: FormProps<"slides">) {
       ))}
 
       <AddRow
-        label="Add slide"
+        label={t("editor.slide.add")}
         onClick={() => {
           onChange({
             ...block,
@@ -721,11 +739,12 @@ function SlidesForm({ block, onChange }: FormProps<"slides">) {
 }
 
 function CodingForm({ block, onChange }: FormProps<"coding">) {
+  const t = useT();
   const { problem, starter, tests, hints } = block.payload;
 
   return (
     <div className="space-y-3">
-      <Field label="Problem">
+      <Field label={t("editor.coding.problem")}>
         <Textarea
           onChange={(event) => {
             onChange({
@@ -733,13 +752,13 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
               payload: { ...block.payload, problem: event.target.value },
             });
           }}
-          placeholder="Describe the exercise and what the function must do."
+          placeholder={t("editor.coding.problemPlaceholder")}
           rows={4}
           value={problem}
         />
       </Field>
 
-      <Field hint="JavaScript" label="Starter code">
+      <Field hint="JavaScript" label={t("editor.coding.starter")}>
         <Textarea
           className={cn("min-h-40", MONO_CLASS)}
           onChange={(event) => {
@@ -755,11 +774,11 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
       </Field>
 
       <div className="space-y-1.5">
-        <p className="text-xs font-medium">Tests</p>
+        <p className="text-xs font-medium">{t("editor.coding.tests")}</p>
         {tests.map((test, index) => (
           <div className="flex items-start gap-1.5" key={`test-${String(index)}`}>
             <Input
-              aria-label={`Name of test ${String(index + 1)}`}
+              aria-label={t("editor.coding.testNameAria", { index: index + 1 })}
               className="w-2/5"
               onChange={(event) => {
                 onChange({
@@ -774,11 +793,11 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
                   },
                 });
               }}
-              placeholder="Name"
+              placeholder={t("editor.coding.testNamePlaceholder")}
               value={test.name}
             />
             <Input
-              aria-label={`Expression of test ${String(index + 1)}`}
+              aria-label={t("editor.coding.testExpressionAria", { index: index + 1 })}
               className={MONO_CLASS}
               onChange={(event) => {
                 onChange({
@@ -798,7 +817,7 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
             />
             <IconButton
               disabled={tests.length <= 1}
-              label="Remove test"
+              label={t("editor.coding.testRemove")}
               onClick={() => {
                 onChange({
                   ...block,
@@ -814,7 +833,7 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
           </div>
         ))}
         <AddRow
-          label="Add test"
+          label={t("editor.coding.testAdd")}
           onClick={() => {
             onChange({
               ...block,
@@ -828,11 +847,11 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
       </div>
 
       <div className="space-y-1.5">
-        <p className="text-xs font-medium">Hints</p>
+        <p className="text-xs font-medium">{t("editor.coding.hints")}</p>
         {hints.map((hint, index) => (
           <div className="flex items-center gap-1.5" key={`hint-${String(index)}`}>
             <Input
-              aria-label={`Hint ${String(index + 1)}`}
+              aria-label={t("editor.coding.hintAria", { index: index + 1 })}
               onChange={(event) => {
                 onChange({
                   ...block,
@@ -844,11 +863,11 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
                   },
                 });
               }}
-              placeholder="A nudge in the right direction"
+              placeholder={t("editor.coding.hintPlaceholder")}
               value={hint}
             />
             <IconButton
-              label="Remove hint"
+              label={t("editor.coding.hintRemove")}
               onClick={() => {
                 onChange({
                   ...block,
@@ -864,7 +883,7 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
           </div>
         ))}
         <AddRow
-          label="Add hint"
+          label={t("editor.coding.hintAdd")}
           onClick={() => {
             onChange({
               ...block,
@@ -878,6 +897,7 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
 }
 
 function GameForm({ block, onChange }: FormProps<"game">) {
+  const t = useT();
   const payload = block.payload;
 
   function switchVariant(variant: "sort" | "match"): void {
@@ -916,7 +936,7 @@ function GameForm({ block, onChange }: FormProps<"game">) {
 
   return (
     <div className="space-y-3">
-      <Field label="Variant">
+      <Field label={t("editor.game.variant")}>
         <select
           className={SELECT_CLASS}
           onChange={(event) => {
@@ -924,18 +944,18 @@ function GameForm({ block, onChange }: FormProps<"game">) {
           }}
           value={payload.variant}
         >
-          <option value="sort">Order the steps</option>
-          <option value="match">Match the pairs</option>
+          <option value="sort">{t("editor.game.sort")}</option>
+          <option value="match">{t("editor.game.match")}</option>
         </select>
       </Field>
 
       {payload.variant === "sort" ? (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium">Items</p>
+          <p className="text-xs font-medium">{t("editor.game.items")}</p>
           {payload.items.map((item, index) => (
             <div className="flex items-center gap-1.5" key={`item-${String(index)}`}>
               <Input
-                aria-label={`Text of item ${String(index + 1)}`}
+                aria-label={t("editor.game.itemTextAria", { index: index + 1 })}
                 onChange={(event) => {
                   onChange({
                     ...block,
@@ -949,11 +969,11 @@ function GameForm({ block, onChange }: FormProps<"game">) {
                     },
                   });
                 }}
-                placeholder="Step text"
+                placeholder={t("editor.game.itemTextPlaceholder")}
                 value={item.text}
               />
               <Input
-                aria-label={`Order of item ${String(index + 1)}`}
+                aria-label={t("editor.game.itemOrderAria", { index: index + 1 })}
                 className="w-20"
                 onChange={(event) => {
                   const order = Number(event.target.value);
@@ -974,7 +994,7 @@ function GameForm({ block, onChange }: FormProps<"game">) {
               />
               <IconButton
                 disabled={payload.items.length <= 2}
-                label="Remove item"
+                label={t("editor.game.itemRemove")}
                 onClick={() => {
                   onChange({
                     ...block,
@@ -992,11 +1012,10 @@ function GameForm({ block, onChange }: FormProps<"game">) {
             </div>
           ))}
           <p className="text-[11px] text-muted-foreground">
-            Order values must be different from each other; only the relative
-            order is used.
+            {t("editor.game.orderHint")}
           </p>
           <AddRow
-            label="Add item"
+            label={t("editor.game.itemAdd")}
             onClick={() => {
               onChange({
                 ...block,
@@ -1013,11 +1032,11 @@ function GameForm({ block, onChange }: FormProps<"game">) {
         </div>
       ) : (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium">Pairs</p>
+          <p className="text-xs font-medium">{t("editor.game.pairs")}</p>
           {payload.pairs.map((pair, index) => (
             <div className="flex items-center gap-1.5" key={`pair-${String(index)}`}>
               <Input
-                aria-label={`Left of pair ${String(index + 1)}`}
+                aria-label={t("editor.game.leftAria", { index: index + 1 })}
                 onChange={(event) => {
                   onChange({
                     ...block,
@@ -1031,11 +1050,11 @@ function GameForm({ block, onChange }: FormProps<"game">) {
                     },
                   });
                 }}
-                placeholder="Left"
+                placeholder={t("editor.game.leftPlaceholder")}
                 value={pair.left}
               />
               <Input
-                aria-label={`Right of pair ${String(index + 1)}`}
+                aria-label={t("editor.game.rightAria", { index: index + 1 })}
                 onChange={(event) => {
                   onChange({
                     ...block,
@@ -1049,12 +1068,12 @@ function GameForm({ block, onChange }: FormProps<"game">) {
                     },
                   });
                 }}
-                placeholder="Right"
+                placeholder={t("editor.game.rightPlaceholder")}
                 value={pair.right}
               />
               <IconButton
                 disabled={payload.pairs.length <= 2}
-                label="Remove pair"
+                label={t("editor.game.pairRemove")}
                 onClick={() => {
                   onChange({
                     ...block,
@@ -1072,7 +1091,7 @@ function GameForm({ block, onChange }: FormProps<"game">) {
             </div>
           ))}
           <AddRow
-            label="Add pair"
+            label={t("editor.game.pairAdd")}
             onClick={() => {
               onChange({
                 ...block,
@@ -1094,6 +1113,7 @@ function SimulationForm({
   onChange,
   onProblem,
 }: FormProps<"simulation"> & { onProblem: (message: string | null) => void }) {
+  const t = useT();
   const [text, setText] = useState(() =>
     JSON.stringify(block.payload, null, 2),
   );
@@ -1112,22 +1132,17 @@ function SimulationForm({
       });
     } catch (cause: unknown) {
       const reason = cause instanceof Error ? cause.message : "unknown error";
-      setError(`Not valid JSON — ${reason}`);
-      onProblem(`The simulation JSON is not valid JSON (${reason}).`);
+      setError(t("editor.sim.invalid", { reason }));
+      onProblem(t("editor.sim.problem", { reason }));
     }
   }
 
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-muted-foreground">
-        Edited as JSON: <code>intro</code>, <code>start</code>, <code>end</code>{" "}
-        and a <code>nodes</code> map. Every node except <code>end</code> needs at
-        least one option, and each option&apos;s <code>next</code> must be a node
-        key.
-      </p>
+      <p className="text-[11px] text-muted-foreground">{t("editor.sim.hint")}</p>
 
       <Textarea
-        aria-label="Simulation JSON"
+        aria-label={t("editor.sim.jsonAria")}
         className={cn("min-h-96", MONO_CLASS)}
         onChange={(event) => {
           apply(event.target.value);
@@ -1156,18 +1171,19 @@ function SimulationForm({
         size="xs"
         variant="outline"
       >
-        Format JSON
+        {t("editor.sim.format")}
       </Button>
     </div>
   );
 }
 
 function RoleplayForm({ block, onChange }: FormProps<"roleplay">) {
+  const t = useT();
   const { scenario, persona, goal, rubric } = block.payload;
 
   return (
     <div className="space-y-3">
-      <Field label="Scenario">
+      <Field label={t("editor.roleplay.scenario")}>
         <Textarea
           onChange={(event) => {
             onChange({
@@ -1175,13 +1191,13 @@ function RoleplayForm({ block, onChange }: FormProps<"roleplay">) {
               payload: { ...block.payload, scenario: event.target.value },
             });
           }}
-          placeholder="Set the room: where is the learner, and what is happening?"
+          placeholder={t("editor.roleplay.scenarioPlaceholder")}
           rows={3}
           value={scenario}
         />
       </Field>
 
-      <Field label="Persona">
+      <Field label={t("editor.roleplay.persona")}>
         <Textarea
           onChange={(event) => {
             onChange({
@@ -1189,13 +1205,13 @@ function RoleplayForm({ block, onChange }: FormProps<"roleplay">) {
               payload: { ...block.payload, persona: event.target.value },
             });
           }}
-          placeholder="Who is the AI playing? Give it a role, a tone and an agenda."
+          placeholder={t("editor.roleplay.personaPlaceholder")}
           rows={3}
           value={persona}
         />
       </Field>
 
-      <Field label="Goal">
+      <Field label={t("editor.roleplay.goal")}>
         <Textarea
           onChange={(event) => {
             onChange({
@@ -1203,18 +1219,18 @@ function RoleplayForm({ block, onChange }: FormProps<"roleplay">) {
               payload: { ...block.payload, goal: event.target.value },
             });
           }}
-          placeholder="What should the learner achieve in the conversation?"
+          placeholder={t("editor.roleplay.goalPlaceholder")}
           rows={2}
           value={goal}
         />
       </Field>
 
       <div className="space-y-1.5">
-        <p className="text-xs font-medium">Rubric</p>
+        <p className="text-xs font-medium">{t("editor.roleplay.rubric")}</p>
         {rubric.map((criterion, index) => (
           <div className="flex items-center gap-1.5" key={`criterion-${String(index)}`}>
             <Input
-              aria-label={`Rubric criterion ${String(index + 1)}`}
+              aria-label={t("editor.roleplay.criterionAria", { index: index + 1 })}
               onChange={(event) => {
                 onChange({
                   ...block,
@@ -1226,12 +1242,12 @@ function RoleplayForm({ block, onChange }: FormProps<"roleplay">) {
                   },
                 });
               }}
-              placeholder="A criterion the feedback report scores"
+              placeholder={t("editor.roleplay.criterionPlaceholder")}
               value={criterion}
             />
             <IconButton
               disabled={rubric.length <= 1}
-              label="Remove criterion"
+              label={t("editor.roleplay.criterionRemove")}
               onClick={() => {
                 onChange({
                   ...block,
@@ -1247,7 +1263,7 @@ function RoleplayForm({ block, onChange }: FormProps<"roleplay">) {
           </div>
         ))}
         <AddRow
-          label="Add criterion"
+          label={t("editor.roleplay.criterionAdd")}
           onClick={() => {
             onChange({
               ...block,
@@ -1261,9 +1277,11 @@ function RoleplayForm({ block, onChange }: FormProps<"roleplay">) {
 }
 
 function ReflectionForm({ block, onChange }: FormProps<"reflection">) {
+  const t = useT();
+
   return (
     <div className="space-y-3">
-      <Field label="Prompt">
+      <Field label={t("editor.reflection.prompt")}>
         <Textarea
           onChange={(event) => {
             onChange({
@@ -1271,13 +1289,16 @@ function ReflectionForm({ block, onChange }: FormProps<"reflection">) {
               payload: { ...block.payload, prompt: event.target.value },
             });
           }}
-          placeholder="What should the learner reflect on?"
+          placeholder={t("editor.reflection.promptPlaceholder")}
           rows={4}
           value={block.payload.prompt}
         />
       </Field>
 
-      <Field hint="Words" label="Minimum length">
+      <Field
+        hint={t("editor.reflection.wordsHint")}
+        label={t("editor.reflection.minLength")}
+      >
         <Input
           min={1}
           onChange={(event) => {

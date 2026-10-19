@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Progress, ProgressValue } from "@/components/ui/progress";
+import { useT } from "@/i18n/client";
 import type {
   BlockRenderProps,
   FlashcardsBlock as FlashcardsBlockData,
@@ -42,6 +43,7 @@ export function FlashcardsBlock({
   completed,
   onComplete,
 }: BlockRenderProps<FlashcardsBlockData>) {
+  const t = useT();
   const { cards } = block.payload;
 
   const [order, setOrder] = useState<number[]>(() =>
@@ -83,19 +85,26 @@ export function FlashcardsBlock({
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <Progress
-          aria-label="Cards reviewed"
+          aria-label={t("block.flashcards.progress")}
           className="flex-1 items-center gap-2"
           value={(reviewed.length / cards.length) * 100}
         >
           <ProgressValue />
         </Progress>
         <span className="text-xs text-nowrap text-muted-foreground tabular-nums">
-          {reviewed.length} / {cards.length} reviewed
+          {t("block.flashcards.reviewedCount", {
+            reviewed: reviewed.length,
+            total: cards.length,
+          })}
         </span>
       </div>
 
       <button
-        aria-label={isFlipped ? "Show the question" : "Show the answer"}
+        aria-label={
+          isFlipped
+            ? t("block.flashcards.showQuestion")
+            : t("block.flashcards.showAnswer")
+        }
         className="block w-full cursor-pointer rounded-xl text-left [perspective:1200px] focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
         onClick={flip}
         onKeyDown={(event) => {
@@ -120,25 +129,25 @@ export function FlashcardsBlock({
         >
           <span className="absolute inset-0 flex flex-col justify-between rounded-xl bg-muted/60 px-5 py-4 ring-1 ring-foreground/10 [backface-visibility:hidden]">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Front
+              {t("block.flashcards.front")}
             </span>
             <span className="text-base leading-relaxed font-medium">
               {card.front}
             </span>
             <span className="text-xs text-muted-foreground">
-              Click, press Space or Enter to reveal the answer
+              {t("block.flashcards.hintFront")}
             </span>
           </span>
 
           <span className="absolute inset-0 flex flex-col justify-between rounded-xl bg-primary/10 px-5 py-4 ring-1 ring-primary/20 [backface-visibility:hidden] [transform:rotateY(180deg)]">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Back
+              {t("block.flashcards.back")}
             </span>
             <span className="overflow-y-auto text-sm leading-relaxed">
               {card.back}
             </span>
             <span className="text-xs text-muted-foreground">
-              ← / → move between cards
+              {t("block.flashcards.hintBack")}
             </span>
           </span>
         </div>
@@ -146,7 +155,7 @@ export function FlashcardsBlock({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
-          aria-label="Previous card"
+          aria-label={t("block.flashcards.previous")}
           disabled={position === 0}
           onClick={() => {
             move(-1);
@@ -158,11 +167,14 @@ export function FlashcardsBlock({
         </Button>
 
         <span className="text-xs text-muted-foreground tabular-nums">
-          Card {position + 1} of {order.length}
+          {t("block.flashcards.position", {
+            current: position + 1,
+            total: order.length,
+          })}
         </span>
 
         <Button
-          aria-label="Next card"
+          aria-label={t("block.flashcards.next")}
           disabled={position === order.length - 1}
           onClick={() => {
             move(1);
@@ -183,7 +195,7 @@ export function FlashcardsBlock({
           variant="ghost"
         >
           <Shuffle aria-hidden="true" />
-          Shuffle
+          {t("block.flashcards.shuffle")}
         </Button>
       </div>
 
@@ -198,18 +210,18 @@ export function FlashcardsBlock({
           {completed ? (
             <>
               <Check aria-hidden="true" />
-              Reviewed
+              {t("block.flashcards.reviewed")}
             </>
           ) : (
-            "Mark as reviewed"
+            t("block.flashcards.markReviewed")
           )}
         </Button>
         <span className="text-xs text-muted-foreground">
           {allReviewed
-            ? "You went through the whole deck."
-            : `Flip ${cards.length - reviewed.length} more card${
-                cards.length - reviewed.length === 1 ? "" : "s"
-              } to finish.`}
+            ? t("block.flashcards.allDone")
+            : t("block.flashcards.remaining", {
+                count: cards.length - reviewed.length,
+              })}
         </span>
       </div>
     </div>

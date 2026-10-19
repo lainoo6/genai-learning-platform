@@ -18,6 +18,8 @@ import {
 } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n/client";
+import { narrationLang, pickVoice, textLang } from "@/i18n/speech";
 import type {
   BlockRenderProps,
   SlidesBlock as SlidesBlockData,
@@ -39,9 +41,6 @@ import { cn } from "@/lib/utils";
  * narration, and the page dots are ordinary buttons.
  */
 
-/** Locale for the narration: all seeded decks are written in English. */
-const NARRATION_LANG = "en-US";
-
 /** Delay between two consecutive bullets fading in, in milliseconds. */
 const BULLET_STAGGER_MS = 120;
 
@@ -61,6 +60,8 @@ export function SlidesBlock({
   completed,
   onComplete,
 }: BlockRenderProps<SlidesBlockData>) {
+  const { locale } = useI18n();
+  const t = useI18n().t;
   const { slides, autoPlay } = block.payload;
 
   const [index, setIndex] = useState(0);
@@ -140,22 +141,23 @@ export function SlidesBlock({
       const synthesis = window.speechSynthesis;
       synthesis.cancel();
 
+      // The interface language picks the voice: a Chinese UI reads with an
+      // installed zh-* voice such as Microsoft Huihui. Only when that language
+      // has no voice at all does the script of the slide decide.
+      const lang = narrationLang(locale);
       const utterance = new SpeechSynthesisUtterance(slide.narration);
-      utterance.lang = NARRATION_LANG;
+      utterance.lang = lang;
       utterance.rate = 1;
 
       // Prefer a voice installed on this machine. Chrome also offers network
       // voices, which need a round trip to a synthesis service and stay silent
       // when it cannot be reached.
-      const voice = synthesis
-        .getVoices()
-        .find(
-          (candidate) =>
-            candidate.localService
-            && candidate.lang.toLowerCase().startsWith("en"),
-        );
+      const voices = synthesis.getVoices();
+      const voice =
+        pickVoice(voices, lang) ?? pickVoice(voices, textLang(slide.narration));
       if (voice !== undefined) {
         utterance.voice = voice;
+        utterance.lang = voice.lang;
       }
 
       let started = false;
@@ -210,7 +212,7 @@ export function SlidesBlock({
         setNarrationIssue("nothing started speaking");
       }, NARRATION_WATCHDOG_MS);
     },
-    [slides, supportsSpeech],
+    [locale, slides, supportsSpeech],
   );
 
   // Changing page always silences the previous one; `autoPlay` then starts the
@@ -315,10 +317,10 @@ export function SlidesBlock({
   const canComplete = allViewed && (!narrationRequired || lastNarrated);
 
   const hint = !allViewed
-    ? `Open all ${slides.length} slides to finish.`
+    ? t("block.slides.hint.open", { total: slides.length })
     : narrationRequired && !lastNarrated
-      ? "Let the last slide finish speaking to complete this block."
-      : "You have been through the whole deck.";
+      ? t("block.slides.hint.narrate")
+      : t("block.slides.hint.done");
 
   return (
     <div
@@ -330,7 +332,10 @@ export function SlidesBlock({
     >
       <div className="rounded-xl bg-muted/50 px-5 py-6 ring-1 ring-foreground/10">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Slide {index + 1} of {slides.length}
+          {t("block.slides.position", {
+            current: index + 1,
+            total: slides.length,
+          })}
         </p>
 
         {/* Keyed by page so the fade-in replays on every page change. */}
@@ -358,7 +363,7 @@ export function SlidesBlock({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
-          aria-label="Previous slide"
+          aria-label={t("block.slides.previous")}
           disabled={index === 0}
           onClick={() => {
             goTo(index - 1);
@@ -369,7 +374,7 @@ export function SlidesBlock({
           <ChevronLeft aria-hidden="true" />
         </Button>
         <Button
-          aria-label="Next slide"
+          aria-label={t("block.slides.next")}
           disabled={index === slides.length - 1}
           onClick={() => {
             goTo(index + 1);
@@ -385,12 +390,14 @@ export function SlidesBlock({
             {isSpeaking ? (
               <>
                 <Pause aria-hidden="true" />
-                Pause
+                {t("block.slides.pause")}
               </>
             ) : (
               <>
                 <Play aria-hidden="true" />
-                {isPaused ? "Resume" : "Play narration"}
+                {isPaused
+                  ? t("block.slides.resume")
+                  : t("block.slides.play")}
               </>
             )}
           </Button>
@@ -400,7 +407,7 @@ export function SlidesBlock({
           {slides.map((_, dotIndex) => (
             <button
               aria-current={dotIndex === index}
-              aria-label={`Go to slide ${dotIndex + 1}`}
+              aria-label={t("block.slides.goto", { index: dotIndex + 1 })}
               className="flex size-7 items-center justify-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               key={dotIndex}
               onClick={() => {
@@ -424,17 +431,17 @@ export function SlidesBlock({
       {supportsSpeech === false ? (
         <p className="flex items-start gap-2 text-xs text-muted-foreground">
           <VolumeX aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-          This browser cannot read the slides out loud, so paging through the
-          deck is enough to finish it.
+          {t("block.slides.unsupported")}
         </p>
       ) : null}
 
       {narrationIssue === null ? null : (
         <p className="flex items-start gap-2 text-xs text-muted-foreground">
           <VolumeX aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-          {`Your browser would not read this deck aloud (${narrationIssue}) — `
-            + "usually a missing English voice or a blocked network voice. "
-            + "Paging through the slides is enough to finish."}
+          {t("block.slides.issue", {
+            issue: narrationIssue,
+            language: locale === "zh" ? "中文" : "英文",
+          })}
         </p>
       )}
 
@@ -449,10 +456,10 @@ export function SlidesBlock({
           {completed ? (
             <>
               <Check aria-hidden="true" />
-              Completed
+              {t("common.completed")}
             </>
           ) : (
-            "Mark as complete"
+            t("common.markComplete")
           )}
         </Button>
         <p className="text-xs text-muted-foreground">{hint}</p>

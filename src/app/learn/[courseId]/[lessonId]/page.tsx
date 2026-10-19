@@ -22,6 +22,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Progress, ProgressValue } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TutorPanel } from "@/components/tutor/TutorPanel";
+import { getI18n } from "@/i18n/server";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
 import { applyBlockOverrides } from "@/lib/blocks/override";
@@ -37,9 +38,10 @@ import { prisma } from "@/lib/prisma";
 import { loadTutorHistory } from "@/lib/tutor";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = {
-  title: "Lesson",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("lesson.metaTitle") };
+}
 
 type LessonPageProps = {
   params: Promise<{ courseId: string; lessonId: string }>;
@@ -56,7 +58,7 @@ async function LessonPlayer({ params }: LessonPageProps) {
   await connection();
   const { courseId, lessonId } = await params;
 
-  const session = await auth();
+  const [session, { t }] = await Promise.all([auth(), getI18n()]);
   const userId = session?.user?.id;
   if (userId === undefined) {
     redirect(
@@ -94,7 +96,7 @@ async function LessonPlayer({ params }: LessonPageProps) {
         course={course}
         enrolled={false}
         firstLessonHref={null}
-        notice="Enroll in this course to open its lessons."
+        notice={t("course.notice.notEnrolled")}
       />
     );
   }
@@ -169,11 +171,11 @@ async function LessonPlayer({ params }: LessonPageProps) {
 
       <div className="space-y-6">
         <nav
-          aria-label="Breadcrumb"
+          aria-label={t("lesson.breadcrumb")}
           className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground"
         >
           <Link className="hover:text-foreground" href="/courses">
-            Courses
+            {t("nav.courses")}
           </Link>
           <ChevronRight aria-hidden="true" className="size-3" />
           {course.source === "LEARNER" ? (
@@ -191,17 +193,26 @@ async function LessonPlayer({ params }: LessonPageProps) {
 
         <header className="space-y-3">
           <p className="text-xs text-muted-foreground">
-            {lesson.moduleTitle} · lesson {index + 1} of {lessons.length}
+            {t("lesson.position", {
+              module: lesson.moduleTitle,
+              current: index + 1,
+              total: lessons.length,
+            })}
           </p>
           <h1 className="text-2xl font-semibold">{lesson.title}</h1>
           <div className="flex flex-wrap items-center gap-3">
-            <Badge variant="secondary">{lesson.estimatedMinutes} min</Badge>
+            <Badge variant="secondary">
+              {t("lesson.minutes", { count: lesson.estimatedMinutes })}
+            </Badge>
             <Badge variant="outline">
-              {completedBlocks.length} / {blocks.length} blocks
+              {t("lesson.blocks", {
+                completed: completedBlocks.length,
+                total: blocks.length,
+              })}
             </Badge>
           </div>
           <Progress
-            aria-label="Lesson progress"
+            aria-label={t("lesson.progress")}
             className="items-center gap-2"
             value={lessonRatio}
           >
@@ -212,9 +223,7 @@ async function LessonPlayer({ params }: LessonPageProps) {
         {parsedBlocks.success ? null : (
           <p className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
             <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-            This lesson contains content that does not match the block schema, so
-            nothing can be rendered yet. Ask the course author to fix the block
-            payload.
+            {t("lesson.schemaError")}
           </p>
         )}
 
@@ -233,13 +242,13 @@ async function LessonPlayer({ params }: LessonPageProps) {
 
         {allBlocksDone ? (
           <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm">
-            <p className="font-medium">Lesson complete 🎉</p>
+            <p className="font-medium">{t("lesson.complete.title")}</p>
             <p className="mt-1 text-muted-foreground">
               {next === undefined
                 ? courseCompleted
-                  ? "You finished every lesson in this course."
-                  : "This was the last lesson of the course."
-                : "Next lesson is unlocked — keep going."}
+                  ? t("lesson.complete.allDone")
+                  : t("lesson.complete.last")
+                : t("lesson.complete.next")}
             </p>
           </div>
         ) : null}
@@ -248,23 +257,22 @@ async function LessonPlayer({ params }: LessonPageProps) {
           <div className="rounded-xl ring-1 ring-primary/30 bg-primary/5 px-4 py-4">
             <p className="flex items-center gap-2 font-medium">
               <PartyPopper aria-hidden="true" className="size-4" />
-              Course complete
+              {t("lesson.courseComplete.title")}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              You completed {course.title}. This course is now marked as finished
-              on your dashboard.
+              {t("lesson.courseComplete.body", { title: course.title })}
             </p>
             <Link
               className={cn(buttonVariants({ variant: "secondary" }), "mt-3")}
               href="/dashboard"
             >
-              Back to dashboard
+              {t("lesson.backToDashboard")}
             </Link>
           </div>
         ) : null}
 
         <nav
-          aria-label="Lesson navigation"
+          aria-label={t("lesson.nav")}
           className="flex flex-wrap items-center justify-between gap-2 border-t pt-4"
         >
           {previous === undefined ? (
@@ -277,7 +285,7 @@ async function LessonPlayer({ params }: LessonPageProps) {
               className={cn(buttonVariants({ variant: "secondary" }), "ml-auto")}
               href="/dashboard"
             >
-              Back to dashboard
+              {t("lesson.backToDashboard")}
             </Link>
           ) : (
             <NavLink direction="next" lesson={next} courseId={courseId} />

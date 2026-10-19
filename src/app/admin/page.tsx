@@ -16,12 +16,14 @@ import {
   listAdminUsers,
   loadAdminOverview,
 } from "@/lib/admin";
+import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { ROLE_OPTIONS } from "@/lib/roles";
 
-export const metadata: Metadata = {
-  title: "Admin",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t("admin.metaTitle") };
+}
 
 type AdminSearchParams = {
   tab?: string | string[];
@@ -69,36 +71,39 @@ function StatCard({
 }
 
 async function OverviewTab() {
-  const overview = await loadAdminOverview();
+  const [overview, { t }] = await Promise.all([
+    loadAdminOverview(),
+    getI18n(),
+  ]);
 
   return (
     <div className="space-y-4">
       <section
-        aria-label="Platform numbers"
+        aria-label={t("admin.stat.platformNumbers")}
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
         <StatCard
-          hint="Registered accounts"
+          hint={t("admin.stat.usersHint")}
           icon={Users}
-          label="Users"
+          label={t("admin.stat.users")}
           value={String(overview.userCount)}
         />
         <StatCard
-          hint={`${overview.publishedCount} published`}
+          hint={t("admin.stat.coursesHint", { count: overview.publishedCount })}
           icon={Library}
-          label="Courses"
+          label={t("admin.stat.courses")}
           value={String(overview.courseCount)}
         />
         <StatCard
-          hint="Visible in the public catalog"
+          hint={t("admin.stat.publishedHint")}
           icon={BookOpenCheck}
-          label="Published"
+          label={t("admin.stat.published")}
           value={String(overview.publishedCount)}
         />
         <StatCard
-          hint="Distinct users with any activity"
+          hint={t("admin.stat.activeHint")}
           icon={Activity}
-          label="Active (7 days)"
+          label={t("admin.stat.active")}
           value={String(overview.activeLast7Days)}
         />
       </section>
@@ -107,16 +112,16 @@ async function OverviewTab() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="flex items-center gap-1.5 text-sm font-medium">
             <Activity aria-hidden="true" className="size-4 text-muted-foreground" />
-            Daily active users
+            {t("admin.chart.title")}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Platform-wide, last 30 days
+            {t("admin.chart.range")}
           </p>
         </div>
         <div className="mt-3">
           <ActivityLineChart
             data={overview.dailyActivity}
-            seriesLabel="Active users"
+            seriesLabel={t("admin.chart.series")}
           />
         </div>
       </section>
@@ -133,25 +138,30 @@ async function UsersTab({
   role: Role | null;
   currentUserId: string;
 }) {
-  const users = await listAdminUsers({ search, role });
+  const [users, { t }] = await Promise.all([
+    listAdminUsers({ search, role }),
+    getI18n(),
+  ]);
 
   return (
     <div className="space-y-4">
       <UserFilters role={role} search={search} />
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-medium">Users</h2>
+        <h2 className="text-lg font-medium">{t("admin.users.title")}</h2>
         <p className="text-xs text-muted-foreground">
-          {users.length} account{users.length === 1 ? "" : "s"}
-          {search.length === 0 ? "" : ` matching “${search}”`}
+          {t("admin.users.count", { count: users.length })}
+          {search.length === 0
+            ? ""
+            : t("admin.users.matching", { query: search })}
         </p>
       </div>
 
       {users.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border px-4 py-12 text-center">
-          <p className="text-sm font-medium">No accounts match</p>
+          <p className="text-sm font-medium">{t("admin.users.empty")}</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-            Try a different name or email, or clear the role filter.
+            {t("admin.users.emptyHint")}
           </p>
         </div>
       ) : (
@@ -162,27 +172,30 @@ async function UsersTab({
 }
 
 async function CoursesTab() {
-  const courses = await listAdminCourses();
+  const [courses, { t }] = await Promise.all([
+    listAdminCourses(),
+    getI18n(),
+  ]);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h2 className="text-lg font-medium">Courses</h2>
+          <h2 className="text-lg font-medium">{t("admin.courses.title")}</h2>
           <p className="text-sm text-muted-foreground">
-            Including drafts and learner-made courses that the catalog hides.
+            {t("admin.courses.subtitle")}
           </p>
         </div>
         <p className="text-xs text-muted-foreground">
-          {courses.length} course{courses.length === 1 ? "" : "s"}
+          {t("admin.courses.count", { count: courses.length })}
         </p>
       </div>
 
       {courses.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border px-4 py-12 text-center">
-          <p className="text-sm font-medium">No courses yet</p>
+          <p className="text-sm font-medium">{t("admin.courses.empty")}</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-            Courses appear here as soon as a teacher or a learner creates one.
+            {t("admin.courses.emptyHint")}
           </p>
         </div>
       ) : (
@@ -206,7 +219,7 @@ async function AdminContent({
 }) {
   // Auth.js draws random bytes; keep it out of the prerender pass.
   await connection();
-  const session = await auth();
+  const [session, { t }] = await Promise.all([auth(), getI18n()]);
   const user = session?.user;
 
   if (user === undefined) {
@@ -227,12 +240,11 @@ async function AdminContent({
       <header className="space-y-2">
         <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-primary">
           <ShieldCheck aria-hidden="true" className="size-3.5" />
-          Administration
+          {t("admin.eyebrow")}
         </p>
-        <h1 className="text-2xl font-semibold">Admin console</h1>
+        <h1 className="text-2xl font-semibold">{t("admin.title")}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Manage who can do what on the platform, moderate every course, and
-          watch activity across all learners.
+          {t("admin.subtitle")}
         </p>
       </header>
 

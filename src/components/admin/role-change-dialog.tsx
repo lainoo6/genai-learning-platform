@@ -13,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ROLE_LABELS } from "@/lib/roles";
+import { useT } from "@/i18n/client";
+import { ROLE_KEYS } from "@/lib/roles";
 import { updateUserRole } from "@/server/admin";
 import { cn } from "@/lib/utils";
 
@@ -27,20 +28,11 @@ import { cn } from "@/lib/utils";
 
 const ROLE_CHOICES: ReadonlyArray<{
   value: Role;
-  description: string;
+  descriptionKey: string;
 }> = [
-  {
-    value: "LEARNER",
-    description: "Browse the catalog, study courses and generate their own.",
-  },
-  {
-    value: "INSTRUCTOR",
-    description: "Create and publish courses, manage students, see insights.",
-  },
-  {
-    value: "ADMIN",
-    description: "Full access to this console, every user and every course.",
-  },
+  { value: "LEARNER", descriptionKey: "admin.role.learnerDescription" },
+  { value: "INSTRUCTOR", descriptionKey: "admin.role.instructorDescription" },
+  { value: "ADMIN", descriptionKey: "admin.role.adminDescription" },
 ];
 
 export function RoleChangeDialog({
@@ -52,6 +44,7 @@ export function RoleChangeDialog({
   name: string;
   currentRole: Role;
 }) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<Role>(currentRole);
@@ -84,7 +77,7 @@ export function RoleChangeDialog({
   return (
     <>
       <Button onClick={openDialog} size="xs" variant="outline">
-        Change role
+        {t("admin.role.change")}
       </Button>
 
       <Dialog
@@ -101,15 +94,14 @@ export function RoleChangeDialog({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change role for {name}</DialogTitle>
+            <DialogTitle>{t("admin.role.dialogTitle", { name })}</DialogTitle>
             <DialogDescription>
-              The new role applies the next time they sign in. A signed-in tab
-              keeps the old navigation until then.
+              {t("admin.role.dialogDescription")}
             </DialogDescription>
           </DialogHeader>
 
           <fieldset className="space-y-2">
-            <legend className="sr-only">Role</legend>
+            <legend className="sr-only">{t("admin.role.legend")}</legend>
             {ROLE_CHOICES.map((choice) => (
               <label
                 className={cn(
@@ -132,10 +124,10 @@ export function RoleChangeDialog({
                 />
                 <span>
                   <span className="block text-sm font-medium">
-                    {ROLE_LABELS[choice.value]}
+                    {t(ROLE_KEYS[choice.value])}
                   </span>
                   <span className="block text-xs text-muted-foreground">
-                    {choice.description}
+                    {t(choice.descriptionKey)}
                   </span>
                 </span>
               </label>
@@ -154,7 +146,7 @@ export function RoleChangeDialog({
               }}
               variant="outline"
             >
-              Cancel
+              {t("editor.delete.cancel")}
             </Button>
             <Button
               disabled={pending || role === currentRole}
@@ -162,7 +154,7 @@ export function RoleChangeDialog({
                 void confirm();
               }}
             >
-              {pending ? "Saving…" : "Save role"}
+              {pending ? t("admin.role.saving") : t("admin.role.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

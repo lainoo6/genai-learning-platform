@@ -63,6 +63,7 @@ export type CourseWithLessons = Pick<
   | "audience"
   | "difficulty"
   | "coverEmoji"
+  | "language"
   | "source"
   | "status"
   | "createdById"
@@ -79,6 +80,7 @@ const courseWithLessonsSelect = {
   audience: true,
   difficulty: true,
   coverEmoji: true,
+  language: true,
   source: true,
   status: true,
   createdById: true,
@@ -126,6 +128,7 @@ function toCourseWithLessons(row: CourseRow): CourseWithLessons {
     audience: row.audience,
     difficulty: row.difficulty,
     coverEmoji: row.coverEmoji,
+    language: row.language,
     source: row.source,
     status: row.status,
     createdById: row.createdById,

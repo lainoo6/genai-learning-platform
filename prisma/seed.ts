@@ -1,7 +1,4 @@
 import {
-  CourseSource,
-  CourseStatus,
-  Prisma,
   PrismaClient,
   Role,
 } from "@prisma/client";
@@ -48,128 +45,6 @@ const DEMO_USERS: DemoUser[] = [
   },
 ];
 
-const PLACEHOLDER_COURSE = {
-  slug: "getting-started-with-genai-for-developers",
-  title: "Getting Started with GenAI for Developers",
-  description:
-    "A placeholder mini-course used to verify the data model end to end. "
-    + "It will be replaced by AI-generated content in later phases.",
-  topic: "Software Development and Engineering",
-  audience: "Non-CS beginners",
-  difficulty: "beginner",
-  coverEmoji: "📘",
-  status: CourseStatus.DRAFT,
-  source: CourseSource.SEED,
-};
-
-const PLACEHOLDER_MODULE_TITLE = "Module 1 · Foundations";
-const PLACEHOLDER_LESSON_TITLE = "Lesson 1 · What Is GenAI?";
-
-/** Reading block content, mirrors the block shape defined in docs/plan/01 §3. */
-type ReadingBlock = {
-  id: string;
-  title: string;
-  type: "reading";
-  payload: {
-    markdown: string;
-    imageUrl?: string;
-  };
-};
-
-/** Quiz block content: one question per supported kind, so P2.2 can be exercised. */
-type QuizBlock = {
-  id: string;
-  title: string;
-  type: "quiz";
-  payload: {
-    passScore: number;
-    questions: {
-      id: string;
-      kind: "single" | "multi" | "truefalse" | "short";
-      prompt: string;
-      options?: string[];
-      answer: number[] | string;
-      explanation: string;
-    }[];
-  };
-};
-
-const PLACEHOLDER_BLOCKS: (ReadingBlock | QuizBlock)[] = [
-  {
-    id: "blk_placeholder_reading",
-    title: "What Is GenAI?",
-    type: "reading",
-    payload: {
-      markdown: [
-        "# What Is GenAI?",
-        "",
-        "Generative AI (GenAI) refers to models that create new content — text, "
-        + "code, images — instead of only classifying existing data.",
-        "",
-        "This block is a **placeholder** seeded by `prisma/seed.ts`. It exists so the",
-        "lesson renderer has a valid, well-formed block to display.",
-      ].join("\n"),
-      imageUrl: "/globe.svg",
-    },
-  },
-  {
-    id: "blk_placeholder_quiz",
-    title: "Check your understanding",
-    type: "quiz",
-    payload: {
-      passScore: 0.6,
-      questions: [
-        {
-          id: "q_single",
-          kind: "single",
-          prompt: "What does a generative model do?",
-          options: [
-            "Creates new content such as text or code",
-            "Only sorts existing records into buckets",
-            "Stores files in a database",
-          ],
-          answer: [0],
-          explanation:
-            "Generative models produce new artefacts; sorting records is a classic "
-            + "classification task, not generation.",
-        },
-        {
-          id: "q_multi",
-          kind: "multi",
-          prompt: "Which of these are everyday uses of GenAI for developers?",
-          options: [
-            "Drafting a first version of a function",
-            "Explaining unfamiliar code",
-            "Guaranteeing that code is bug-free",
-          ],
-          answer: [0, 1],
-          explanation:
-            "Drafting and explaining code are realistic uses; no tool can guarantee "
-            + "bug-free output, so you still review and test everything.",
-        },
-        {
-          id: "q_truefalse",
-          kind: "truefalse",
-          prompt: "A GenAI answer should be shipped to users without review.",
-          answer: [1],
-          explanation:
-            "False. Model output can be wrong or outdated, so a human stays "
-            + "accountable for what ships.",
-        },
-        {
-          id: "q_short",
-          kind: "short",
-          prompt: "Name one thing you should always do before trusting generated code.",
-          answer: "review, test, read",
-          explanation:
-            "Reviewing, testing or simply reading the code carefully all count — "
-            + "the point is that you never trust it blindly.",
-        },
-      ],
-    },
-  },
-];
-
 async function seedUsers(passwordHash: string): Promise<Map<string, string>> {
   const idsByEmail = new Map<string, string>();
 
@@ -196,63 +71,6 @@ async function seedUsers(passwordHash: string): Promise<Map<string, string>> {
   return idsByEmail;
 }
 
-async function seedPlaceholderCourse(createdById: string): Promise<string> {
-  const course = await prisma.course.upsert({
-    where: { slug: PLACEHOLDER_COURSE.slug },
-    update: { createdById },
-    create: { ...PLACEHOLDER_COURSE, createdById },
-  });
-
-  const existingModule = await prisma.module.findFirst({
-    where: { courseId: course.id },
-    orderBy: { order: "asc" },
-  });
-
-  const courseModule = existingModule
-    ? await prisma.module.update({
-        where: { id: existingModule.id },
-        data: { title: PLACEHOLDER_MODULE_TITLE, order: 0 },
-      })
-    : await prisma.module.create({
-        data: {
-          courseId: course.id,
-          title: PLACEHOLDER_MODULE_TITLE,
-          order: 0,
-        },
-      });
-
-  const existingLesson = await prisma.lesson.findFirst({
-    where: { moduleId: courseModule.id },
-    orderBy: { order: "asc" },
-  });
-
-  const blocks = PLACEHOLDER_BLOCKS as unknown as Prisma.InputJsonValue;
-
-  if (existingLesson) {
-    await prisma.lesson.update({
-      where: { id: existingLesson.id },
-      data: {
-        title: PLACEHOLDER_LESSON_TITLE,
-        order: 0,
-        estimatedMinutes: 10,
-        blocks,
-      },
-    });
-  } else {
-    await prisma.lesson.create({
-      data: {
-        moduleId: courseModule.id,
-        title: PLACEHOLDER_LESSON_TITLE,
-        order: 0,
-        estimatedMinutes: 10,
-        blocks,
-      },
-    });
-  }
-
-  return course.id;
-}
-
 async function main(): Promise<void> {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
   const idsByEmail = await seedUsers(passwordHash);
@@ -262,12 +80,10 @@ async function main(): Promise<void> {
     throw new Error("Instructor demo user was not seeded.");
   }
 
-  const courseId = await seedPlaceholderCourse(instructorId);
   const seededCourse = await seedCourse(prisma, instructorId);
   const phase3Courses = await seedPhase3Courses(prisma, instructorId);
 
   console.log(`Seeded ${DEMO_USERS.length} demo users (password: ${DEMO_PASSWORD}).`);
-  console.log(`Seeded placeholder course ${courseId} (${PLACEHOLDER_COURSE.slug}).`);
   console.log(
     `Seeded seed course ${seededCourse.courseId} `
     + `(${SEED_COURSE_SLUG}, ${seededCourse.lessonCount} lessons).`,

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { CONTENT_LANGUAGE_LABEL, type ContentLanguage } from "@/lib/llm/language";
 import { mockText } from "@/lib/llm/mock";
 import { BACKGROUND_LABELS, GOAL_LABELS, type LearnerProfile } from "@/lib/profile";
 
@@ -28,6 +29,8 @@ export type TutorContext = {
   blockType: string | null;
   blockTitle: string | null;
   blockDigest: string | null;
+  /** Interface language of the learner; the tutor answers in it. */
+  language?: ContentLanguage;
 };
 
 /** Reply shape shared by the streaming route and the mock fallback. */
@@ -61,6 +64,7 @@ export function describeProfile(profile: LearnerProfile | null): string {
 
 /** System prompt: persona + learner profile + the material in front of them. */
 export function tutorSystemPrompt(context: TutorContext): string {
+  const language = context.language ?? "en";
   const material = [
     `Course: ${context.courseTitle}`,
     `Lesson: ${context.lessonTitle}`,
@@ -81,6 +85,8 @@ export function tutorSystemPrompt(context: TutorContext): string {
     "",
     "Ground every answer in that material. If the question is unrelated, answer",
     "briefly and steer the learner back to the lesson.",
+    "",
+    `Answer in ${CONTENT_LANGUAGE_LABEL[language]}, whatever language the question is written in.`,
   ].join("\n");
 }
 
@@ -97,6 +103,10 @@ export function tutorQuestionPrompt(question: string): string {
  * carries the `[MOCK]` marker.
  */
 export function mockTutorReply(context: TutorContext, question: string): string {
+  if ((context.language ?? "en") === "zh") {
+    return mockChineseTutorReply(context, question);
+  }
+
   const subject = context.blockTitle ?? context.lessonTitle;
   const activity = context.blockType === null ? "lesson" : `${context.blockType} activity`;
 
@@ -108,5 +118,25 @@ export function mockTutorReply(context: TutorContext, question: string): string 
       `You asked: "${question}". I am running in mock mode, so this is a prepared answer rather than a generated one — switch off LLM_MOCK and add an API key for real answers.`,
       `Tell me which part feels unclear and we will take it one step at a time.`,
     ].join(" "),
+  );
+}
+
+/**
+ * Chinese canned answer used when the interface language is Chinese and no API
+ * key is configured.
+ */
+function mockChineseTutorReply(context: TutorContext, question: string): string {
+  const subject = context.blockTitle ?? context.lessonTitle;
+  const activity =
+    context.blockType === null ? "这一课" : `这个「${context.blockType}」活动`;
+
+  return mockText(
+    [
+      `如果是我，会这样理解「${subject}」——也就是你在《${context.courseTitle}》里打开的${activity}。`,
+      "值得带走的一点是：它是构建软件过程中的一步，先描述清楚，再检验，再改进。",
+      `一个具体的例子：假设你要用两句话把「${subject}」讲给同事听——第一句说它是什么，第二句说它对结果为什么重要。`,
+      `你问的是：「${question}」。我目前运行在模拟模式，所以这是一段预置回答，而不是现场生成的；关掉 LLM_MOCK 并配置 API key 就能得到真实回答。`,
+      "告诉我哪一部分还不清楚，我们一步一步来。",
+    ].join(""),
   );
 }

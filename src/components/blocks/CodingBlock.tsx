@@ -15,6 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n/client";
 import {
   RUN_TIMEOUT_MS,
   runCodingTests,
@@ -50,6 +51,7 @@ export function CodingBlock({
   context,
   onComplete,
 }: BlockRenderProps<CodingBlockData>) {
+  const t = useT();
   const { problem, starter, tests, hints } = block.payload;
 
   const [results, setResults] = useState<CodingTestResult[] | null>(null);
@@ -168,7 +170,7 @@ export function CodingBlock({
     setStatus("failed");
     setFailure(
       outcome.status === "timeout"
-        ? `Execution stopped after ${RUN_TIMEOUT_MS / 1000} seconds — check for a loop that never ends.`
+        ? t("block.coding.timeout", { seconds: RUN_TIMEOUT_MS / 1000 })
         : outcome.message,
     );
   }
@@ -195,12 +197,14 @@ export function CodingBlock({
           }}
         >
           <Play aria-hidden="true" />
-          {status === "running" ? "Running…" : "Run tests"}
+          {status === "running"
+            ? t("block.coding.running")
+            : t("block.coding.run")}
         </Button>
 
         <Button onClick={handleReset} variant="outline">
           <RotateCcw aria-hidden="true" />
-          Reset
+          {t("block.coding.reset")}
         </Button>
 
         {hints.length > 0 ? (
@@ -212,14 +216,19 @@ export function CodingBlock({
             variant="ghost"
           >
             <Lightbulb aria-hidden="true" />
-            {hintsShown === 0 ? "Show a hint" : "Show another hint"}
+            {hintsShown === 0
+              ? t("block.coding.hint")
+              : t("block.coding.hintMore")}
           </Button>
         ) : null}
 
         <span className="ml-auto text-xs text-muted-foreground tabular-nums">
           {results === null
-            ? `${tests.length} test${tests.length === 1 ? "" : "s"} to pass`
-            : `${results.filter((result) => result.passed).length} / ${tests.length} passing`}
+            ? t("block.coding.testsToPass", { count: tests.length })
+            : t("block.coding.passing", {
+                passed: results.filter((result) => result.passed).length,
+                total: tests.length,
+              })}
         </span>
       </div>
 
@@ -259,7 +268,9 @@ export function CodingBlock({
                 )}
                 <span className="font-medium">{result.name}</span>
                 <span className="text-muted-foreground">
-                  {result.passed ? "passed" : "failed"}
+                  {result.passed
+                    ? t("block.coding.passed")
+                    : t("block.coding.failed")}
                 </span>
               </span>
               {result.passed || result.error === null ? null : (
@@ -283,16 +294,16 @@ export function CodingBlock({
           {completed ? (
             <>
               <Check aria-hidden="true" />
-              Completed
+              {t("common.completed")}
             </>
           ) : (
-            "Mark as complete"
+            t("common.markComplete")
           )}
         </Button>
         <p className="text-xs text-muted-foreground">
           {allPassed || completed
-            ? "All tests pass — nice work."
-            : "Run the tests and get every one of them passing to finish."}
+            ? t("block.coding.allPass")
+            : t("block.coding.needPass")}
         </p>
       </div>
     </div>
