@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, RotateCcw, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,6 @@ import type {
   QuizBlock as QuizBlockData,
   QuizQuestion,
 } from "@/lib/blocks/schema";
-import { trackBlockEvent } from "@/server/progress";
 
 /**
  * Quiz block.
@@ -35,7 +34,10 @@ import { trackBlockEvent } from "@/server/progress";
 const TRUE_FALSE_KEYS = ["block.quiz.true", "block.quiz.false"];
 
 /** Options to display, or an empty list for free-text questions. */
-function optionsOf(question: QuizQuestion, t: (key: string) => string): string[] {
+function optionsOf(
+  question: QuizQuestion,
+  t: (key: string) => string,
+): string[] {
   if (question.kind === "short") {
     return [];
   }
@@ -45,12 +47,13 @@ function optionsOf(question: QuizQuestion, t: (key: string) => string): string[]
 export function QuizBlock({
   block,
   completed,
-  context,
+  onAttempt,
   onComplete,
 }: BlockRenderProps<QuizBlockData>) {
   const t = useT();
   const { questions, passScore } = block.payload;
 
+  const savedAttemptRef = useRef(false);
   const [index, setIndex] = useState(0);
   const [responses, setResponses] = useState<QuizResponses>({});
   const [revealed, setRevealed] = useState<string[]>([]);
@@ -96,14 +99,9 @@ export function QuizBlock({
    * learner reaches the pass mark.
    */
   function recordAttempt(): void {
-    const wrongQuestionIds = questions
-      .filter((entry) => !gradeQuestion(entry, responses[entry.id]))
-      .map((entry) => entry.id);
-
-    void trackBlockEvent(context.lessonId, block.id, "QUIZ_ATTEMPT", {
-      wrongQuestionIds,
-      score: gradeQuiz(questions, responses, passScore).score,
-    });
+    if (savedAttemptRef.current) return;
+    savedAttemptRef.current = true;
+    onAttempt?.({ answer: { responses } });
   }
 
   function checkAnswer(): void {
@@ -111,12 +109,16 @@ export function QuizBlock({
       setRevealed((previous) => [...previous, question.id]);
     }
 
-    if (isLastQuestion) {
+    if (
+      !isRevealed &&
+      new Set([...revealed, question.id]).size === questions.length
+    ) {
       recordAttempt();
     }
   }
 
   function tryAgain(): void {
+    savedAttemptRef.current = false;
     setResponses({});
     setRevealed([]);
     setIndex(0);
@@ -124,9 +126,9 @@ export function QuizBlock({
 
   const options = optionsOf(question, t);
   const canCheck =
-    !isRevealed
-    && currentResponse !== undefined
-    && (currentResponse.kind !== "text" || currentResponse.text.trim().length > 0);
+    !isRevealed &&
+    currentResponse !== undefined &&
+    (currentResponse.kind !== "text" || currentResponse.text.trim().length > 0);
 
   return (
     <div className="space-y-5">
@@ -145,7 +147,10 @@ export function QuizBlock({
             className="mt-3"
             disabled={isRevealed}
             onChange={(event) => {
-              setResponse(question.id, { kind: "text", text: event.target.value });
+              setResponse(question.id, {
+                kind: "text",
+                text: event.target.value,
+              });
             }}
             placeholder={t("block.quiz.placeholder")}
             value={currentResponse?.kind === "text" ? currentResponse.text : ""}
@@ -159,8 +164,8 @@ export function QuizBlock({
               >
                 <input
                   checked={
-                    currentResponse?.kind === "choice"
-                    && currentResponse.choices.includes(optionIndex)
+                    currentResponse?.kind === "choice" &&
+                    currentResponse.choices.includes(optionIndex)
                   }
                   className="mt-0.5 size-4 accent-primary"
                   disabled={isRevealed}
@@ -243,7 +248,9 @@ export function QuizBlock({
           <p className="mt-1 text-xs text-muted-foreground">
             {result.passed
               ? t("block.quiz.passed", { percent: Math.round(passScore * 100) })
-              : t("block.quiz.failed", { percent: Math.round(passScore * 100) })}
+              : t("block.quiz.failed", {
+                  percent: Math.round(passScore * 100),
+                })}
           </p>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">

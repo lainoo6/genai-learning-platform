@@ -1,7 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,8 +15,7 @@ import type {
  * Reflection block: a free-text note with a minimum length.
  *
  * The answer is not graded — reaching `minWords` is what unlocks the completion
- * button. The text itself stays local (nothing to score or persist beyond the
- * completion record); AI feedback on top of it is an AI-phase feature.
+ * button. The text and completion feedback are persisted through the activity interface.
  */
 const CJK_CHARACTER = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/g;
 
@@ -40,11 +39,12 @@ function countWords(text: string): number {
 export function ReflectionBlock({
   block,
   completed,
-  onComplete,
+  onAttempt,
 }: BlockRenderProps<ReflectionBlockData>) {
   const t = useT();
   const { prompt, minWords } = block.payload;
 
+  const submittedTextRef = useRef<string | null>(null);
   const [text, setText] = useState("");
   const words = countWords(text);
   const canComplete = words >= minWords;
@@ -67,7 +67,9 @@ export function ReflectionBlock({
         <Button
           disabled={!canComplete || completed}
           onClick={() => {
-            onComplete(block.id);
+            if (submittedTextRef.current === text) return;
+            submittedTextRef.current = text;
+            onAttempt?.({ answer: { text } });
           }}
           variant={completed ? "secondary" : "default"}
         >

@@ -44,12 +44,16 @@ type Row = {
 };
 
 function toRows(items: SortItem[]): Row[] {
-  return items.map((item, index) => ({
-    id: index,
-    text: item.text,
-    order: item.order,
-    locked: false,
-  }));
+  const rows = items
+    .map((item, index) => ({
+      id: index,
+      text: item.text,
+      order: item.order,
+      locked: false,
+    }))
+    .sort((a, b) => a.order - b.order);
+  // Deterministic rotation avoids hydration mismatch and never reveals the answer.
+  return rows.length < 2 ? rows : [...rows.slice(1), rows[0]];
 }
 
 export function SortGame({
@@ -60,7 +64,8 @@ export function SortGame({
 }: SortGameProps) {
   /** `order` values in the order the rows should end up in. */
   const targetOrders = useMemo(
-    () => [...items].sort((a, b) => a.order - b.order).map((item) => item.order),
+    () =>
+      [...items].sort((a, b) => a.order - b.order).map((item) => item.order),
     [items],
   );
 
@@ -116,18 +121,20 @@ export function SortGame({
 
     setRows(nextRows);
     setAttempts(taken);
+    onFinish({
+      variant: "sort",
+      attempts: taken,
+      order: rows.map((row) => row.id),
+    });
 
     if (correct === nextRows.length) {
       setSolved(true);
       setSelected(null);
       setFeedback(t("block.sort.solved", { attempts: taken }));
-      onFinish({ variant: "sort", attempts: taken });
       return;
     }
 
-    setFeedback(
-      t("block.sort.partial", { correct, total: nextRows.length }),
-    );
+    setFeedback(t("block.sort.partial", { correct, total: nextRows.length }));
   }
 
   function startOver(): void {
@@ -244,9 +251,7 @@ export function SortGame({
           )}
         </Button>
         <p className="text-xs text-muted-foreground">
-          {solved || completed
-            ? t("block.sort.done")
-            : t("block.sort.need")}
+          {solved || completed ? t("block.sort.done") : t("block.sort.need")}
         </p>
       </div>
     </div>

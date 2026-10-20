@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { MarkdownView } from "@/components/markdown";
@@ -15,8 +15,8 @@ import type {
   BlockType,
   QuizQuestion,
   QuestionKind,
-  SimulationBlock,
 } from "@/lib/blocks/schema";
+import { simulationBlockSchema } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,10 +28,8 @@ import { cn } from "@/lib/utils";
  * the whole course when the author saves, which is what produces the specific
  * "payload.questions.0.options.1" message instead of a silent coercion.
  *
- * Only the simulation is different: its payload is edited as raw JSON, because
- * a nested node/option form would be larger than the block itself. A JSON
- * syntax error is reported upwards through `onProblem` so the save button can
- * refuse a textarea whose content was never applied.
+ * Simulation nodes and sort positions use forms; the shared schema validates
+ * references and score values again on the server before saving.
  */
 
 const SELECT_CLASS =
@@ -61,7 +59,9 @@ function Field({
       <span className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-medium">{label}</span>
         {hint === undefined ? null : (
-          <span className="text-[11px] font-normal text-muted-foreground">{hint}</span>
+          <span className="text-[11px] font-normal text-muted-foreground">
+            {hint}
+          </span>
         )}
       </span>
       {children}
@@ -121,7 +121,6 @@ function AddRow({
 export function BlockForm({
   block,
   onChange,
-  onProblem,
 }: {
   block: Block;
   onChange: (next: Block) => void;
@@ -141,13 +140,7 @@ export function BlockForm({
     case "game":
       return <GameForm block={block} onChange={onChange} />;
     case "simulation":
-      return (
-        <SimulationForm
-          block={block}
-          onChange={onChange}
-          onProblem={onProblem}
-        />
-      );
+      return <SimulationForm block={block} onChange={onChange} />;
     case "roleplay":
       return <RoleplayForm block={block} onChange={onChange} />;
     case "reflection":
@@ -254,9 +247,9 @@ function convertQuestion(
   }
 
   const options =
-    question.kind === "single"
-    || question.kind === "multi"
-    || question.kind === "truefalse"
+    question.kind === "single" ||
+    question.kind === "multi" ||
+    question.kind === "truefalse"
       ? question.options
       : undefined;
 
@@ -265,14 +258,20 @@ function convertQuestion(
       return {
         ...base,
         kind,
-        options: options ?? [t("editor.option.label", { index: 1 }), t("editor.option.label", { index: 2 })],
+        options: options ?? [
+          t("editor.option.label", { index: 1 }),
+          t("editor.option.label", { index: 2 }),
+        ],
         answer: [0],
       };
     case "multi":
       return {
         ...base,
         kind,
-        options: options ?? [t("editor.option.label", { index: 1 }), t("editor.option.label", { index: 2 })],
+        options: options ?? [
+          t("editor.option.label", { index: 1 }),
+          t("editor.option.label", { index: 2 }),
+        ],
         answer: [0],
       };
     case "truefalse":
@@ -298,7 +297,10 @@ function newQuestion(kind: QuestionKind, t: Translator): QuizQuestion {
 }
 
 /** Removes one option and shifts the answer indices that followed it. */
-function removeChoiceOption(question: ChoiceQuestion, index: number): ChoiceQuestion {
+function removeChoiceOption(
+  question: ChoiceQuestion,
+  index: number,
+): ChoiceQuestion {
   const options = question.options.filter((_, position) => position !== index);
   const answer = question.answer
     .filter((selected) => selected !== index)
@@ -330,7 +332,10 @@ function ChoiceOptions({
   return (
     <div className="space-y-1.5">
       {question.options.map((option, index) => (
-        <div className="flex items-center gap-1.5" key={`option-${String(index)}`}>
+        <div
+          className="flex items-center gap-1.5"
+          key={`option-${String(index)}`}
+        >
           <input
             aria-label={t("editor.option.markCorrect", { index: index + 1 })}
             checked={question.answer.includes(index)}
@@ -343,7 +348,9 @@ function ChoiceOptions({
 
               const answer = question.answer.includes(index)
                 ? question.answer.filter((selected) => selected !== index)
-                : [...question.answer, index].sort((left, right) => left - right);
+                : [...question.answer, index].sort(
+                    (left, right) => left - right,
+                  );
               emit(question.options, answer);
             }}
             type={question.kind === "single" ? "radio" : "checkbox"}
@@ -424,10 +431,7 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
       </Field>
 
       {questions.map((question, index) => (
-        <div
-          className="space-y-2 rounded-lg border p-2.5"
-          key={question.id}
-        >
+        <div className="space-y-2 rounded-lg border p-2.5" key={question.id}>
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium">
               {t("editor.question.number", { index: index + 1 })}
@@ -439,7 +443,11 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
                 onChange={(event) => {
                   replaceQuestion(
                     index,
-                    convertQuestion(question, event.target.value as QuestionKind, t),
+                    convertQuestion(
+                      question,
+                      event.target.value as QuestionKind,
+                      t,
+                    ),
                   );
                 }}
                 value={question.kind}
@@ -473,7 +481,10 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
           <Textarea
             aria-label={t("editor.question.promptAria", { index: index + 1 })}
             onChange={(event) => {
-              replaceQuestion(index, { ...question, prompt: event.target.value });
+              replaceQuestion(index, {
+                ...question,
+                prompt: event.target.value,
+              });
             }}
             placeholder={t("editor.question.promptPlaceholder")}
             rows={2}
@@ -512,9 +523,14 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
 
           {question.kind === "short" ? (
             <Input
-              aria-label={t("editor.question.keywordsAria", { index: index + 1 })}
+              aria-label={t("editor.question.keywordsAria", {
+                index: index + 1,
+              })}
               onChange={(event) => {
-                replaceQuestion(index, { ...question, answer: event.target.value });
+                replaceQuestion(index, {
+                  ...question,
+                  answer: event.target.value,
+                });
               }}
               placeholder={t("editor.question.keywordsPlaceholder")}
               value={question.answer}
@@ -522,7 +538,9 @@ function QuizForm({ block, onChange }: FormProps<"quiz">) {
           ) : null}
 
           <Input
-            aria-label={t("editor.question.explanationAria", { index: index + 1 })}
+            aria-label={t("editor.question.explanationAria", {
+              index: index + 1,
+            })}
             onChange={(event) => {
               replaceQuestion(index, {
                 ...question,
@@ -555,12 +573,17 @@ function FlashcardsForm({ block, onChange }: FormProps<"flashcards">) {
   const t = useT();
   const cards = block.payload.cards;
 
-  function replaceCard(index: number, next: { front: string; back: string }): void {
+  function replaceCard(
+    index: number,
+    next: { front: string; back: string },
+  ): void {
     onChange({
       ...block,
       payload: {
         ...block.payload,
-        cards: cards.map((card, position) => (position === index ? next : card)),
+        cards: cards.map((card, position) =>
+          position === index ? next : card,
+        ),
       },
     });
   }
@@ -658,7 +681,10 @@ function SlidesForm({ block, onChange }: FormProps<"slides">) {
       </label>
 
       {slides.map((slide, index) => (
-        <div className="space-y-2 rounded-lg border p-2.5" key={`slide-${String(index)}`}>
+        <div
+          className="space-y-2 rounded-lg border p-2.5"
+          key={`slide-${String(index)}`}
+        >
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium">
               {t("editor.slide.number", { index: index + 1 })}
@@ -689,7 +715,10 @@ function SlidesForm({ block, onChange }: FormProps<"slides">) {
             value={slide.title}
           />
 
-          <Field hint={t("editor.slide.bulletsHint")} label={t("editor.slide.bullets")}>
+          <Field
+            hint={t("editor.slide.bulletsHint")}
+            label={t("editor.slide.bullets")}
+          >
             <Textarea
               onChange={(event) => {
                 replaceSlide(index, {
@@ -706,10 +735,16 @@ function SlidesForm({ block, onChange }: FormProps<"slides">) {
             />
           </Field>
 
-          <Field hint={t("editor.slide.narrationHint")} label={t("editor.slide.narration")}>
+          <Field
+            hint={t("editor.slide.narrationHint")}
+            label={t("editor.slide.narration")}
+          >
             <Textarea
               onChange={(event) => {
-                replaceSlide(index, { ...slide, narration: event.target.value });
+                replaceSlide(index, {
+                  ...slide,
+                  narration: event.target.value,
+                });
               }}
               placeholder={t("editor.slide.narrationPlaceholder")}
               rows={3}
@@ -726,10 +761,7 @@ function SlidesForm({ block, onChange }: FormProps<"slides">) {
             ...block,
             payload: {
               ...block.payload,
-              slides: [
-                ...slides,
-                { title: "", bullets: [], narration: "" },
-              ],
+              slides: [...slides, { title: "", bullets: [], narration: "" }],
             },
           });
         }}
@@ -776,7 +808,10 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
       <div className="space-y-1.5">
         <p className="text-xs font-medium">{t("editor.coding.tests")}</p>
         {tests.map((test, index) => (
-          <div className="flex items-start gap-1.5" key={`test-${String(index)}`}>
+          <div
+            className="flex items-start gap-1.5"
+            key={`test-${String(index)}`}
+          >
             <Input
               aria-label={t("editor.coding.testNameAria", { index: index + 1 })}
               className="w-2/5"
@@ -797,7 +832,9 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
               value={test.name}
             />
             <Input
-              aria-label={t("editor.coding.testExpressionAria", { index: index + 1 })}
+              aria-label={t("editor.coding.testExpressionAria", {
+                index: index + 1,
+              })}
               className={MONO_CLASS}
               onChange={(event) => {
                 onChange({
@@ -849,7 +886,10 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
       <div className="space-y-1.5">
         <p className="text-xs font-medium">{t("editor.coding.hints")}</p>
         {hints.map((hint, index) => (
-          <div className="flex items-center gap-1.5" key={`hint-${String(index)}`}>
+          <div
+            className="flex items-center gap-1.5"
+            key={`hint-${String(index)}`}
+          >
             <Input
               aria-label={t("editor.coding.hintAria", { index: index + 1 })}
               onChange={(event) => {
@@ -899,6 +939,26 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
 function GameForm({ block, onChange }: FormProps<"game">) {
   const t = useT();
   const payload = block.payload;
+  const sortedItems =
+    payload.variant === "sort"
+      ? [...payload.items].sort((a, b) => a.order - b.order)
+      : [];
+  function updateItems(items: typeof sortedItems): void {
+    onChange({
+      ...block,
+      payload: {
+        variant: "sort",
+        items: items.map((item, order) => ({ ...item, order })),
+      },
+    });
+  }
+  function moveItem(index: number, delta: number): void {
+    const items = [...sortedItems];
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return;
+    [items[index], items[target]] = [items[target], items[index]];
+    updateItems(items);
+  }
 
   function switchVariant(variant: "sort" | "match"): void {
     if (payload.variant === variant) {
@@ -952,59 +1012,47 @@ function GameForm({ block, onChange }: FormProps<"game">) {
       {payload.variant === "sort" ? (
         <div className="space-y-1.5">
           <p className="text-xs font-medium">{t("editor.game.items")}</p>
-          {payload.items.map((item, index) => (
-            <div className="flex items-center gap-1.5" key={`item-${String(index)}`}>
+          {sortedItems.map((item, index) => (
+            <div
+              className="flex items-center gap-1.5"
+              key={`item-${String(index)}`}
+            >
               <Input
                 aria-label={t("editor.game.itemTextAria", { index: index + 1 })}
                 onChange={(event) => {
-                  onChange({
-                    ...block,
-                    payload: {
-                      variant: "sort",
-                      items: payload.items.map((entry, position) =>
-                        position === index
-                          ? { ...entry, text: event.target.value }
-                          : entry,
-                      ),
-                    },
-                  });
+                  updateItems(
+                    sortedItems.map((entry, position) =>
+                      position === index
+                        ? { ...entry, text: event.target.value }
+                        : entry,
+                    ),
+                  );
                 }}
                 placeholder={t("editor.game.itemTextPlaceholder")}
                 value={item.text}
               />
-              <Input
-                aria-label={t("editor.game.itemOrderAria", { index: index + 1 })}
-                className="w-20"
-                onChange={(event) => {
-                  const order = Number(event.target.value);
-                  onChange({
-                    ...block,
-                    payload: {
-                      variant: "sort",
-                      items: payload.items.map((entry, position) =>
-                        position === index
-                          ? { ...entry, order: Number.isFinite(order) ? order : 0 }
-                          : entry,
-                      ),
-                    },
-                  });
-                }}
-                type="number"
-                value={item.order}
-              />
+              <span className="text-xs tabular-nums">{index + 1}</span>
+              <IconButton
+                label={t("activity.moveUp")}
+                disabled={index === 0}
+                onClick={() => moveItem(index, -1)}
+              >
+                <ArrowUp />
+              </IconButton>
+              <IconButton
+                label={t("activity.moveDown")}
+                disabled={index === sortedItems.length - 1}
+                onClick={() => moveItem(index, 1)}
+              >
+                <ArrowDown />
+              </IconButton>
               <IconButton
                 disabled={payload.items.length <= 2}
                 label={t("editor.game.itemRemove")}
                 onClick={() => {
-                  onChange({
-                    ...block,
-                    payload: {
-                      variant: "sort",
-                      items: payload.items.filter(
-                        (_, position) => position !== index,
-                      ),
-                    },
-                  });
+                  updateItems(
+                    sortedItems.filter((_, position) => position !== index),
+                  );
                 }}
               >
                 <Trash2 aria-hidden="true" />
@@ -1017,16 +1065,10 @@ function GameForm({ block, onChange }: FormProps<"game">) {
           <AddRow
             label={t("editor.game.itemAdd")}
             onClick={() => {
-              onChange({
-                ...block,
-                payload: {
-                  variant: "sort",
-                  items: [
-                    ...payload.items,
-                    { text: "", order: payload.items.length },
-                  ],
-                },
-              });
+              updateItems([
+                ...sortedItems,
+                { text: "", order: sortedItems.length },
+              ]);
             }}
           />
         </div>
@@ -1034,7 +1076,10 @@ function GameForm({ block, onChange }: FormProps<"game">) {
         <div className="space-y-1.5">
           <p className="text-xs font-medium">{t("editor.game.pairs")}</p>
           {payload.pairs.map((pair, index) => (
-            <div className="flex items-center gap-1.5" key={`pair-${String(index)}`}>
+            <div
+              className="flex items-center gap-1.5"
+              key={`pair-${String(index)}`}
+            >
               <Input
                 aria-label={t("editor.game.leftAria", { index: index + 1 })}
                 onChange={(event) => {
@@ -1108,71 +1153,195 @@ function GameForm({ block, onChange }: FormProps<"game">) {
   );
 }
 
-function SimulationForm({
-  block,
-  onChange,
-  onProblem,
-}: FormProps<"simulation"> & { onProblem: (message: string | null) => void }) {
+function SimulationForm({ block, onChange }: FormProps<"simulation">) {
   const t = useT();
-  const [text, setText] = useState(() =>
-    JSON.stringify(block.payload, null, 2),
-  );
-  const [error, setError] = useState<string | null>(null);
-
-  function apply(value: string): void {
-    setText(value);
-
-    try {
-      const parsed: unknown = JSON.parse(value);
-      setError(null);
-      onProblem(null);
-      onChange({
-        ...block,
-        payload: parsed as SimulationBlock["payload"],
-      });
-    } catch (cause: unknown) {
-      const reason = cause instanceof Error ? cause.message : "unknown error";
-      setError(t("editor.sim.invalid", { reason }));
-      onProblem(t("editor.sim.problem", { reason }));
-    }
+  const payload = block.payload;
+  const ids = Object.keys(payload.nodes);
+  const validation = simulationBlockSchema.safeParse(block);
+  function emit(next: typeof payload): void {
+    onChange({ ...block, payload: next });
   }
-
+  function updateNode(id: string, node: (typeof payload.nodes)[string]): void {
+    emit({ ...payload, nodes: { ...payload.nodes, [id]: node } });
+  }
+  function nodeSelect(
+    label: string,
+    value: string,
+    change: (id: string) => void,
+  ) {
+    return (
+      <Field label={label}>
+        <select
+          className={SELECT_CLASS}
+          value={value}
+          onChange={(e) => change(e.target.value)}
+        >
+          {!ids.includes(value) ? (
+            <option value={value}>
+              {t("activity.invalidTarget")}: {value}
+            </option>
+          ) : null}
+          {ids.map((id) => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
+        </select>
+      </Field>
+    );
+  }
   return (
-    <div className="space-y-2">
-      <p className="text-[11px] text-muted-foreground">{t("editor.sim.hint")}</p>
-
-      <Textarea
-        aria-label={t("editor.sim.jsonAria")}
-        className={cn("min-h-96", MONO_CLASS)}
-        onChange={(event) => {
-          apply(event.target.value);
-        }}
-        rows={20}
-        spellCheck={false}
-        value={text}
-      />
-
-      {error === null ? null : (
-        <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1.5 text-xs text-red-700">
-          {error}
-        </p>
+    <div className="space-y-3">
+      {validation.success ? null : (
+        <ul
+          role="alert"
+          className="list-disc rounded-lg border border-destructive/40 p-3 pl-6 text-xs text-destructive"
+        >
+          {validation.error.issues.map((issue, i) => (
+            <li key={i}>
+              {issue.path.join(".")}: {issue.message}
+            </li>
+          ))}
+        </ul>
       )}
-
-      <Button
+      <Field label={t("activity.intro")}>
+        <Textarea
+          value={payload.intro}
+          onChange={(e) => emit({ ...payload, intro: e.target.value })}
+        />
+      </Field>
+      {nodeSelect(t("activity.startNode"), payload.start, (start) =>
+        emit({ ...payload, start }),
+      )}
+      {nodeSelect(t("activity.endNode"), payload.end, (end) =>
+        emit({
+          ...payload,
+          end,
+          nodes: {
+            ...payload.nodes,
+            [end]: { ...payload.nodes[end], options: [] },
+          },
+        }),
+      )}
+      {ids.map((id) => {
+        const node = payload.nodes[id];
+        return (
+          <fieldset key={id} className="space-y-2 rounded-lg border p-3">
+            <legend className="text-xs font-medium">
+              {id}
+              {id === payload.end ? ` · ${t("activity.endNode")}` : ""}
+            </legend>
+            <Field label={t("activity.nodeText")}>
+              <Textarea
+                value={node.text}
+                onChange={(e) =>
+                  updateNode(id, { ...node, text: e.target.value })
+                }
+              />
+            </Field>
+            {id === payload.end
+              ? null
+              : node.options.map((option, index) => {
+                  const change = (patch: Partial<typeof option>) =>
+                    updateNode(id, {
+                      ...node,
+                      options: node.options.map((old, i) =>
+                        i === index ? { ...old, ...patch } : old,
+                      ),
+                    });
+                  return (
+                    <div
+                      key={index}
+                      className="space-y-2 rounded-lg bg-muted/40 p-2"
+                    >
+                      <Field label={t("activity.optionLabel")}>
+                        <Input
+                          value={option.label}
+                          onChange={(e) => change({ label: e.target.value })}
+                        />
+                      </Field>
+                      {nodeSelect(t("activity.target"), option.next, (next) =>
+                        change({ next }),
+                      )}
+                      <Field label={t("activity.feedback")}>
+                        <Textarea
+                          value={option.feedback}
+                          onChange={(e) => change({ feedback: e.target.value })}
+                        />
+                      </Field>
+                      <Field label={t("activity.points")}>
+                        <Input
+                          type="number"
+                          step="any"
+                          value={option.score}
+                          onChange={(e) =>
+                            change({ score: Number(e.target.value) })
+                          }
+                        />
+                      </Field>
+                      <IconButton
+                        label={t("editor.option.remove")}
+                        onClick={() =>
+                          updateNode(id, {
+                            ...node,
+                            options: node.options.filter((_, i) => i !== index),
+                          })
+                        }
+                      >
+                        <Trash2 />
+                      </IconButton>
+                    </div>
+                  );
+                })}
+            {id === payload.end ? null : (
+              <AddRow
+                label={t("editor.option.add")}
+                onClick={() =>
+                  updateNode(id, {
+                    ...node,
+                    options: [
+                      ...node.options,
+                      { label: "", next: payload.end, feedback: "", score: 0 },
+                    ],
+                  })
+                }
+              />
+            )}
+            <Button
+              size="xs"
+              variant="ghost"
+              disabled={id === payload.start || id === payload.end}
+              onClick={() => {
+                const nodes = Object.fromEntries(
+                  Object.entries(payload.nodes).filter(([key]) => key !== id),
+                );
+                emit({ ...payload, nodes });
+              }}
+            >
+              {t("activity.deleteNode")}
+            </Button>
+          </fieldset>
+        );
+      })}
+      <p className="text-xs text-muted-foreground">{t("activity.nodeHint")}</p>
+      <AddRow
+        label={t("activity.addNode")}
         onClick={() => {
-          try {
-            setText(JSON.stringify(JSON.parse(text), null, 2));
-            setError(null);
-            onProblem(null);
-          } catch {
-            // The error is already shown above; formatting changes nothing.
-          }
+          const id = `node-${crypto.randomUUID().slice(0, 8)}`;
+          emit({
+            ...payload,
+            nodes: {
+              ...payload.nodes,
+              [id]: {
+                text: "",
+                options: [
+                  { label: "", next: payload.end, feedback: "", score: 0 },
+                ],
+              },
+            },
+          });
         }}
-        size="xs"
-        variant="outline"
-      >
-        {t("editor.sim.format")}
-      </Button>
+      />
     </div>
   );
 }
@@ -1228,9 +1397,14 @@ function RoleplayForm({ block, onChange }: FormProps<"roleplay">) {
       <div className="space-y-1.5">
         <p className="text-xs font-medium">{t("editor.roleplay.rubric")}</p>
         {rubric.map((criterion, index) => (
-          <div className="flex items-center gap-1.5" key={`criterion-${String(index)}`}>
+          <div
+            className="flex items-center gap-1.5"
+            key={`criterion-${String(index)}`}
+          >
             <Input
-              aria-label={t("editor.roleplay.criterionAria", { index: index + 1 })}
+              aria-label={t("editor.roleplay.criterionAria", {
+                index: index + 1,
+              })}
               onChange={(event) => {
                 onChange({
                   ...block,

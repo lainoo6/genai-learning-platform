@@ -8,10 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/client";
 import type { Block, BlockRenderProps } from "@/lib/blocks/schema";
-import type {
-  Audience,
-  AuthoringDifficulty,
-} from "@/lib/llm/prompts/outline";
+import type { Audience, AuthoringDifficulty } from "@/lib/llm/prompts/outline";
 import {
   countWizardLessons,
   flattenWizardLessons,
@@ -55,7 +52,7 @@ function PreviewBlock({ block, lessonId }: { block: Block; lessonId: string }) {
         <Component
           block={block}
           completed={false}
-          context={{ courseId: "preview-course", lessonId }}
+          context={{ courseId: "preview-course", lessonId, preview: true }}
           onComplete={() => {
             // Preview only: completion is not recorded until the course exists.
           }}
@@ -66,8 +63,16 @@ function PreviewBlock({ block, lessonId }: { block: Block; lessonId: string }) {
 }
 
 export function CoursePreview(props: CoursePreviewProps) {
-  const { outline, jobs, audience, difficulty, isSaving, error, onBack, onSave } =
-    props;
+  const {
+    outline,
+    jobs,
+    audience,
+    difficulty,
+    isSaving,
+    error,
+    onBack,
+    onSave,
+  } = props;
 
   const t = useT();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -75,7 +80,8 @@ export function CoursePreview(props: CoursePreviewProps) {
   const flattened = flattenWizardLessons(outline);
   const selected =
     flattened.find((item) => item.lesson.key === selectedKey) ?? flattened[0];
-  const selectedJob = selected === undefined ? null : jobs[selected.lesson.key] ?? null;
+  const selectedJob =
+    selected === undefined ? null : (jobs[selected.lesson.key] ?? null);
   const totalMinutes = totalWizardMinutes(outline, jobs);
 
   return (
@@ -141,7 +147,10 @@ export function CoursePreview(props: CoursePreviewProps) {
                         type="button"
                       >
                         {isReady ? (
-                          <Check aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                          <Check
+                            aria-hidden="true"
+                            className="mt-0.5 size-3 shrink-0"
+                          />
                         ) : (
                           <span className="mt-0.5 size-3 shrink-0 rounded-full border" />
                         )}

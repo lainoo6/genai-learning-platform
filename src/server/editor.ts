@@ -57,7 +57,7 @@ export async function saveCourse(
 
   const session = await auth();
   const user = session?.user;
-  if (user === undefined) {
+  if (user === undefined || (user.role !== "INSTRUCTOR" && user.role !== "ADMIN")) {
     return { ok: false, error: t("server.editor.signIn") };
   }
 

@@ -7,8 +7,7 @@ import type { QuizQuestion } from "./schema";
 
 /** A learner answer to one question: chosen option indices or free text. */
 export type QuizResponse =
-  | { kind: "choice"; choices: number[] }
-  | { kind: "text"; text: string };
+  { kind: "choice"; choices: number[] } | { kind: "text"; text: string };
 
 /** Learner answers keyed by question id. Unanswered questions are `undefined`. */
 export type QuizResponses = Readonly<Record<string, QuizResponse | undefined>>;
@@ -29,10 +28,13 @@ export function normaliseText(value: string): string {
 /**
  * Short-answer rule: `keywords` is a comma-separated list stored in
  * `question.answer`. The response is correct when it **contains any** keyword
- * (case-insensitive, whitespace-insensitive substring match). Empty responses
+ * (case-insensitive, whitespace-insensitive, with Latin word boundaries). Empty responses
  * and empty keyword lists are always wrong.
  */
-export function isShortAnswerCorrect(response: string, keywords: string): boolean {
+export function isShortAnswerCorrect(
+  response: string,
+  keywords: string,
+): boolean {
   const normalisedResponse = normaliseText(response);
   if (normalisedResponse.length === 0) {
     return false;
@@ -41,7 +43,17 @@ export function isShortAnswerCorrect(response: string, keywords: string): boolea
   return keywords
     .split(/[,，]/)
     .map((keyword) => normaliseText(keyword))
-    .some((keyword) => keyword.length > 0 && normalisedResponse.includes(keyword));
+    .some((keyword) => {
+      if (!keyword) return false;
+      // Latin/numeric keywords must be whole words: "AI" must not match "email".
+      // CJK has no whitespace word boundaries, so preserve phrase matching there.
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const left = /^[a-z0-9_]/i.test(keyword) ? "(?<![a-z0-9_])" : "";
+      const right = /[a-z0-9_]$/i.test(keyword) ? "(?![a-z0-9_])" : "";
+      return new RegExp(`${left}${escaped}${right}`, "i").test(
+        normalisedResponse,
+      );
+    });
 }
 
 /** Choice questions are correct when the selected set equals the answer set. */
@@ -66,11 +78,16 @@ export function gradeQuestion(
   }
 
   if (question.kind === "short") {
-    return response.kind === "text"
-      && isShortAnswerCorrect(response.text, question.answer);
+    return (
+      response.kind === "text" &&
+      isShortAnswerCorrect(response.text, question.answer)
+    );
   }
 
-  return response.kind === "choice" && isChoiceCorrect(response.choices, question.answer);
+  return (
+    response.kind === "choice" &&
+    isChoiceCorrect(response.choices, question.answer)
+  );
 }
 
 /** Grades a whole quiz. `passScore` is a ratio in [0, 1]. */

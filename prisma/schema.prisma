@@ -50,6 +50,7 @@ model User {
   createdCourses Course[]         @relation("CourseCreator")
   tutorSessions  TutorSession[]
   blockOverrides UserBlockOverride[]
+  activityAttempts ActivityAttempt[]
 }
 
 model Course {
@@ -93,6 +94,7 @@ model Lesson {
   estimatedMinutes Int              @default(10)
   blocks           Json
   progress         LessonProgress[]
+  activityAttempts ActivityAttempt[]
 }
 
 model Enrollment {
@@ -175,4 +177,20 @@ model TutorMessage {
   role      String
   content   String
   createdAt DateTime     @default(now())
+}
+
+/// Immutable submission + feedback snapshot. attemptId makes retries idempotent.
+model ActivityAttempt {
+  id        String   @id @default(cuid())
+  attemptId String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId  String
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  blockId   String
+  blockType String
+  result    Json
+  createdAt DateTime @default(now())
+  @@unique([userId, lessonId, blockId, attemptId])
+  @@index([userId, lessonId, blockId, createdAt])
 }

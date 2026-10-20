@@ -41,7 +41,8 @@ import {
   type EditorModule,
 } from "@/lib/teach-editor";
 import { cn } from "@/lib/utils";
-import { saveCourse } from "@/server/editor";
+import type { SaveCourseResult } from "@/server/editor";
+import { postJson } from "@/lib/post-json";
 import { BlockEditorPanel } from "./block-editor-panel";
 import { BlockListPanel } from "./block-list-panel";
 import { useI18n } from "@/i18n/client";
@@ -86,14 +87,17 @@ function countIssues(issues: IssueMap): number {
     Object.values(map).reduce((total, list) => total + list.length, 0);
 
   return (
-    issues.course.length
-    + sum(issues.modules)
-    + sum(issues.lessons)
-    + sum(issues.blocks)
+    issues.course.length +
+    sum(issues.modules) +
+    sum(issues.lessons) +
+    sum(issues.blocks)
   );
 }
 
-function findLesson(course: EditorCourse, lessonId: string | null): EditorLesson | null {
+function findLesson(
+  course: EditorCourse,
+  lessonId: string | null,
+): EditorLesson | null {
   if (lessonId === null) {
     return null;
   }
@@ -313,7 +317,9 @@ function SettingsField({
       <span className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-medium">{label}</span>
         {hint === undefined ? null : (
-          <span className="text-[11px] font-normal text-muted-foreground">{hint}</span>
+          <span className="text-[11px] font-normal text-muted-foreground">
+            {hint}
+          </span>
         )}
       </span>
       {children}
@@ -332,24 +338,29 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
   );
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [issues, setIssues] = useState<IssueMap>(emptyIssues);
-  const [blockProblems, setBlockProblems] = useState<Record<string, string>>({});
+  const [blockProblems, setBlockProblems] = useState<Record<string, string>>(
+    {},
+  );
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(true);
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(
+    null,
+  );
 
   const selectedLesson = findLesson(draft, selectedLessonId);
   const selectedBlock =
-    selectedLesson?.blocks.find((block) => block.id === selectedBlockId) ?? null;
+    selectedLesson?.blocks.find((block) => block.id === selectedBlockId) ??
+    null;
   const lessonCount = draft.modules.reduce(
     (total, courseModule) => total + courseModule.lessons.length,
     0,
   );
   const blockCount = draft.modules.reduce(
     (total, courseModule) =>
-      total
-      + courseModule.lessons.reduce(
+      total +
+      courseModule.lessons.reduce(
         (lessonTotal, lesson) => lessonTotal + lesson.blocks.length,
         0,
       ),
@@ -400,7 +411,12 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
     patch: Partial<
       Pick<
         EditorCourse,
-        "title" | "description" | "audience" | "difficulty" | "coverEmoji" | "status"
+        | "title"
+        | "description"
+        | "audience"
+        | "difficulty"
+        | "coverEmoji"
+        | "status"
       >
     >,
   ): void {
@@ -453,7 +469,8 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
     }));
 
     const selectionRemoved =
-      removed?.lessons.some((lesson) => lesson.id === selectedLessonId) ?? false;
+      removed?.lessons.some((lesson) => lesson.id === selectedLessonId) ??
+      false;
 
     if (selectionRemoved) {
       selectBlock(null);
@@ -501,7 +518,10 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
       ...previous,
       modules: previous.modules.map((courseModule) =>
         courseModule.id === moduleId
-          ? { ...courseModule, lessons: swap(courseModule.lessons, index, delta) }
+          ? {
+              ...courseModule,
+              lessons: swap(courseModule.lessons, index, delta),
+            }
           : courseModule,
       ),
     }));
@@ -691,7 +711,15 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
     setSaveError(null);
 
     try {
-      const result = await saveCourse(draft.id, parsed.data);
+      const result = await postJson<SaveCourseResult>(
+        `/api/teach/courses/${encodeURIComponent(draft.id)}`,
+        parsed.data,
+        {
+          timeoutMs: 45_000,
+          timeoutMessage: t("editor.course.saveTimeout"),
+          failureMessage: t("editor.course.saveRequestFailed"),
+        },
+      );
 
       if (!result.ok) {
         setSaveError(result.error);
@@ -707,7 +735,9 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
     } catch (cause: unknown) {
       console.error("[editor] save request failed", cause);
       setSaveError(
-        "The course could not be saved. Your work is still on screen — check the connection and try again.",
+        cause instanceof Error
+          ? cause.message
+          : t("editor.course.saveRequestFailed"),
       );
       setSaveState("error");
     }
@@ -727,9 +757,8 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
     setPendingDelete(null);
   }
 
-  const lessonIssues = selectedLesson === null
-    ? []
-    : issues.lessons[selectedLesson.id] ?? [];
+  const lessonIssues =
+    selectedLesson === null ? [] : (issues.lessons[selectedLesson.id] ?? []);
 
   return (
     <div className="space-y-4">
@@ -747,9 +776,13 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1.5">
-            <h1 className="text-2xl font-semibold">{t("editor.course.edit")}</h1>
+            <h1 className="text-2xl font-semibold">
+              {t("editor.course.edit")}
+            </h1>
             <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <Badge variant={draft.status === "PUBLISHED" ? "default" : "secondary"}>
+              <Badge
+                variant={draft.status === "PUBLISHED" ? "default" : "secondary"}
+              >
                 {t(EDITOR_STATUS_KEYS[draft.status])}
               </Badge>
               <span>
@@ -771,7 +804,10 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
           <div className="flex flex-wrap items-center gap-2">
             {draft.status === "PUBLISHED" ? (
               <Link
-                className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "gap-1.5",
+                )}
                 href={`/courses/${draft.slug}`}
                 target="_blank"
               >
@@ -807,7 +843,10 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
             className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-700"
           >
             <p className="flex items-start gap-1.5 font-medium">
-              <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <TriangleAlert
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0"
+              />
               {saveError}
             </p>
             {issues.course.length === 0 ? null : (
@@ -970,9 +1009,11 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
       </section>
 
       <datalist id="editor-audience-suggestions">
-        {(locale === "zh" ? AUDIENCE_SUGGESTIONS_ZH : AUDIENCE_SUGGESTIONS).map((audience) => (
-          <option key={audience} value={audience} />
-        ))}
+        {(locale === "zh" ? AUDIENCE_SUGGESTIONS_ZH : AUDIENCE_SUGGESTIONS).map(
+          (audience) => (
+            <option key={audience} value={audience} />
+          ),
+        )}
       </datalist>
 
       <div className="grid gap-4 xl:grid-cols-[13rem_minmax(0,1fr)_22rem]">
@@ -1050,7 +1091,11 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
 
         <BlockEditorPanel
           block={selectedBlock}
-          errors={selectedBlock === null ? [] : issues.blocks[selectedBlock.id] ?? []}
+          errors={
+            selectedBlock === null
+              ? []
+              : (issues.blocks[selectedBlock.id] ?? [])
+          }
           onChange={(next) => {
             commit((previous) => replaceBlock(previous, next));
           }}

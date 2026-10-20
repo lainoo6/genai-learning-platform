@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, Check, RotateCcw, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/client";
@@ -10,7 +10,6 @@ import type {
   SimulationBlock as SimulationBlockData,
   SimulationOption,
 } from "@/lib/blocks/schema";
-import { trackBlockEvent } from "@/server/progress";
 
 /**
  * Simulation block: a branching scenario, one decision at a time.
@@ -39,6 +38,7 @@ const END_REASON_KEYS: Record<EndReason, string> = {
 /** One decision the learner has already made. */
 type Step = {
   nodeId: string;
+  optionIndex: number;
   nodeText: string;
   optionLabel: string;
   feedback: string;
@@ -56,12 +56,13 @@ type Pending = {
 export function SimulationBlock({
   block,
   completed,
-  context,
+  onAttempt,
   onComplete,
 }: BlockRenderProps<SimulationBlockData>) {
   const t = useT();
   const { intro, start, end, nodes } = block.payload;
 
+  const continueLockRef = useRef(false);
   const [current, setCurrent] = useState(start);
   const [history, setHistory] = useState<Step[]>([]);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -81,8 +82,10 @@ export function SimulationBlock({
       return;
     }
 
+    continueLockRef.current = false;
     const step: Step = {
       nodeId: current,
+      optionIndex: node.options.indexOf(option),
       nodeText: node.text,
       optionLabel: option.label,
       feedback: option.feedback,
@@ -97,7 +100,7 @@ export function SimulationBlock({
     if (option.next === end) {
       next = null;
       reason = "end";
-    } else if (!(option.next in nodes)) {
+    } else if (!Object.hasOwn(nodes, option.next)) {
       next = null;
       reason = "broken-link";
     } else if (nextHistory.length >= MAX_STEPS) {
@@ -114,18 +117,22 @@ export function SimulationBlock({
 
   function continueAfterFeedback(): void {
     const currentPending = pending;
-    if (currentPending === null) {
+    if (currentPending === null || continueLockRef.current) {
       return;
     }
 
+    continueLockRef.current = true;
     setPending(null);
 
     if (currentPending.next === null) {
       setFinished(true);
-      void trackBlockEvent(context.lessonId, block.id, "SIM_END", {
-        score: history.reduce((total, step) => total + step.score, 0),
-        steps: history.length,
-        outcome: currentPending.reason ?? "end",
+      onAttempt?.({
+        answer: {
+          choices: history.map(({ nodeId, optionIndex }) => ({
+            nodeId,
+            optionIndex,
+          })),
+        },
       });
       return;
     }
@@ -170,7 +177,7 @@ export function SimulationBlock({
             </p>
           </div>
 
-          {endNode === undefined ? null : (
+          {endNode === undefined || endReason !== "end" ? null : (
             <p className="text-sm leading-relaxed">{endNode.text}</p>
           )}
 
@@ -233,9 +240,11 @@ export function SimulationBlock({
 
       <div className="flex flex-wrap items-center gap-3 border-t pt-4">
         <Button
-          disabled={!finished || completed}
+          disabled={!finished || endReason !== "end" || completed}
           onClick={() => {
-            onComplete(block.id);
+            if (start === end && history.length === 0)
+              onAttempt?.({ answer: { choices: [] } });
+            else onComplete(block.id);
           }}
           variant={completed ? "secondary" : "default"}
         >
@@ -255,9 +264,7 @@ export function SimulationBlock({
         </Button>
 
         <p className="text-xs text-muted-foreground">
-          {finished || completed
-            ? t("block.sim.again")
-            : t("block.sim.hint")}
+          {finished || completed ? t("block.sim.again") : t("block.sim.hint")}
         </p>
       </div>
     </div>
