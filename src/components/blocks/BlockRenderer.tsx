@@ -9,7 +9,10 @@ import { useT } from "@/i18n/client";
 import type { Block, BlockRenderProps } from "@/lib/blocks/schema";
 import { AttemptHistory } from "./attempt-history";
 import { submitActivity } from "@/server/activities";
-import type { ActivitySubmission } from "@/lib/blocks/activity-result";
+import {
+  gradeActivity,
+  type ActivitySubmission,
+} from "@/lib/blocks/activity-result";
 import { completeBlock } from "@/server/progress";
 import { BlockExplainer } from "./block-explainer";
 import { blockRegistry } from "./registry";
@@ -64,7 +67,19 @@ export function BlockRenderer(props: BlockRendererProps) {
   >([]);
   const queue = useRef(Promise.resolve());
   function handleAttempt(input: ActivitySubmission) {
-    if (preview) return;
+    if (preview) {
+      // Preview is read-only, but some blocks complete by submitting an
+      // activity rather than calling onComplete (coding finalises its run this
+      // way). Grade the submission locally so those buttons still respond.
+      try {
+        if (gradeActivity(block, input.answer).completed) {
+          setPreviewCompleted(true);
+        }
+      } catch {
+        // A malformed attempt would be rejected by the server; ignore it here.
+      }
+      return;
+    }
     setSavingCount((n) => n + 1);
     const submission = {
       ...input,
