@@ -201,6 +201,7 @@
   "block.reflection.words": "{words} / {min} words",
   "block.renderer.done": "Done",
   "block.renderer.personalised": "Personalised",
+  "block.renderer.previewNotSaved": "Preview — progress is not saved.",
   "block.renderer.saving": "Saving progress…",
   "block.roleplay": "Role play",
   "block.roleplay.conversation": "Role play conversation",

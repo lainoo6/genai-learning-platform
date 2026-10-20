@@ -201,6 +201,7 @@
   "block.reflection.words": "{words} / {min} 字",
   "block.renderer.done": "已完成",
   "block.renderer.personalised": "已个性化",
+  "block.renderer.previewNotSaved": "预览模式：不会储存进度。",
   "block.renderer.saving": "正在保存进度…",
   "block.roleplay": "角色扮演",
   "block.roleplay.conversation": "角色扮演对话",

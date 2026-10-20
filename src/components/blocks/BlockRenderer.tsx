@@ -50,6 +50,12 @@ export function BlockRenderer(props: BlockRendererProps) {
 
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Preview never writes progress, but the block still has to acknowledge the
+   * click: a teacher who marks a block done sees the tick, not a dead button.
+   */
+  const [previewCompleted, setPreviewCompleted] = useState(false);
+  const isCompleted = completed || previewCompleted;
 
   const [savingCount, setSavingCount] = useState(0);
   const [revision, setRevision] = useState(0);
@@ -89,22 +95,28 @@ export function BlockRenderer(props: BlockRendererProps) {
       setSavingCount((n) => n - 1);
     });
   }
-  const handleComplete: BlockRenderProps["onComplete"] = preview
-    ? () => {}
-    : (onComplete ??
-      ((blockId, score) => {
-        startTransition(async () => {
-          if (preview) return;
-          await queue.current;
-          const result = await completeBlock(lessonId, blockId, score, preview);
-          if (result.ok) {
-            setError(null);
-            router.refresh();
-            return;
-          }
-          setError(result.error);
-        });
-      }));
+  const handleComplete: BlockRenderProps["onComplete"] = (blockId, score) => {
+    if (preview) {
+      setPreviewCompleted(true);
+      return;
+    }
+
+    if (onComplete) {
+      onComplete(blockId, score);
+      return;
+    }
+
+    startTransition(async () => {
+      await queue.current;
+      const result = await completeBlock(lessonId, blockId, score, false);
+      if (result.ok) {
+        setError(null);
+        router.refresh();
+        return;
+      }
+      setError(result.error);
+    });
+  };
 
   // The registry is keyed by `block.type`, so TypeScript cannot narrow the union
   // of component types by itself; the mapping guarantees the props line up.
@@ -121,10 +133,15 @@ export function BlockRenderer(props: BlockRendererProps) {
           <Badge variant="outline">{t("block.renderer.personalised")}</Badge>
         ) : null}
         <span className="ml-auto flex items-center gap-2">
-          {completed ? (
+          {isCompleted ? (
             <span className="flex items-center gap-1 text-xs text-emerald-600">
               <Check aria-hidden="true" className="size-3.5" />
               {t("block.renderer.done")}
+            </span>
+          ) : null}
+          {preview && previewCompleted ? (
+            <span className="text-xs text-muted-foreground">
+              {t("block.renderer.previewNotSaved")}
             </span>
           ) : null}
           {preview ? null : (
@@ -141,7 +158,7 @@ export function BlockRenderer(props: BlockRendererProps) {
       <div className="px-4 py-4">
         <Component
           block={block}
-          completed={completed}
+          completed={isCompleted}
           context={{ courseId, lessonId, preview }}
           onAttempt={handleAttempt}
           onComplete={handleComplete}
