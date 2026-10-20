@@ -45,6 +45,18 @@ describe("activity access / preview isolation", () => {
     mocks.auth.mockResolvedValue({ user: { id: "u", role: "INSTRUCTOR" } });
     await expect(activityAccess("l", "b")).rejects.toThrow();
   });
+  it("allows a stored-course teacher preview without reading enrollment", async () => {
+    mocks.auth.mockResolvedValue({
+      user: { id: "teacher", role: "INSTRUCTOR" },
+    });
+    const access = await activityAccess("l", "b", undefined, true);
+    expect(access.preview).toBe(true);
+    expect(access.block.id).toBe("b");
+    expect(mocks.enrollment).not.toHaveBeenCalled();
+  });
+  it("rejects a learner who forges ?preview=1", async () => {
+    await expect(activityAccess("l", "b", undefined, true)).rejects.toThrow();
+  });
   it("allows unsaved teacher previews without touching lesson / enrollment storage", async () => {
     mocks.auth.mockResolvedValue({
       user: { id: "teacher", role: "INSTRUCTOR" },

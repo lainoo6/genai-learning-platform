@@ -41,6 +41,7 @@ export async function trackBlockEvent(
   blockId: string,
   type: BlockEventType,
   payload?: Record<string, unknown>,
+  preview = false,
 ): Promise<void> {
   const parsedInput = blockEventSchema.safeParse({
     lessonId,
@@ -55,10 +56,11 @@ export async function trackBlockEvent(
 
   let access;
   try {
-    access = await activityAccess(lessonId, blockId);
+    access = await activityAccess(lessonId, blockId, undefined, preview);
   } catch {
     return;
   }
+  if (access.preview) return;
   const userId = access.userId;
 
   await trackEvent(parsedInput.data.type, {
@@ -73,10 +75,13 @@ export async function completeBlock(
   lessonId: string,
   blockId: string,
   _score?: number,
+  preview = false,
 ): Promise<ProgressActionResult> {
   try {
     void _score; // Legacy callers may still pass a score; all grading now uses saved evidence.
-    const access = await activityAccess(lessonId, blockId);
+    const access = await activityAccess(lessonId, blockId, undefined, preview);
+    // Preview is read-only: report success to the UI, write nothing.
+    if (access.preview) return { ok: true };
     if (
       [
         "quiz",

@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleCheck,
+  Eye,
   ExternalLink,
   Loader2,
   Save,
@@ -802,6 +803,15 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
+              href={`/learn/${draft.id}?preview=1`}
+              target="_blank"
+            >
+              <Eye aria-hidden="true" />
+              {t("course.previewAsStudent")}
+            </Link>
+
             {draft.status === "PUBLISHED" ? (
               <Link
                 className={cn(

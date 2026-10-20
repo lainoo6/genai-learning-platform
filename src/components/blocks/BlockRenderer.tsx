@@ -65,9 +65,12 @@ export function BlockRenderer(props: BlockRendererProps) {
       attemptId: input.attemptId ?? crypto.randomUUID(),
     };
     queue.current = queue.current.then(async () => {
-      const result = await submitActivity(lessonId, block.id, submission).catch(
-        () => ({ ok: false as const, error: t("activity.saveFailed") }),
-      );
+      const result = await submitActivity(
+        lessonId,
+        block.id,
+        submission,
+        preview,
+      ).catch(() => ({ ok: false as const, error: t("activity.saveFailed") }));
       if (!result.ok) {
         setError(result.error);
         setFailed((prev) =>
@@ -93,7 +96,7 @@ export function BlockRenderer(props: BlockRendererProps) {
         startTransition(async () => {
           if (preview) return;
           await queue.current;
-          const result = await completeBlock(lessonId, blockId, score);
+          const result = await completeBlock(lessonId, blockId, score, preview);
           if (result.ok) {
             setError(null);
             router.refresh();

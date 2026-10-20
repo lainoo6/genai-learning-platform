@@ -48,6 +48,13 @@ export async function enroll(courseId: string): Promise<EnrollResult> {
     };
   }
 
+  // Teachers never enroll: doing so would create a learner record with 0%
+  // progress and make the course look started on their dashboard. Preview mode
+  // is the read-only path instead.
+  if (session?.user?.role === "INSTRUCTOR") {
+    return { ok: false, error: t("server.course.instructorCannotEnroll") };
+  }
+
   if (course.status !== "PUBLISHED") {
     return { ok: false, error: t("server.course.notOpen") };
   }
