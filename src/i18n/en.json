@@ -373,6 +373,7 @@
   "editor.course.edit": "Edit course",
   "editor.course.lessonsCount": "{count} lessons",
   "editor.course.modulesCount": "{count} modules",
+  "editor.course.previewUnsaved": "You have unsaved changes. The preview shows the last saved version. Continue?",
   "editor.course.save": "Save changes",
   "editor.course.saveRequestFailed": "The save response could not be read. Keep this page open and check the connection.",
   "editor.course.saveTimeout": "The save request timed out. The outcome is unknown: keep a copy of your edits, then reload to check before saving again.",

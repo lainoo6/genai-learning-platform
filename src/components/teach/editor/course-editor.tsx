@@ -758,6 +758,27 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
     setPendingDelete(null);
   }
 
+  /**
+   * The preview renders the saved course from the database, not this draft.
+   * Unsaved edits would silently be missing there, so ask first; only a
+   * confirmed click is allowed through to the preview tab.
+   */
+  function handlePreviewClick(
+    event: React.MouseEvent<HTMLAnchorElement>,
+  ): void {
+    if (!isDirty) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!window.confirm(t("editor.course.previewUnsaved"))) {
+      return;
+    }
+
+    window.open(event.currentTarget.href, "_blank", "noopener,noreferrer");
+  }
+
   const lessonIssues =
     selectedLesson === null ? [] : (issues.lessons[selectedLesson.id] ?? []);
 
@@ -806,6 +827,7 @@ export function CourseEditor({ course }: { course: EditorCourse }) {
             <Link
               className={cn(buttonVariants({ variant: "outline" }), "gap-1.5")}
               href={`/learn/${draft.id}?preview=1`}
+              onClick={handlePreviewClick}
               target="_blank"
             >
               <Eye aria-hidden="true" />

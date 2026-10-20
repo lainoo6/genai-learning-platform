@@ -373,6 +373,7 @@
   "editor.course.edit": "编辑课程",
   "editor.course.lessonsCount": "{count} 节课",
   "editor.course.modulesCount": "{count} 个模块",
+  "editor.course.previewUnsaved": "你有尚未儲存的變更，預覽將顯示上次儲存的版本。是否繼續？",
   "editor.course.save": "保存修改",
   "editor.course.saveRequestFailed": "无法读取保存响应，请保留当前页面并检查连接。",
   "editor.course.saveTimeout": "保存请求超时，暂无法确认是否成功。请先备份修改内容，再刷新检查，避免重复保存。",
