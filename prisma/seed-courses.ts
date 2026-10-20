@@ -825,6 +825,8 @@ export async function seedCourse(
       ...COURSE,
       source: CourseSource.SEED,
       status: CourseStatus.PUBLISHED,
+      // Seeded content is the platform's staff pick by default.
+      isCurated: true,
       createdById,
     },
   });

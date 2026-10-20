@@ -1,3 +1,5 @@
+import type { CourseStatus } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -11,6 +13,8 @@ import { prisma } from "@/lib/prisma";
 export type GeneratedCourseSummary = {
   id: string;
   title: string;
+  /** Kept so the history can flag a course an admin has taken down. */
+  status: CourseStatus;
   lessonCount: number;
   /** First lesson in reading order, used by the "Open" link. */
   firstLessonId: string | null;
@@ -27,6 +31,7 @@ export async function listGeneratedCourses(
     select: {
       id: true,
       title: true,
+      status: true,
       createdAt: true,
       modules: {
         orderBy: { order: "asc" },
@@ -46,6 +51,7 @@ export async function listGeneratedCourses(
     return {
       id: row.id,
       title: row.title,
+      status: row.status,
       lessonCount: lessons.length,
       firstLessonId: lessons[0]?.id ?? null,
       createdAt: row.createdAt,

@@ -13,6 +13,7 @@ import { getI18n } from "@/i18n/server";
 import { COURSE_SOURCE_KEYS, type AdminCourseRow } from "@/lib/admin";
 import { EDITOR_STATUS_KEYS } from "@/lib/teach-editor";
 
+import { CourseCuratedButton } from "./course-curated-button";
 import { CourseStatusButton } from "./course-status-button";
 
 /**
@@ -48,6 +49,7 @@ export async function CourseTable({ courses }: { courses: AdminCourseRow[] }) {
             <TableHead>{t("admin.table.creator")}</TableHead>
             <TableHead>{t("admin.table.status")}</TableHead>
             <TableHead>{t("admin.table.source")}</TableHead>
+            <TableHead>{t("admin.table.curated")}</TableHead>
             <TableHead className="text-right">
               {t("admin.table.students")}
             </TableHead>
@@ -91,6 +93,13 @@ export async function CourseTable({ courses }: { courses: AdminCourseRow[] }) {
 
               <TableCell className="text-sm text-muted-foreground">
                 {t(COURSE_SOURCE_KEYS[course.source])}
+              </TableCell>
+
+              <TableCell>
+                <CourseCuratedButton
+                  courseId={course.id}
+                  isCurated={course.isCurated}
+                />
               </TableCell>
 
               <TableCell className="text-right text-sm tabular-nums">

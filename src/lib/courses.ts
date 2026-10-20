@@ -66,6 +66,7 @@ export type CourseWithLessons = Pick<
   | "language"
   | "source"
   | "status"
+  | "isCurated"
   | "createdById"
 > & {
   modules: CourseModule[];
@@ -83,6 +84,7 @@ const courseWithLessonsSelect = {
   language: true,
   source: true,
   status: true,
+  isCurated: true,
   createdById: true,
   modules: {
     orderBy: { order: "asc" },
@@ -131,6 +133,7 @@ function toCourseWithLessons(row: CourseRow): CourseWithLessons {
     language: row.language,
     source: row.source,
     status: row.status,
+    isCurated: row.isCurated,
     createdById: row.createdById,
     modules: row.modules.map((courseModule) => ({
       id: courseModule.id,
@@ -179,13 +182,15 @@ export function firstLesson(
 }
 
 /**
- * Courses shown in the public catalog.
+ * Courses shown on every public surface.
  *
  * Learner-generated courses (P4.7) are published so the player works, but they
  * belong to the learner who asked for them: they never appear in the catalog,
- * the recommendations or a public course page.
+ * the home page preview, the recommendations or a public course page.
+ *
+ * Exported so the home page reuses the same rule instead of re-deriving it.
  */
-const PUBLIC_COURSE_WHERE = {
+export const PUBLIC_COURSE_WHERE = {
   status: "PUBLISHED",
   source: { not: "LEARNER" },
 } satisfies Prisma.CourseWhereInput;

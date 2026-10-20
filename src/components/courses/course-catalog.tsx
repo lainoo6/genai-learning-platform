@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Check, Clock, Search } from "lucide-react";
+import { BookOpen, Check, Clock, Search, Star } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -29,6 +29,8 @@ export type CourseCardData = {
   difficulty: string;
   coverEmoji: string;
   sourceLabel: string;
+  /** Staff pick; independent of `sourceLabel`, so both badges can show. */
+  curated: boolean;
   difficultyLabel: string;
   languageLabel: string;
   lessonCount: number;
@@ -146,6 +148,12 @@ export function CourseCatalog({ courses }: { courses: CourseCardData[] }) {
                 </CardHeader>
 
                 <CardContent className="flex flex-wrap items-center gap-1.5">
+                  {course.curated ? (
+                    <Badge className="gap-1">
+                      <Star aria-hidden="true" />
+                      {t("courses.badge.curated")}
+                    </Badge>
+                  ) : null}
                   <Badge variant="secondary">{course.difficultyLabel}</Badge>
                   <Badge variant="outline">{course.audience}</Badge>
                   <Badge variant="outline">{course.sourceLabel}</Badge>

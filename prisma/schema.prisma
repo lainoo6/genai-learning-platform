@@ -66,6 +66,10 @@ model Course {
   language    String       @default("en")
   status      CourseStatus @default(DRAFT)
   source      CourseSource @default(SEED)
+  /// Staff pick, shown as its own badge in the catalog. Kept separate from
+  /// `source` so an AI-generated course can be curated without losing its
+  /// provenance. Only admins can change it.
+  isCurated   Boolean      @default(false)
   createdById String
   createdBy   User         @relation("CourseCreator", fields: [createdById], references: [id])
   modules     Module[]

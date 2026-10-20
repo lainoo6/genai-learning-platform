@@ -103,6 +103,7 @@ export type AdminCourseRow = {
   title: string;
   status: CourseStatus;
   source: CourseSource;
+  isCurated: boolean;
   coverEmoji: string;
   creatorName: string;
   creatorEmail: string;
@@ -126,6 +127,7 @@ export async function listAdminCourses(): Promise<AdminCourseRow[]> {
       title: true,
       status: true,
       source: true,
+      isCurated: true,
       coverEmoji: true,
       updatedAt: true,
       createdBy: { select: { name: true, email: true } },
@@ -140,6 +142,7 @@ export async function listAdminCourses(): Promise<AdminCourseRow[]> {
     title: row.title,
     status: row.status,
     source: row.source,
+    isCurated: row.isCurated,
     coverEmoji: row.coverEmoji,
     creatorName: row.createdBy.name,
     creatorEmail: row.createdBy.email,

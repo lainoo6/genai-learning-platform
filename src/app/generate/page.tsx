@@ -39,6 +39,7 @@ async function GenerateContent() {
   const history: GeneratedCourseItem[] = generated.map((course) => ({
     id: course.id,
     title: course.title,
+    status: course.status,
     lessonCount: course.lessonCount,
     firstLessonId: course.firstLessonId,
     createdAt: dateFormat.format(course.createdAt),

@@ -111,7 +111,47 @@ export async function setCourseStatus(
   }
 
   revalidatePath("/admin");
+  revalidatePath("/");
   revalidatePath("/courses");
   revalidatePath("/teach");
+  return { ok: true };
+}
+
+/**
+ * Adds or removes the "curated" badge on a course.
+ *
+ * The flag is editorial only: it never changes visibility (that stays on
+ * `status` + `source`) and never reorders the catalog. Admin-only, because a
+ * staff pick is a platform statement rather than something an author claims.
+ */
+export async function setCourseCurated(
+  courseId: string,
+  isCurated: boolean,
+): Promise<AdminActionResult> {
+  const { t } = await getI18n();
+  const adminId = await requireAdminId();
+  if (adminId === null) {
+    return { ok: false, error: t("server.admin.courseForbidden") };
+  }
+
+  const parsedCourseId = idSchema.safeParse(courseId);
+  const parsedCurated = z.boolean().safeParse(isCurated);
+
+  if (!parsedCourseId.success || !parsedCurated.success) {
+    return { ok: false, error: t("server.admin.courseInvalid") };
+  }
+
+  const updated = await prisma.course.updateMany({
+    where: { id: parsedCourseId.data },
+    data: { isCurated: parsedCurated.data },
+  });
+
+  if (updated.count === 0) {
+    return { ok: false, error: t("server.admin.courseMissing") };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/courses");
+  revalidatePath("/");
   return { ok: true };
 }

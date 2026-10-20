@@ -180,6 +180,15 @@ async function DashboardContent() {
             const ratio =
               lessons.length === 0 ? 0 : (completedCount / lessons.length) * 100;
 
+            // Soft takedown keeps enrolments, but an archived course has no
+            // public page left: linking there would dead-end on a 404.
+            const coursePageHref =
+              course.source === "LEARNER"
+                ? "/generate"
+                : course.status === "PUBLISHED"
+                  ? `/courses/${course.slug}`
+                  : null;
+
             return (
               <Card className="h-full" key={course.id}>
                 <CardHeader>
@@ -187,10 +196,19 @@ async function DashboardContent() {
                     {course.coverEmoji}
                   </span>
                   <CardTitle>{course.title}</CardTitle>
-                  {course.source === "LEARNER" ? (
-                    <Badge className="w-fit" variant="outline">
-                      {t("dashboard.card.generatedByYou")}
-                    </Badge>
+                  {course.source === "LEARNER" || course.status === "ARCHIVED" ? (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {course.source === "LEARNER" ? (
+                        <Badge variant="outline">
+                          {t("dashboard.card.generatedByYou")}
+                        </Badge>
+                      ) : null}
+                      {course.status === "ARCHIVED" ? (
+                        <Badge variant="destructive">
+                          {t("dashboard.card.archived")}
+                        </Badge>
+                      ) : null}
+                    </div>
                   ) : null}
                   <CardDescription className="line-clamp-2">
                     {course.description}
@@ -249,18 +267,16 @@ async function DashboardContent() {
                       <ArrowRight aria-hidden="true" />
                     </Link>
                   )}
-                  <Link
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    href={
-                      course.source === "LEARNER"
-                        ? "/generate"
-                        : `/courses/${course.slug}`
-                    }
-                  >
-                    {course.source === "LEARNER"
-                      ? t("dashboard.card.generatedCourses")
-                      : t("dashboard.card.coursePage")}
-                  </Link>
+                  {coursePageHref === null ? null : (
+                    <Link
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                      href={coursePageHref}
+                    >
+                      {course.source === "LEARNER"
+                        ? t("dashboard.card.generatedCourses")
+                        : t("dashboard.card.coursePage")}
+                    </Link>
+                  )}
                 </CardFooter>
               </Card>
             );

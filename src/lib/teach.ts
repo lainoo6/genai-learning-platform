@@ -38,12 +38,19 @@ export const COURSE_STATUS_LABELS: Record<CourseStatus, string> = {
   ARCHIVED: "Archived",
 };
 
-/** Every course the user authored, newest edit first. */
+/**
+ * Every course the user authored, newest edit first
+ * (learner self-service courses excepted — see the module comment).
+ *
+ * Seeded courses are owned by the instructor who curates them, so a `SEED`
+ * source must stay in this list: filtering on "AI_GENERATED or INSTRUCTOR"
+ * used to hide every pre-seeded course, including its drafts.
+ */
 export async function listTaughtCourses(userId: string): Promise<TaughtCourse[]> {
   const rows = await prisma.course.findMany({
     where: {
       createdById: userId,
-      source: { in: ["AI_GENERATED", "INSTRUCTOR"] },
+      source: { not: "LEARNER" },
     },
     orderBy: { updatedAt: "desc" },
     select: {

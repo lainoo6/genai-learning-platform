@@ -1,5 +1,6 @@
 "use client";
 
+import type { CourseStatus } from "@prisma/client";
 import { ArrowRight, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,8 @@ import { deleteGeneratedCourse } from "@/server/generate";
 export type GeneratedCourseItem = {
   id: string;
   title: string;
+  /** Archived by an admin: still listed here, flagged so the learner knows. */
+  status: CourseStatus;
   lessonCount: number;
   firstLessonId: string | null;
   createdAt: string;
@@ -90,6 +93,11 @@ export function GeneratedCourseList({
                 <Badge variant="secondary">
                   {t("generate.history.lessons", { count: course.lessonCount })}
                 </Badge>
+                {course.status === "ARCHIVED" ? (
+                  <Badge variant="destructive">
+                    {t("generate.history.archived")}
+                  </Badge>
+                ) : null}
               </p>
             </div>
 

@@ -14,6 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import { getI18n } from "@/i18n/server";
+import { PUBLIC_COURSE_WHERE } from "@/lib/courses";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +46,7 @@ async function PublishedCourses() {
 
   const [courses, { t }] = await Promise.all([
     prisma.course.findMany({
-      where: { status: "PUBLISHED" },
+      where: PUBLIC_COURSE_WHERE,
       orderBy: { createdAt: "desc" },
       take: 6,
       select: {
