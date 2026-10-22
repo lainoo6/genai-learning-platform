@@ -33,6 +33,7 @@ import {
   getCourseById,
   listLessonProgress,
   type CourseLesson,
+  type LessonProgressRecord,
 } from "@/lib/courses";
 import { isMockMode } from "@/lib/llm/provider";
 import { prisma } from "@/lib/prisma";
@@ -46,7 +47,12 @@ export async function generateMetadata(): Promise<Metadata> {
 
 type LessonPageProps = {
   params: Promise<{ courseId: string; lessonId: string }>;
+  searchParams: Promise<{ preview?: string | string[] }>;
 };
+
+function isPreviewRequested(value: string | string[] | undefined): boolean {
+  return Array.isArray(value) ? value.includes("1") : value === "1";
+}
 
 /**
  * Lesson player.
@@ -55,17 +61,23 @@ type LessonPageProps = {
  * refresh never loses anything, and each block component only owns the local
  * interaction state for one attempt.
  */
-async function LessonPlayer({ params }: LessonPageProps) {
+async function LessonPlayer({ params, searchParams }: LessonPageProps) {
   await connection();
   const { courseId, lessonId } = await params;
+  const { preview } = await searchParams;
 
   const [session, { t }] = await Promise.all([auth(), getI18n()]);
   const userId = session?.user?.id;
   if (userId === undefined) {
     redirect(
-      `/login?callbackUrl=${encodeURIComponent(`/learn/${courseId}/${lessonId}`)}`,
+      `/login?callbackUrl=${encodeURIComponent(`/learn/${courseId}/${lessonId}${isPreviewRequested(preview) ? "?preview=1" : ""}`)}`,
     );
   }
+
+  const role = session?.user?.role;
+  const canPreview =
+    isPreviewRequested(preview) &&
+    (role === "INSTRUCTOR" || role === "ADMIN");
 
   const course = await getCourseById(courseId);
   if (course === null) {
@@ -78,20 +90,34 @@ async function LessonPlayer({ params }: LessonPageProps) {
     notFound();
   }
 
+  // A preview of an unpublished draft is only for its author (or an admin).
+  if (
+    canPreview &&
+    course.status !== "PUBLISHED" &&
+    role !== "ADMIN" &&
+    course.createdById !== userId
+  ) {
+    notFound();
+  }
+
   const lessons = flattenLessons(course);
   const lesson = lessons.find((candidate) => candidate.id === lessonId);
   if (lesson === undefined) {
     notFound();
   }
 
-  const enrollment = await prisma.enrollment.findUnique({
-    where: { userId_courseId: { userId, courseId } },
-    select: { completedAt: true },
-  });
+  // Preview never enrolls the teacher, so there is intentionally no enrollment
+  // lookup in this branch.
+  const enrollment = canPreview
+    ? null
+    : await prisma.enrollment.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+        select: { completedAt: true },
+      });
 
   // Not enrolled yet: show the same course page with a prompt instead of the
   // lesson, so a shared player URL never dead-ends.
-  if (enrollment === null) {
+  if (!canPreview && enrollment === null) {
     return (
       <CourseDetail
         course={course}
@@ -106,10 +132,14 @@ async function LessonPlayer({ params }: LessonPageProps) {
     );
   }
 
-  const progress = await listLessonProgress(
-    userId,
-    lessons.map((entry) => entry.id),
-  );
+  // Preview shows the course from a clean slate: no existing learner progress
+  // leaks into what the teacher sees.
+  const progress = canPreview
+    ? new Map<string, LessonProgressRecord>()
+    : await listLessonProgress(
+        userId,
+        lessons.map((entry) => entry.id),
+      );
 
   const lessonRow = await prisma.lesson.findUnique({
     where: { id: lessonId },
@@ -117,11 +147,14 @@ async function LessonPlayer({ params }: LessonPageProps) {
   });
 
   // Per-learner rewrites (P4.4) are merged in at read time, so the stored lesson
-  // payload stays exactly as the author wrote it for everybody else.
-  const overrideRows = await prisma.userBlockOverride.findMany({
-    where: { userId, lessonId },
-    select: { blockId: true, markdown: true },
-  });
+  // payload stays exactly as the author wrote it for everybody else. Preview
+  // always renders the canonical lesson.
+  const overrideRows = canPreview
+    ? []
+    : await prisma.userBlockOverride.findMany({
+        where: { userId, lessonId },
+        select: { blockId: true, markdown: true },
+      });
   const overriddenBlockIds = new Set(overrideRows.map((row) => row.blockId));
 
   const parsedBlocks = blockListSchema.safeParse(lessonRow?.blocks);
@@ -130,11 +163,15 @@ async function LessonPlayer({ params }: LessonPageProps) {
     overrideRows,
   );
 
-  await trackEvent("LESSON_START", {
-    userId,
-    courseId,
-    payload: { lessonId, lessonTitle: lesson.title },
-  });
+  // Preview is invisible to analytics: otherwise every teacher preview would
+  // look like a learner starting the lesson.
+  if (!canPreview) {
+    await trackEvent("LESSON_START", {
+      userId,
+      courseId,
+      payload: { lessonId, lessonTitle: lesson.title },
+    });
+  }
 
   const modules: OutlineModule[] = course.modules.map((courseModule) => ({
     id: courseModule.id,
@@ -156,15 +193,19 @@ async function LessonPlayer({ params }: LessonPageProps) {
   const allBlocksDone =
     blocks.length > 0 && blocks.every((block) => completedBlocks.includes(block.id));
   const courseCompleted =
-    enrollment.completedAt !== null
-    || lessons.every((entry) => progress.get(entry.id)?.status === "COMPLETED");
+    !canPreview &&
+    (enrollment?.completedAt != null ||
+      lessons.every((entry) => progress.get(entry.id)?.status === "COMPLETED"));
 
   const lessonRatio =
     blocks.length === 0 ? 0 : (completedBlocks.length / blocks.length) * 100;
 
   // Conversation shown when the tutor drawer opens (P4.3): the last messages of
   // this lesson's session, or an empty list until the learner asks something.
-  const tutorMessages = await loadTutorHistory(userId, courseId, lessonId);
+  // The tutor is hidden during preview, so no history is read.
+  const tutorMessages = canPreview
+    ? []
+    : await loadTutorHistory(userId, courseId, lessonId);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[17rem_minmax(0,1fr)]">
@@ -172,6 +213,7 @@ async function LessonPlayer({ params }: LessonPageProps) {
         courseId={courseId}
         currentLessonId={lessonId}
         modules={modules}
+        preview={canPreview}
       />
 
       <div className="space-y-6">
@@ -184,8 +226,8 @@ async function LessonPlayer({ params }: LessonPageProps) {
           </Link>
           <ChevronRight aria-hidden="true" className="size-3" />
           {course.source === "LEARNER" || course.status !== "PUBLISHED" ? (
-            // Generated courses have no public page, and an archived course
-            // lost it: linking either would dead-end on the catalog's 404.
+            // Generated courses and unpublished or archived courses have no
+            // public page; linking them would dead-end on the catalog's 404.
             <span className="text-foreground">{course.title}</span>
           ) : (
             <Link className="hover:text-foreground" href={`/courses/${course.slug}`}>
@@ -202,6 +244,16 @@ async function LessonPlayer({ params }: LessonPageProps) {
             {t("lesson.archived")}
           </p>
         ) : null}
+
+        {canPreview ? (
+          <p
+            className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm"
+            role="status"
+          >
+            {t("lesson.preview.notice")}
+          </p>
+        ) : null}
+
 
         <header className="space-y-3">
           <p className="text-xs text-muted-foreground">
@@ -248,6 +300,7 @@ async function LessonPlayer({ params }: LessonPageProps) {
               key={block.id}
               lessonId={lessonId}
               overridden={overriddenBlockIds.has(block.id)}
+              preview={canPreview}
             />
           ))}
         </div>
@@ -290,7 +343,12 @@ async function LessonPlayer({ params }: LessonPageProps) {
           {previous === undefined ? (
             <span />
           ) : (
-            <NavLink direction="previous" lesson={previous} courseId={courseId} />
+            <NavLink
+              courseId={courseId}
+              direction="previous"
+              lesson={previous}
+              preview={canPreview}
+            />
           )}
           {next === undefined ? (
             <Link
@@ -300,18 +358,25 @@ async function LessonPlayer({ params }: LessonPageProps) {
               {t("lesson.backToDashboard")}
             </Link>
           ) : (
-            <NavLink direction="next" lesson={next} courseId={courseId} />
+            <NavLink
+              courseId={courseId}
+              direction="next"
+              lesson={next}
+              preview={canPreview}
+            />
           )}
         </nav>
       </div>
 
-      <TutorPanel
-        courseId={courseId}
-        initialMessages={tutorMessages}
-        lessonId={lessonId}
-        lessonTitle={lesson.title}
-        mockMode={isMockMode()}
-      />
+      {canPreview ? null : (
+        <TutorPanel
+          courseId={courseId}
+          initialMessages={tutorMessages}
+          lessonId={lessonId}
+          lessonTitle={lesson.title}
+          mockMode={isMockMode()}
+        />
+      )}
     </div>
   );
 }
@@ -320,10 +385,12 @@ function NavLink({
   courseId,
   direction,
   lesson,
+  preview,
 }: {
   courseId: string;
   direction: "previous" | "next";
   lesson: CourseLesson;
+  preview: boolean;
 }) {
   const isPrevious = direction === "previous";
   const Icon = isPrevious ? ArrowLeft : ArrowRight;
@@ -343,7 +410,10 @@ function NavLink({
   );
 
   return (
-    <Link className={className} href={`/learn/${courseId}/${lesson.id}`}>
+    <Link
+      className={className}
+      href={`/learn/${courseId}/${lesson.id}${preview ? "?preview=1" : ""}`}
+    >
       {link}
     </Link>
   );
@@ -353,7 +423,7 @@ export default function LessonPage(props: LessonPageProps) {
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
       <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
-        <LessonPlayer params={props.params} />
+        <LessonPlayer params={props.params} searchParams={props.searchParams} />
       </Suspense>
     </main>
   );

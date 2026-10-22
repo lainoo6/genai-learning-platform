@@ -13,6 +13,7 @@ export const LLM_USAGES = [
   "tutor",
   "explain-block",
   "roleplay-feedback",
+  "code-review",
   "course-outline",
   "course-lesson",
   "learner-course",

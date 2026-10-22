@@ -49,7 +49,8 @@ export type MatchGameProps = {
 const CARD_BASE =
   "flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 const CARD_IDLE = "bg-muted/50 ring-1 ring-foreground/10 hover:bg-muted";
-const CARD_MATCHED = "cursor-default bg-emerald-500/10 ring-1 ring-emerald-500/40";
+const CARD_MATCHED =
+  "cursor-default bg-emerald-500/10 ring-1 ring-emerald-500/40";
 const CARD_PICKED = "bg-primary/10 ring-2 ring-primary";
 
 export function MatchGame({
@@ -72,6 +73,7 @@ export function MatchGame({
 
   /** Pair indices already matched. */
   const t = useT();
+  const choicesRef = useRef<{ left: number; right: number }[]>([]);
   const [matched, setMatched] = useState<number[]>([]);
   const [pickedLeft, setPickedLeft] = useState<number | null>(null);
   const [wrongRight, setWrongRight] = useState<number | null>(null);
@@ -115,6 +117,12 @@ export function MatchGame({
 
     const taken = attempts + 1;
     setAttempts(taken);
+    choicesRef.current.push({ left: pickedLeft, right: index });
+    onFinish({
+      variant: "match",
+      attempts: taken,
+      choices: [...choicesRef.current],
+    });
 
     if (pickedLeft === index) {
       const nextMatched = [...matched, index];
@@ -127,7 +135,6 @@ export function MatchGame({
         setNotice(
           t("block.match.solved", { count: pairs.length, attempts: taken }),
         );
-        onFinish({ variant: "match", attempts: taken });
       }
       return;
     }
@@ -142,6 +149,7 @@ export function MatchGame({
   }
 
   function startOver(): void {
+    choicesRef.current = [];
     if (resetTimerRef.current !== null) {
       window.clearTimeout(resetTimerRef.current);
       resetTimerRef.current = null;
@@ -218,7 +226,9 @@ export function MatchGame({
                   }}
                   style={
                     isWrong
-                      ? { animation: `match-shake ${WRONG_PAIR_DELAY_MS}ms ease-in-out` }
+                      ? {
+                          animation: `match-shake ${WRONG_PAIR_DELAY_MS}ms ease-in-out`,
+                        }
                       : undefined
                   }
                   type="button"
@@ -272,9 +282,7 @@ export function MatchGame({
           )}
         </Button>
         <p className="text-xs text-muted-foreground">
-          {solved || completed
-            ? t("block.match.done")
-            : t("block.match.need")}
+          {solved || completed ? t("block.match.done") : t("block.match.need")}
         </p>
       </div>
     </div>

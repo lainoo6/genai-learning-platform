@@ -4,7 +4,6 @@ import type {
   BlockRenderProps,
   GameBlock as GameBlockData,
 } from "@/lib/blocks/schema";
-import { trackBlockEvent } from "@/server/progress";
 import { MatchGame } from "./MatchGame";
 import { SortGame } from "./SortGame";
 
@@ -18,13 +17,13 @@ import { SortGame } from "./SortGame";
 export function GameBlock({
   block,
   completed,
-  context,
+  onAttempt,
   onComplete,
 }: BlockRenderProps<GameBlockData>) {
   const { payload } = block;
 
   function handleFinish(stats: Record<string, unknown>): void {
-    void trackBlockEvent(context.lessonId, block.id, "GAME_FINISH", stats);
+    onAttempt?.({ answer: stats });
   }
 
   if (payload.variant === "sort") {

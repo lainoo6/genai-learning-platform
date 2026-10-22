@@ -25,7 +25,12 @@ export const readingBlockSchema = blockBaseSchema.extend({
 });
 
 /** Answer formats supported by a quiz question. */
-export const questionKindSchema = z.enum(["single", "multi", "truefalse", "short"]);
+export const questionKindSchema = z.enum([
+  "single",
+  "multi",
+  "truefalse",
+  "short",
+]);
 
 const questionBaseSchema = z.object({
   id: z.string().min(1),
@@ -72,7 +77,10 @@ export const trueFalseQuestionSchema = questionBaseSchema
   })
   .refine(
     (question) =>
-      choicesWithinOptions(question.answer, question.options ?? ["True", "False"]),
+      choicesWithinOptions(
+        question.answer,
+        question.options ?? ["True", "False"],
+      ),
     { message: "True/false answer must be 0 or 1." },
   );
 
@@ -197,16 +205,16 @@ export const gameBlockSchema = blockBaseSchema
   })
   .refine(
     (block) =>
-      block.payload.variant !== "sort"
-      || new Set(block.payload.items.map((item) => item.order)).size
-        === block.payload.items.length,
+      block.payload.variant !== "sort" ||
+      new Set(block.payload.items.map((item) => item.order)).size ===
+        block.payload.items.length,
     { message: "Sort items must all carry a distinct order value." },
   );
 
 /** One choice offered by a simulation node. */
 export const simulationOptionSchema = z.object({
   label: z.string().min(1),
-  /** Node this choice leads to. Unknown ids end the run (see SimulationBlock). */
+  /** Node this choice leads to. Must name an existing node. */
   next: z.string().min(1),
   feedback: z.string().min(1),
   /** Points added to the run total; may be negative. */
@@ -235,10 +243,10 @@ export const simulationBlockSchema = blockBaseSchema
       nodes: z.record(z.string(), simulationNodeSchema),
     }),
   })
-  .refine((block) => block.payload.start in block.payload.nodes, {
+  .refine((block) => Object.hasOwn(block.payload.nodes, block.payload.start), {
     message: "The simulation must start on a node that exists.",
   })
-  .refine((block) => block.payload.end in block.payload.nodes, {
+  .refine((block) => Object.hasOwn(block.payload.nodes, block.payload.end), {
     message: "The simulation must end on a node that exists.",
   })
   .refine(
@@ -250,7 +258,51 @@ export const simulationBlockSchema = blockBaseSchema
       message:
         "Every simulation node except the end node needs at least one option.",
     },
-  );
+  )
+  .superRefine((block, ctx) => {
+    const { nodes, end, start } = block.payload;
+    for (const [id, node] of Object.entries(nodes)) {
+      node.options.forEach((option, index) => {
+        if (!Object.hasOwn(nodes, option.next))
+          ctx.addIssue({
+            code: "custom",
+            path: ["payload", "nodes", id, "options", index, "next"],
+            message: `Unknown target: ${option.next}`,
+          });
+      });
+    }
+    if (nodes[end]?.options.length)
+      ctx.addIssue({
+        code: "custom",
+        path: ["payload", "end"],
+        message: "The end node cannot have outgoing options.",
+      });
+    // Every reachable node must have a route to the end, even when loops exist.
+    const reachable = new Set<string>();
+    const visit = (id: string) => {
+      if (reachable.has(id) || !Object.hasOwn(nodes, id)) return;
+      reachable.add(id);
+      if (id !== end) nodes[id].options.forEach((o) => visit(o.next));
+    };
+    visit(start);
+    const canEnd = new Set([end]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const [id, node] of Object.entries(nodes))
+        if (!canEnd.has(id) && node.options.some((o) => canEnd.has(o.next))) {
+          canEnd.add(id);
+          changed = true;
+        }
+    }
+    for (const id of reachable)
+      if (!canEnd.has(id))
+        ctx.addIssue({
+          code: "custom",
+          path: ["payload", "nodes", id],
+          message: "This node has no path to the end.",
+        });
+  });
 
 /**
  * `roleplay` — a conversation with an AI character, graded afterwards against
@@ -282,7 +334,11 @@ export const blockSchema = z.discriminatedUnion("type", [
 ]);
 
 /** `Lesson.blocks` is stored as a JSON array of blocks. */
-export const blockListSchema = z.array(blockSchema);
+export const blockListSchema = z
+  .array(blockSchema)
+  .refine((blocks) => new Set(blocks.map((b) => b.id)).size === blocks.length, {
+    message: "Activity ids must be unique within a lesson.",
+  });
 
 export type BlockType = z.infer<typeof blockSchema>["type"];
 export type Block = z.infer<typeof blockSchema>;
@@ -311,6 +367,7 @@ export type BlockOfType<T extends BlockType> = Extract<Block, { type: T }>;
 export type BlockContext = {
   courseId: string;
   lessonId: string;
+  preview?: boolean;
 };
 
 /**
@@ -327,4 +384,5 @@ export type BlockRenderProps<T extends Block = Block> = {
   completed: boolean;
   onComplete: (blockId: string, score?: number) => void;
   context: BlockContext;
+  onAttempt?: (result: import("./activity-result").ActivitySubmission) => void;
 };

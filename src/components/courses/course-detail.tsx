@@ -1,15 +1,18 @@
-import { Check, ChevronLeft, Clock, Lock, Star } from "lucide-react";
+import { Check, ChevronLeft, Clock, Eye, Lock, Star } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { CONTENT_LANGUAGES } from "@/i18n/config";
 import { getI18n } from "@/i18n/server";
+import { auth } from "@/lib/auth";
 import { blockMetaFor } from "@/lib/blocks/meta";
 import {
   countLessons,
   totalMinutes,
   type CourseWithLessons,
 } from "@/lib/courses";
+import { cn } from "@/lib/utils";
 import { EnrollButton } from "./enroll-button";
 
 /** Dictionary keys for the two enums shown as badges. */
@@ -46,7 +49,9 @@ export async function CourseDetail({
   /** Optional callout shown above the hero (e.g. "Enroll to start learning"). */
   notice?: string | null;
 }) {
-  const { t } = await getI18n();
+  const [{ t }, session] = await Promise.all([getI18n(), auth()]);
+  const isTeacher =
+    session?.user?.role === "INSTRUCTOR" || session?.user?.role === "ADMIN";
   const difficultyLabel =
     DIFFICULTY_KEYS[course.difficulty] === undefined
       ? course.difficulty
@@ -115,7 +120,7 @@ export async function CourseDetail({
               <Clock aria-hidden="true" className="size-3.5" />
               {t("courses.card.minutes", { count: totalMinutes(course) })}
             </span>
-            {enrolled ? (
+            {enrolled && !isTeacher ? (
               <span className="flex items-center gap-1 text-emerald-600">
                 <Check aria-hidden="true" className="size-3.5" />
                 {t("course.enrolled")}
@@ -124,11 +129,24 @@ export async function CourseDetail({
           </p>
         </div>
 
-        <EnrollButton
-          courseId={course.id}
-          enrolled={enrolled}
-          firstLessonHref={firstLessonHref}
-        />
+        {isTeacher ? (
+          <Link
+            className={cn(
+              buttonVariants({ variant: "secondary", size: "lg" }),
+              "gap-1.5",
+            )}
+            href={`/learn/${course.id}?preview=1`}
+          >
+            <Eye aria-hidden="true" />
+            {t("course.previewAsStudent")}
+          </Link>
+        ) : (
+          <EnrollButton
+            courseId={course.id}
+            enrolled={enrolled}
+            firstLessonHref={firstLessonHref}
+          />
+        )}
       </header>
 
       <hr className="border-foreground/10" />
@@ -149,7 +167,13 @@ export async function CourseDetail({
               {courseModule.lessons.map((lesson, index) => (
                 <li key={lesson.id}>
                   <LessonRow
-                    href={enrolled ? `/learn/${course.id}/${lesson.id}` : null}
+                    href={
+                      isTeacher
+                        ? `/learn/${course.id}/${lesson.id}?preview=1`
+                        : enrolled
+                          ? `/learn/${course.id}/${lesson.id}`
+                          : null
+                    }
                     title={lesson.title}
                     types={lesson.blockTypes}
                     position={index + 1}

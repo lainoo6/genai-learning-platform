@@ -14,6 +14,7 @@ import type {
 export function ReadingBlock({
   block,
   completed,
+  context,
   onComplete,
 }: BlockRenderProps<ReadingBlockData>) {
   const t = useT();
@@ -49,7 +50,7 @@ export function ReadingBlock({
             t("block.reading.mark")
           )}
         </Button>
-        {completed ? (
+        {completed && !context.preview ? (
           <span className="text-xs text-muted-foreground">
             {t("block.reading.saved")}
           </span>

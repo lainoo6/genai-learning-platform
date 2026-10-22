@@ -3,12 +3,14 @@
 import { z } from "zod";
 
 import { getI18n } from "@/i18n/server";
-import { trackEvent } from "@/lib/analytics";
-import { auth } from "@/lib/auth";
-import { blockListSchema } from "@/lib/blocks/schema";
+import { prisma } from "@/lib/prisma";
+import { activityAccess } from "@/lib/activity-access";
+import { persistActivity } from "@/lib/activity-store";
+import { normalizedScore } from "@/lib/blocks/activity-result";
+import { roleplayBlockSchema } from "@/lib/blocks/schema";
 import { contentLanguageFromLocale } from "@/lib/llm/language";
 import { registerLlmMocks } from "@/lib/llm/mocks";
-import { generateJson } from "@/lib/llm/provider";
+import { generateJson, isMockMode } from "@/lib/llm/provider";
 import {
   roleplayFeedbackPrompt,
   roleplayFeedbackSchema,
@@ -16,28 +18,25 @@ import {
   ROLEPLAY_MAX_TRANSCRIPT,
   type RoleplayFeedback,
 } from "@/lib/llm/prompts/roleplay";
-import { prisma } from "@/lib/prisma";
 
 /**
  * End-of-activity grading for the roleplay block (P4.5).
  *
- * The browser owns the transcript (the chat is not persisted), so it sends the
+ * The browser owns the transcript (completed chats are persisted), so it sends the
  * turns back for grading. The block — and therefore the rubric the model is
  * asked to score — is always read from the stored lesson, never from the
  * request, so a learner cannot rewrite the criteria they are graded against.
  */
 
 export type RoleplayFeedbackResult =
-  | { ok: true; report: RoleplayFeedback }
-  | { ok: false; error: string };
+  { ok: true; report: RoleplayFeedback } | { ok: false; error: string };
 
 const inputSchema = z.object({
+  attemptId: z.string().uuid(),
+  previewBlock: roleplayBlockSchema.optional(),
   lessonId: z.string().min(1),
   blockId: z.string().min(1),
-  transcript: z
-    .array(roleplayTurnSchema)
-    .min(1)
-    .max(ROLEPLAY_MAX_TRANSCRIPT),
+  transcript: z.array(roleplayTurnSchema).min(1).max(ROLEPLAY_MAX_TRANSCRIPT),
 });
 
 type RoleplayFeedbackInput = z.input<typeof inputSchema>;
@@ -53,45 +52,45 @@ export async function requestRoleplayFeedback(
     return { ok: false, error: t("server.roleplay.submitFailed") };
   }
 
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (userId === undefined) {
-    return { ok: false, error: t("server.roleplay.signIn") };
-  }
-
-  const { lessonId, blockId, transcript } = parsedInput.data;
-
-  if (!transcript.some((turn) => turn.role === "user")) {
+  const { lessonId, blockId, transcript, attemptId, previewBlock } =
+    parsedInput.data;
+  if (!transcript.some((turn) => turn.role === "user"))
     return { ok: false, error: t("server.roleplay.empty") };
+  let access;
+  try {
+    access = await activityAccess(lessonId, blockId, previewBlock);
+  } catch (cause) {
+    return {
+      ok: false,
+      error:
+        cause instanceof Error ? cause.message : t("server.roleplay.failed"),
+    };
   }
-
-  const lesson = await prisma.lesson.findUnique({
-    where: { id: lessonId },
-    select: {
-      blocks: true,
-      module: { select: { courseId: true } },
-    },
-  });
-
-  if (lesson === null) {
-    return { ok: false, error: t("server.roleplay.lessonNotFound") };
-  }
-
-  const parsedBlocks = blockListSchema.safeParse(lesson.blocks);
-  const block = parsedBlocks.success
-    ? parsedBlocks.data.find(
-        (candidate) => candidate.id === blockId && candidate.type === "roleplay",
-      )
-    : undefined;
-
-  if (block === undefined || block.type !== "roleplay") {
+  const { block, userId, courseId } = access;
+  if (block.type !== "roleplay")
     return { ok: false, error: t("server.roleplay.blockNotFound") };
-  }
-
-  const courseId = lesson.module.courseId;
   registerLlmMocks();
 
   try {
+    if (!access.preview) {
+      const existing = await prisma.activityAttempt.findUnique({
+        where: {
+          userId_lessonId_blockId_attemptId: {
+            userId,
+            lessonId,
+            blockId,
+            attemptId,
+          },
+        },
+      });
+      if (existing) {
+        const saved = existing.result as { feedback?: { report?: unknown } };
+        return {
+          ok: true,
+          report: roleplayFeedbackSchema.parse(saved.feedback?.report),
+        };
+      }
+    }
     const report = await generateJson(
       roleplayFeedbackSchema,
       roleplayFeedbackPrompt(block, transcript, language),
@@ -104,25 +103,32 @@ export async function requestRoleplayFeedback(
       },
     );
 
+    if (
+      report.criteria.length !== block.payload.rubric.length ||
+      report.criteria.some((c, i) => c.criterion !== block.payload.rubric[i])
+    )
+      throw new Error("Feedback rubric mismatch. Please retry.");
     const total = report.criteria.reduce(
       (sum, criterion) => sum + criterion.score,
       0,
     );
-    const averageScore =
-      report.criteria.length === 0
-        ? 0
-        : Math.round((total / report.criteria.length) * 10) / 10;
-
-    await trackEvent("ROLEPLAY_END", {
-      userId,
-      courseId,
-      payload: {
+    if (!access.preview)
+      await persistActivity({
+        ...access,
+        courseId: courseId!,
         lessonId,
-        blockId,
-        turns: transcript.length,
-        averageScore,
-      },
-    });
+        attemptId,
+        answer: { transcript },
+        grade: {
+          score: isMockMode()
+            ? null
+            : normalizedScore(total, 0, report.criteria.length * 5),
+          completed: true,
+          passed: null,
+          verification: isMockMode() ? "mock" : "ai",
+          feedback: { report, mock: isMockMode() },
+        },
+      });
 
     return { ok: true, report };
   } catch (error: unknown) {

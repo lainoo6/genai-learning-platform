@@ -33,10 +33,13 @@ export function LessonOutline({
   courseId,
   currentLessonId,
   modules,
+  preview = false,
 }: {
   courseId: string;
   currentLessonId: string;
   modules: OutlineModule[];
+  /** Keep `?preview=1` on every lesson link while a teacher previews. */
+  preview?: boolean;
 }) {
   const t = useT();
   const [isDrawerOpen, setDrawerOpen] = useState(false);
@@ -66,6 +69,7 @@ export function LessonOutline({
       onNavigate={() => {
         setDrawerOpen(false);
       }}
+      preview={preview}
     />
   );
 
@@ -126,11 +130,13 @@ function OutlineList({
   currentLessonId,
   modules,
   onNavigate,
+  preview,
 }: {
   courseId: string;
   currentLessonId: string;
   modules: OutlineModule[];
   onNavigate: () => void;
+  preview: boolean;
 }) {
   const t = useT();
 
@@ -162,7 +168,7 @@ function OutlineList({
                         ? "bg-primary/10 text-primary"
                         : "hover:bg-muted",
                     )}
-                    href={`/learn/${courseId}/${lesson.id}`}
+                    href={`/learn/${courseId}/${lesson.id}${preview ? "?preview=1" : ""}`}
                     onClick={onNavigate}
                   >
                     <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">

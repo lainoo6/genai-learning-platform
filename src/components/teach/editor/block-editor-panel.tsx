@@ -2,6 +2,9 @@
 
 import { Trash2, TriangleAlert } from "lucide-react";
 
+import { useState } from "react";
+import { BlockRenderer } from "@/components/blocks/BlockRenderer";
+import { blockSchema } from "@/lib/blocks/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +32,7 @@ export type BlockEditorPanelProps = {
 export function BlockEditorPanel(props: BlockEditorPanelProps) {
   const { block, errors, onChange, onProblem, onDelete } = props;
   const t = useT();
+  const [previewing, setPreviewing] = useState(false);
 
   if (block === null) {
     return (
@@ -82,6 +86,28 @@ export function BlockEditorPanel(props: BlockEditorPanelProps) {
         onProblem={onProblem}
       />
 
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => setPreviewing((v) => !v)}
+      >
+        {t("activity.preview")}
+      </Button>
+      {previewing ? (
+        blockSchema.safeParse(block).success ? (
+          <BlockRenderer
+            key={JSON.stringify(block)}
+            block={block}
+            courseId="preview"
+            lessonId="preview"
+            preview
+          />
+        ) : (
+          <p className="text-xs text-destructive">
+            {t("activity.previewInvalid")}
+          </p>
+        )
+      ) : null}
       <div className="border-t pt-2">
         <Button onClick={onDelete} size="sm" variant="ghost">
           <Trash2 aria-hidden="true" />

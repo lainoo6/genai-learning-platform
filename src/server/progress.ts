@@ -1,23 +1,15 @@
 "use server";
 
-import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
-import { getI18n } from "@/i18n/server";
 import { trackEvent } from "@/lib/analytics";
-import { auth } from "@/lib/auth";
-import { blockListSchema } from "@/lib/blocks/schema";
+import { activityAccess } from "@/lib/activity-access";
+import { persistActivity } from "@/lib/activity-store";
+import { gradeActivity } from "@/lib/blocks/activity-result";
 import { prisma } from "@/lib/prisma";
 
 /** Result shape returned to the block components (never throws at the client). */
 export type ProgressActionResult = { ok: true } | { ok: false; error: string };
-
-const completeBlockSchema = z.object({
-  lessonId: z.string().min(1),
-  blockId: z.string().min(1),
-  /** Quiz score as a ratio in [0, 1]; omitted by unscored blocks. */
-  score: z.number().min(0).max(1).optional(),
-});
 
 const BLOCK_EVENT_TYPES = ["GAME_FINISH", "SIM_END", "QUIZ_ATTEMPT"] as const;
 type BlockEventType = (typeof BLOCK_EVENT_TYPES)[number];
@@ -49,6 +41,7 @@ export async function trackBlockEvent(
   blockId: string,
   type: BlockEventType,
   payload?: Record<string, unknown>,
+  preview = false,
 ): Promise<void> {
   const parsedInput = blockEventSchema.safeParse({
     lessonId,
@@ -61,179 +54,67 @@ export async function trackBlockEvent(
     return;
   }
 
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (userId === undefined) {
+  let access;
+  try {
+    access = await activityAccess(lessonId, blockId, undefined, preview);
+  } catch {
     return;
   }
-
-  const lesson = await prisma.lesson.findUnique({
-    where: { id: lessonId },
-    select: { module: { select: { courseId: true } } },
-  });
-
-  if (lesson === null) {
-    return;
-  }
+  if (access.preview) return;
+  const userId = access.userId;
 
   await trackEvent(parsedInput.data.type, {
     userId,
-    courseId: lesson.module.courseId,
-    payload: { lessonId, blockId, ...(parsedInput.data.payload ?? {}) },
+    courseId: access.courseId,
+    payload: { ...(parsedInput.data.payload ?? {}), lessonId, blockId },
   });
 }
 
-/** Reads the stored `completedBlocks` JSON array, dropping anything malformed. */
-function readCompletedBlocks(value: Prisma.JsonValue | null | undefined): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter((entry): entry is string => typeof entry === "string");
-}
-
-/**
- * Stamps `Enrollment.completedAt` once every lesson of the course is completed.
- *
- * Called after a lesson flips to COMPLETED; `updateMany` with `completedAt: null`
- * keeps it idempotent without relying on a unique constraint.
- */
-async function completeCourseIfDone(
-  userId: string,
-  courseId: string,
-): Promise<void> {
-  const lessons = await prisma.lesson.findMany({
-    where: { module: { courseId } },
-    select: { id: true },
-  });
-
-  if (lessons.length === 0) {
-    return;
-  }
-
-  const completedCount = await prisma.lessonProgress.count({
-    where: {
-      userId,
-      status: "COMPLETED",
-      lessonId: { in: lessons.map((lesson) => lesson.id) },
-    },
-  });
-
-  if (completedCount < lessons.length) {
-    return;
-  }
-
-  await prisma.enrollment.updateMany({
-    where: { userId, courseId, completedAt: null },
-    data: { completedAt: new Date() },
-  });
-}
-
-/**
- * Records one completed block for the signed-in learner.
- *
- * Upserts `LessonProgress`: `blockId` is appended once (deduped), the status
- * moves to at least IN_PROGRESS, and `score` is only overwritten by scored
- * blocks (quiz) so a reading block never clears a quiz result.
- */
+/** Backward-compatible completion adapter. Graded activities need a saved passing attempt. */
 export async function completeBlock(
   lessonId: string,
   blockId: string,
-  score?: number,
+  _score?: number,
+  preview = false,
 ): Promise<ProgressActionResult> {
-  const { t } = await getI18n();
-  const parsedInput = completeBlockSchema.safeParse({ lessonId, blockId, score });
-  if (!parsedInput.success) {
-    return { ok: false, error: t("server.progress.invalid") };
-  }
-
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (userId === undefined) {
-    return { ok: false, error: t("server.progress.signIn") };
-  }
-
-  const lesson = await prisma.lesson.findUnique({
-    where: { id: lessonId },
-    select: {
-      id: true,
-      blocks: true,
-      module: { select: { courseId: true } },
-    },
-  });
-
-  if (lesson === null) {
-    return { ok: false, error: t("server.progress.lessonNotFound") };
-  }
-
-  const parsedBlocks = blockListSchema.safeParse(lesson.blocks);
-  if (
-    !parsedBlocks.success
-    || !parsedBlocks.data.some((block) => block.id === blockId)
-  ) {
-    return { ok: false, error: t("server.progress.unknownBlock") };
-  }
-
-  const existing = await prisma.lessonProgress.findUnique({
-    where: { userId_lessonId: { userId, lessonId } },
-    select: { status: true, completedBlocks: true },
-  });
-
-  const completedBlocks = readCompletedBlocks(existing?.completedBlocks);
-  if (!completedBlocks.includes(blockId)) {
-    completedBlocks.push(blockId);
-  }
-
-  // A lesson is finished once every one of its blocks has been completed.
-  const allBlockIds = parsedBlocks.data.map((block) => block.id);
-  const isLessonComplete = allBlockIds.every((id) =>
-    completedBlocks.includes(id),
-  );
-
-  await prisma.lessonProgress.upsert({
-    where: { userId_lessonId: { userId, lessonId } },
-    create: {
-      userId,
+  try {
+    void _score; // Legacy callers may still pass a score; all grading now uses saved evidence.
+    const access = await activityAccess(lessonId, blockId, undefined, preview);
+    // Preview is read-only: report success to the UI, write nothing.
+    if (access.preview) return { ok: true };
+    if (
+      [
+        "quiz",
+        "coding",
+        "game",
+        "simulation",
+        "roleplay",
+        "reflection",
+      ].includes(access.block.type)
+    ) {
+      const attempts = await prisma.activityAttempt.findMany({
+        where: { userId: access.userId, lessonId, blockId },
+      });
+      if (
+        !attempts.some((a) => (a.result as { completed?: boolean }).completed)
+      )
+        return { ok: false, error: "Submit this activity successfully first." };
+      return { ok: true };
+    }
+    await persistActivity({
+      ...access,
+      courseId: access.courseId!,
       lessonId,
-      status: isLessonComplete ? "COMPLETED" : "IN_PROGRESS",
-      completedBlocks,
-      score: score ?? null,
-    },
-    update: {
-      status: isLessonComplete || existing?.status === "COMPLETED"
-        ? "COMPLETED"
-        : "IN_PROGRESS",
-      completedBlocks,
-      // `undefined` leaves the previous score untouched (Prisma skips it).
-      score: score ?? undefined,
-    },
-  });
-
-  if (isLessonComplete) {
-    await completeCourseIfDone(userId, lesson.module.courseId);
-  }
-
-  const courseId = lesson.module.courseId;
-
-  if (score === undefined) {
-    await trackEvent("BLOCK_COMPLETE", {
-      userId,
-      courseId,
-      payload: { lessonId, blockId },
+      attemptId: `completion-${blockId}`,
+      answer: {},
+      grade: gradeActivity(access.block, {}),
     });
     return { ok: true };
+  } catch (cause) {
+    return {
+      ok: false,
+      error:
+        cause instanceof Error ? cause.message : "Unable to save completion.",
+    };
   }
-
-  await trackEvent("QUIZ_SUBMIT", {
-    userId,
-    courseId,
-    payload: { lessonId, blockId, score },
-  });
-  await trackEvent("BLOCK_COMPLETE", {
-    userId,
-    courseId,
-    payload: { lessonId, blockId, score },
-  });
-
-  return { ok: true };
 }

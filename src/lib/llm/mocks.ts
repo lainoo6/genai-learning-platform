@@ -14,6 +14,11 @@ import { mockRoleplayFeedback } from "@/lib/llm/prompts/roleplay";
  * the handler, which makes this safe to call on every request.
  */
 export function registerLlmMocks(): void {
+  registerMock("code-review", () => ({
+    summary: "[MOCK] Demo feedback only; no AI analysis of your code has run.",
+    errors: [], improvements: ["[MOCK] Use clear variable names and small functions."],
+    edgeCases: ["[MOCK] Check empty inputs, boundary values and unexpected types."],
+  }));
   registerMock("explain-block", ({ prompt }) => mockExplain(prompt));
   registerMock("roleplay-feedback", ({ prompt }) => mockRoleplayFeedback(prompt));
   registerMock("course-outline", ({ prompt }) => mockCourseOutline(prompt));

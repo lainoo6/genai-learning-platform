@@ -29,7 +29,7 @@ import { requestRoleplayFeedback } from "@/server/roleplay";
 /**
  * Roleplay block (P4.5): a chat with an AI character plus a graded debrief.
  *
- * The conversation lives in this component — it is practice, not a record — so
+ * Each completed conversation is saved with its transcript and feedback, so
  * "Play again" is a real reset. Replies stream from `/api/roleplay`; "End & get
  * feedback" sends the transcript back to a server action, which reads the
  * rubric from the stored lesson and returns one score per criterion.
@@ -55,6 +55,9 @@ export function RoleplayBlock({
   const [isReporting, setIsReporting] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
 
+  const streamingRef = useRef(false);
+  const reportingRef = useRef(false);
+  const attemptIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -70,14 +73,16 @@ export function RoleplayBlock({
   async function send(text: string): Promise<void> {
     const trimmed = text.trim();
     if (
-      trimmed.length === 0
-      || isStreaming
-      || ended
-      || atTurnLimit
+      trimmed.length === 0 ||
+      streamingRef.current ||
+      reportingRef.current ||
+      ended ||
+      atTurnLimit
     ) {
       return;
     }
 
+    streamingRef.current = true;
     setChatError(null);
     setDraft("");
     setIsStreaming(true);
@@ -102,11 +107,14 @@ export function RoleplayBlock({
           blockId: block.id,
           message: trimmed,
           history,
+          ...(context.preview ? { previewBlock: block } : {}),
         }),
       });
 
       if (!response.ok || response.body === null) {
-        throw new Error(t("block.roleplay.unavailable", { status: response.status }));
+        throw new Error(
+          t("block.roleplay.unavailable", { status: response.status }),
+        );
       }
 
       const reader = response.body.getReader();
@@ -158,6 +166,7 @@ export function RoleplayBlock({
           : t("block.roleplay.failedAnswer"),
       );
     } finally {
+      streamingRef.current = false;
       setIsStreaming(false);
     }
   }
@@ -167,15 +176,23 @@ export function RoleplayBlock({
       .filter((message) => message.content.trim().length > 0)
       .map(({ role, content }) => ({ role, content }));
 
-    if (transcript.length === 0 || isReporting) {
+    if (
+      transcript.length === 0 ||
+      reportingRef.current ||
+      streamingRef.current
+    ) {
       return;
     }
 
+    reportingRef.current = true;
     setReportError(null);
     setIsReporting(true);
 
     try {
+      attemptIdRef.current ??= crypto.randomUUID();
       const result = await requestRoleplayFeedback({
+        attemptId: attemptIdRef.current,
+        ...(context.preview ? { previewBlock: block } : {}),
         lessonId: context.lessonId,
         blockId: block.id,
         transcript,
@@ -183,6 +200,7 @@ export function RoleplayBlock({
 
       if (result.ok) {
         setReport(result.report);
+        if (!context.preview) onComplete(block.id);
       } else {
         setReportError(result.error);
       }
@@ -193,11 +211,13 @@ export function RoleplayBlock({
           : t("block.roleplay.failedReport"),
       );
     } finally {
+      reportingRef.current = false;
       setIsReporting(false);
     }
   }
 
   function playAgain(): void {
+    attemptIdRef.current = null;
     setMessages([]);
     setDraft("");
     setChatError(null);
@@ -205,7 +225,8 @@ export function RoleplayBlock({
     setReportError(null);
   }
 
-  const canSend = draft.trim().length > 0 && !isStreaming && !ended && !atTurnLimit;
+  const canSend =
+    draft.trim().length > 0 && !isStreaming && !ended && !atTurnLimit;
 
   return (
     <div className="space-y-4">
@@ -361,7 +382,9 @@ export function RoleplayBlock({
       {report === null ? null : (
         <div className="space-y-3 rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-4 py-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-medium">{t("block.roleplay.report")}</h3>
+            <h3 className="text-sm font-medium">
+              {t("block.roleplay.report")}
+            </h3>
             <Badge variant="secondary">
               {t("block.roleplay.criteriaCount", {
                 count: report.criteria.length,
@@ -384,7 +407,9 @@ export function RoleplayBlock({
                     {criterion.score} / 5
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">{criterion.comment}</p>
+                <p className="text-sm text-muted-foreground">
+                  {criterion.comment}
+                </p>
               </li>
             ))}
           </ul>

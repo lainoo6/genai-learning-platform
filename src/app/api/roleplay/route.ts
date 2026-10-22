@@ -2,17 +2,22 @@ import { type ModelMessage, streamText } from "ai";
 import { z } from "zod";
 
 import { getI18n } from "@/i18n/server";
-import { auth } from "@/lib/auth";
-import { blockListSchema } from "@/lib/blocks/schema";
+import { activityAccess } from "@/lib/activity-access";
+import { roleplayBlockSchema } from "@/lib/blocks/schema";
 import { contentLanguageFromLocale } from "@/lib/llm/language";
-import { isMockMode, llmApiKey, llmClient, llmModel, llmProviderOptions } from "@/lib/llm/provider";
+import {
+  isMockMode,
+  llmApiKey,
+  llmClient,
+  llmModel,
+  llmProviderOptions,
+} from "@/lib/llm/provider";
 import {
   mockRoleplayReply,
   roleplaySystemPrompt,
   roleplayTurnSchema,
   ROLEPLAY_MAX_TRANSCRIPT,
 } from "@/lib/llm/prompts/roleplay";
-import { prisma } from "@/lib/prisma";
 
 /**
  * In-character streaming endpoint for the roleplay block (P4.5).
@@ -26,6 +31,7 @@ import { prisma } from "@/lib/prisma";
  */
 
 const requestSchema = z.object({
+  previewBlock: roleplayBlockSchema.optional(),
   lessonId: z.string().min(1),
   blockId: z.string().min(1),
   message: z.string().trim().min(1).max(2000),
@@ -73,41 +79,25 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const session = await auth();
-  if (session?.user?.id === undefined) {
+  let access;
+  try {
+    access = await activityAccess(
+      parsed.data.lessonId,
+      parsed.data.blockId,
+      parsed.data.previewBlock,
+    );
+  } catch (cause) {
     return Response.json(
-      { error: t("server.roleplay.signInChat") },
-      { status: 401, headers: NO_STORE },
+      { error: cause instanceof Error ? cause.message : "Unauthorized" },
+      { status: 403, headers: NO_STORE },
     );
   }
-
-  const lesson = await prisma.lesson.findUnique({
-    where: { id: parsed.data.lessonId },
-    select: { blocks: true },
-  });
-
-  if (lesson === null) {
+  const { block } = access;
+  if (block.type !== "roleplay")
     return Response.json(
-      { error: t("server.roleplay.lessonNotFound") },
-      { status: 404, headers: NO_STORE },
+      { error: "Roleplay activity required." },
+      { status: 400, headers: NO_STORE },
     );
-  }
-
-  const parsedBlocks = blockListSchema.safeParse(lesson.blocks);
-  const block = parsedBlocks.success
-    ? parsedBlocks.data.find(
-        (candidate) =>
-          candidate.id === parsed.data.blockId && candidate.type === "roleplay",
-      )
-    : undefined;
-
-  if (block === undefined || block.type !== "roleplay") {
-    return Response.json(
-      { error: t("server.roleplay.blockNotFound") },
-      { status: 404, headers: NO_STORE },
-    );
-  }
-
   const { history, message } = parsed.data;
 
   if (isMockMode()) {
@@ -126,9 +116,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const messages: ModelMessage[] = [
-    ...history.map(
-      (turn): ModelMessage => ({ role: turn.role, content: turn.content }),
-    ),
+    ...history.map((turn): ModelMessage => ({
+      role: turn.role,
+      content: turn.content,
+    })),
     { role: "user", content: message },
   ];
 
