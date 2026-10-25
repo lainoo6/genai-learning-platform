@@ -117,9 +117,10 @@ type InputPlan =
  * Fits an upload into the input budget.
  *
  * Under budget: everything is kept — there is no per-image cap.
- * Over budget: truncate the text first, then drop the lowest-priority images.
- * An upload whose text is already under `MIN_TEXT_TOKENS` is rejected instead,
- * so a deck full of images cannot be silently reduced to almost nothing.
+ * Over budget: drop the lowest-priority images first; only when even a
+ * text-only prompt is too long is the text truncated. An upload whose text is
+ * already under `MIN_TEXT_TOKENS` is rejected instead, so a deck full of
+ * images cannot be silently reduced to almost nothing.
  */
 function planInput(
   text: string,
@@ -143,22 +144,8 @@ function planInput(
     return { ok: false, error: t("server.generate.file.overLimit") };
   }
 
-  // Truncation keeps at least the minimum text; if the image count alone makes
-  // that impossible, images are dropped below instead.
-  const textBudget = Math.max(
-    MIN_TEXT_TOKENS,
-    MAX_INPUT_TOKENS -
-      plannedImages.length * TOKEN_PER_IMAGE -
-      PROMPT_OVERHEAD,
-  );
-
-  if (textTokens > textBudget) {
-    plannedText = truncateToTokens(plannedText, textBudget);
-    textTokens = estimateTextTokens(plannedText);
-    warnings.push(t("server.generate.file.truncated"));
-  }
-
-  if (totalTokens() > MAX_INPUT_TOKENS) {
+  // Images go first: the full document text survives as long as possible.
+  if (plannedImages.length > 0) {
     const before = plannedImages.length;
 
     for (const image of rankForDropping(plannedImages, slideTexts)) {
@@ -171,6 +158,18 @@ function planInput(
       warnings.push(
         t("server.generate.file.imagesDropped", { count: dropped }),
       );
+    }
+  }
+
+  // Only a text-only prompt that is still too long costs words. At this point
+  // every image has been dropped, so the available budget is the full text one.
+  if (totalTokens() > MAX_INPUT_TOKENS) {
+    const textBudget = MAX_INPUT_TOKENS - PROMPT_OVERHEAD;
+
+    if (textTokens > textBudget) {
+      plannedText = truncateToTokens(plannedText, textBudget);
+      textTokens = estimateTextTokens(plannedText);
+      warnings.push(t("server.generate.file.truncated"));
     }
   }
 
