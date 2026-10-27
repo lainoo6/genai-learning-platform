@@ -1,0 +1,164 @@
+"use client";
+
+import type { Role } from "@prisma/client";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useT } from "@/i18n/client";
+import { ROLE_KEYS } from "@/lib/roles";
+import { updateUserRole } from "@/server/admin";
+import { cn } from "@/lib/utils";
+
+/**
+ * Role change with an explicit confirmation (P5.4).
+ *
+ * The dialog spells out what each role can do and warns that the change takes
+ * effect on the user's next sign-in, because the session is a signed JWT that
+ * still carries the old role.
+ */
+
+const ROLE_CHOICES: ReadonlyArray<{
+  value: Role;
+  descriptionKey: string;
+}> = [
+  { value: "LEARNER", descriptionKey: "admin.role.learnerDescription" },
+  { value: "INSTRUCTOR", descriptionKey: "admin.role.instructorDescription" },
+  { value: "ADMIN", descriptionKey: "admin.role.adminDescription" },
+];
+
+export function RoleChangeDialog({
+  userId,
+  name,
+  currentRole,
+}: {
+  userId: string;
+  name: string;
+  currentRole: Role;
+}) {
+  const t = useT();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [role, setRole] = useState<Role>(currentRole);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function openDialog(): void {
+    setRole(currentRole);
+    setError(null);
+    setOpen(true);
+  }
+
+  async function confirm(): Promise<void> {
+    setPending(true);
+    setError(null);
+
+    const result = await updateUserRole(userId, role);
+
+    if (!result.ok) {
+      setError(result.error);
+      setPending(false);
+      return;
+    }
+
+    setPending(false);
+    setOpen(false);
+    router.refresh();
+  }
+
+  return (
+    <>
+      <Button onClick={openDialog} size="xs" variant="outline">
+        {t("admin.role.change")}
+      </Button>
+
+      <Dialog
+        onOpenChange={(next) => {
+          if (pending) {
+            return;
+          }
+          setOpen(next);
+          if (!next) {
+            setError(null);
+          }
+        }}
+        open={open}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("admin.role.dialogTitle", { name })}</DialogTitle>
+            <DialogDescription>
+              {t("admin.role.dialogDescription")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <fieldset className="space-y-2">
+            <legend className="sr-only">{t("admin.role.legend")}</legend>
+            {ROLE_CHOICES.map((choice) => (
+              <label
+                className={cn(
+                  "flex cursor-pointer items-start gap-2.5 rounded-lg px-3 py-2 ring-1 transition-colors",
+                  role === choice.value
+                    ? "bg-primary/5 ring-primary/40"
+                    : "ring-foreground/10 hover:bg-muted/60",
+                )}
+                key={choice.value}
+              >
+                <input
+                  checked={role === choice.value}
+                  className="mt-0.5"
+                  name={`role-${userId}`}
+                  onChange={() => {
+                    setRole(choice.value);
+                  }}
+                  type="radio"
+                  value={choice.value}
+                />
+                <span>
+                  <span className="block text-sm font-medium">
+                    {t(ROLE_KEYS[choice.value])}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {t(choice.descriptionKey)}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+
+          {error === null ? null : (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+
+          <DialogFooter>
+            <Button
+              disabled={pending}
+              onClick={() => {
+                setOpen(false);
+              }}
+              variant="outline"
+            >
+              {t("editor.delete.cancel")}
+            </Button>
+            <Button
+              disabled={pending || role === currentRole}
+              onClick={() => {
+                void confirm();
+              }}
+            >
+              {pending ? t("admin.role.saving") : t("admin.role.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

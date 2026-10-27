@@ -1,0 +1,196 @@
+// Prisma schema for the GenAI-driven interactive learning platform.
+// Data model is fixed by docs/plan/01_架构与数据模型.md §2: later phases add tables, never modify these.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  LEARNER
+  INSTRUCTOR
+  ADMIN
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CourseSource {
+  SEED
+  AI_GENERATED
+  INSTRUCTOR
+  LEARNER
+}
+
+enum ProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(LEARNER)
+  background   String?
+  goal         String?
+  createdAt    DateTime @default(now())
+  enrollments    Enrollment[]
+  lessonProgress LessonProgress[]
+  events         EngagementEvent[]
+  createdCourses Course[]         @relation("CourseCreator")
+  tutorSessions  TutorSession[]
+  blockOverrides UserBlockOverride[]
+  activityAttempts ActivityAttempt[]
+}
+
+model Course {
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  title       String
+  description String
+  topic       String
+  audience    String
+  difficulty  String
+  coverEmoji  String       @default("📘")
+  /// Language the course content was written in ("en" or "zh"). Set when the
+  /// course is generated; switching the interface language never rewrites it.
+  language    String       @default("en")
+  status      CourseStatus @default(DRAFT)
+  source      CourseSource @default(SEED)
+  createdById String
+  createdBy   User         @relation("CourseCreator", fields: [createdById], references: [id])
+  modules     Module[]
+  enrollments Enrollment[]
+  events      EngagementEvent[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Module {
+  id       String   @id @default(cuid())
+  courseId String
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title    String
+  order    Int
+  lessons  Lesson[]
+}
+
+model Lesson {
+  id               String           @id @default(cuid())
+  moduleId         String
+  module           Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title            String
+  order            Int
+  estimatedMinutes Int              @default(10)
+  blocks           Json
+  progress         LessonProgress[]
+  activityAttempts ActivityAttempt[]
+}
+
+model Enrollment {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  @@unique([userId, courseId])
+}
+
+model LessonProgress {
+  id              String         @id @default(cuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId        String
+  lesson          Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  status          ProgressStatus @default(NOT_STARTED)
+  completedBlocks Json           @default("[]")
+  score           Float?
+  updatedAt       DateTime       @updatedAt
+  @@unique([userId, lessonId])
+}
+
+model EngagementEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  courseId  String?
+  course    Course?  @relation(fields: [courseId], references: [id])
+  type      String
+  payload   Json?
+  createdAt DateTime @default(now())
+}
+
+model GenerationJob {
+  id          String   @id @default(cuid())
+  type        String
+  input       Json
+  output      Json?
+  status      String   @default("PENDING")
+  createdById String
+  courseId    String?
+  createdAt   DateTime @default(now())
+}
+
+model TutorSession {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId  String?
+  context   Json?
+  messages  TutorMessage[]
+  createdAt DateTime       @default(now())
+}
+
+/**
+ * Per-learner rewrite of a reading block (P4.4 "Replace content").
+ *
+ * Only the author of the override ever sees it: the lesson payload stays
+ * untouched, and the override is merged in at read time.
+ */
+model UserBlockOverride {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId  String
+  blockId   String
+  markdown  String
+  createdAt DateTime @default(now())
+  @@unique([userId, lessonId, blockId])
+}
+
+model TutorMessage {
+  id        String       @id @default(cuid())
+  sessionId String
+  session   TutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  createdAt DateTime     @default(now())
+}
+
+/// Immutable submission + feedback snapshot. attemptId makes retries idempotent.
+model ActivityAttempt {
+  id        String   @id @default(cuid())
+  attemptId String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId  String
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  blockId   String
+  blockType String
+  result    Json
+  createdAt DateTime @default(now())
+  @@unique([userId, lessonId, blockId, attemptId])
+  @@index([userId, lessonId, blockId, createdAt])
+}
