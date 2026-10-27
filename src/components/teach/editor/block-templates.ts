@@ -144,6 +144,9 @@ const ENGLISH: Record<BlockType, Template> = {
       items: [
         { text: "First step", order: 0 },
         { text: "Second step", order: 1 },
+        { text: "Third step", order: 2 },
+        { text: "Fourth step", order: 3 },
+        { text: "Fifth step", order: 4 },
       ],
     },
   }),
@@ -266,6 +269,9 @@ const CHINESE: Record<BlockType, Template> = {
       items: [
         { text: "第一步", order: 0 },
         { text: "第二步", order: 1 },
+        { text: "第三步", order: 2 },
+        { text: "第四步", order: 3 },
+        { text: "第五步", order: 4 },
       ],
     },
   }),

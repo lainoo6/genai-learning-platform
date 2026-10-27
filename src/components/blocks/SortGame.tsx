@@ -85,12 +85,8 @@ export function SortGame({
   const canMoveUp = selectedSlot > 0;
   const canMoveDown = selectedSlot >= 0 && selectedSlot < freeSlots.length - 1;
 
-  function move(direction: -1 | 1): void {
-    if (selected === null) {
-      return;
-    }
-
-    const slot = freeSlots.indexOf(selected);
+  function moveFrom(index: number, direction: -1 | 1): void {
+    const slot = freeSlots.indexOf(index);
     const target = freeSlots[slot + direction];
     if (slot < 0 || target === undefined) {
       return;
@@ -98,17 +94,23 @@ export function SortGame({
 
     setRows((previous) => {
       const next = [...previous];
-      const moving = next[selected];
+      const moving = next[index];
       const displaced = next[target];
       if (moving === undefined || displaced === undefined) {
         return previous;
       }
-      next[selected] = displaced;
+      next[index] = displaced;
       next[target] = moving;
       return next;
     });
     setSelected(target);
     setFeedback(null);
+  }
+
+  function move(direction: -1 | 1): void {
+    if (selected !== null) {
+      moveFrom(selected, direction);
+    }
   }
 
   function checkOrder(): void {
@@ -165,6 +167,15 @@ export function SortGame({
                     : "bg-muted/50 ring-1 ring-foreground/10 hover:bg-muted",
               )}
               disabled={row.locked}
+              onFocus={() => {
+                setSelected(index);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+                  event.preventDefault();
+                  moveFrom(index, event.key === "ArrowUp" ? -1 : 1);
+                }
+              }}
               onClick={() => {
                 setSelected(index);
               }}
