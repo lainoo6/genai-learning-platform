@@ -18,6 +18,7 @@ import type {
 } from "@/lib/blocks/schema";
 import { simulationBlockSchema } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
+import { reorderSortItems } from "./block-templates";
 
 /**
  * Per-type editing forms for the course editor (P5.1).
@@ -953,11 +954,8 @@ function GameForm({ block, onChange }: FormProps<"game">) {
     });
   }
   function moveItem(index: number, delta: number): void {
-    const items = [...sortedItems];
-    const target = index + delta;
-    if (target < 0 || target >= items.length) return;
-    [items[index], items[target]] = [items[target], items[index]];
-    updateItems(items);
+    if (delta !== -1 && delta !== 1) return;
+    updateItems(reorderSortItems(sortedItems, index, delta));
   }
 
   function switchVariant(variant: "sort" | "match"): void {

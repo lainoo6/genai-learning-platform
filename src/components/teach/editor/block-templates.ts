@@ -1,5 +1,5 @@
 import type { Locale } from "@/i18n/config";
-import type { Block, BlockType } from "@/lib/blocks/schema";
+import type { Block, BlockType, SortItem } from "@/lib/blocks/schema";
 
 /**
  * Starting points for the block picker in the course editor (P5.1).
@@ -73,6 +73,20 @@ function newId(): string {
 }
 
 type Template = () => Block;
+
+export function reorderSortItems(
+  items: readonly SortItem[],
+  index: number,
+  delta: -1 | 1,
+): SortItem[] {
+  const target = index + delta;
+  if (index < 0 || target < 0 || target >= items.length) {
+    return [...items];
+  }
+  const next = [...items];
+  [next[index], next[target]] = [next[target], next[index]];
+  return next.map((item, order) => ({ ...item, order }));
+}
 
 const ENGLISH: Record<BlockType, Template> = {
   reading: () => ({

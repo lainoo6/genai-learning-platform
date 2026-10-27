@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/client";
+import { moveSortRow } from "@/lib/blocks/sort";
 import type { SortItem } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
 
@@ -87,21 +88,12 @@ export function SortGame({
 
   function moveFrom(index: number, direction: -1 | 1): void {
     const slot = freeSlots.indexOf(index);
+    if (slot < 0) return;
     const target = freeSlots[slot + direction];
-    if (slot < 0 || target === undefined) {
-      return;
-    }
+    if (target === undefined) return;
 
     setRows((previous) => {
-      const next = [...previous];
-      const moving = next[index];
-      const displaced = next[target];
-      if (moving === undefined || displaced === undefined) {
-        return previous;
-      }
-      next[index] = displaced;
-      next[target] = moving;
-      return next;
+      return moveSortRow(previous, index, direction);
     });
     setSelected(target);
     setFeedback(null);
