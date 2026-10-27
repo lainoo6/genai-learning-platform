@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
 
   // pdf.js loads its worker and standard-font assets dynamically; bundling it
   // breaks those paths under Turbopack, so keep it as a runtime dependency.
-  serverExternalPackages: ["pdfjs-dist"],
+  serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas"],
 
   experimental: {
     serverActions: {
