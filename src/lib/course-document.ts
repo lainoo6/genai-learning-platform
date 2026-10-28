@@ -11,7 +11,7 @@ import { extractPdfText, extractPptxText } from "@/lib/file-extractor";
  * This is the validation and extraction block that used to live inside
  * `generateCourseFromFileAction`, lifted out unchanged so the repository flow
  * can read an optional document without a second copy. The module pulls in
- * `pdfjs-dist` and `jszip`, so only server actions may import it.
+ * `pdf-parse` and `jszip`, so only server actions may import it.
  */
 
 export type CourseDocumentFailure =

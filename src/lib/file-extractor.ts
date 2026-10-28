@@ -1,5 +1,6 @@
 import JSZip from "jszip";
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { CanvasFactory } from "pdf-parse/worker";
+import { PDFParse } from "pdf-parse";
 
 /**
  * Plain-text extraction for the two upload formats the generator accepts.
@@ -43,51 +44,26 @@ function textRuns(xml: string): string {
 /**
  * Extracts the text layer of every PDF page.
  *
- * `isEvalSupported: false` is required under Next's server runtime: the
- * default evaluates embedded font programs with `new Function`, which is
- * blocked. Fonts are also left unresolved because only the text is needed.
+ * pdf-parse runs pdf.js inside a worker and injects its own polyfills, so it
+ * works under the Node/Vercel server runtime where importing `pdfjs-dist`
+ * directly failed (`Module not found`, missing `DOMMatrix`). The worker entry
+ * must be imported before the main module to register those polyfills, and the
+ * canvas factory supplies the DOM canvas APIs pdf.js expects.
  */
 export async function extractPdfText(bytes: Uint8Array): Promise<string> {
-  // pdf.js transfers (and detaches) the typed array it receives, so hand it a
-  // copy and keep the caller's bytes usable for the PPTX image reader.
-  const data = new Uint8Array(bytes);
-
-  const task = getDocument({
-    data,
-    isEvalSupported: false,
-    disableFontFace: true,
-    useSystemFonts: false,
-    useWorkerFetch: false,
-    verbosity: 0,
+  // pdf.js takes ownership of the data it receives, so pass a copy and keep
+  // the caller's bytes usable for the PPTX image reader.
+  const parser = new PDFParse({
+    data: Buffer.from(bytes),
+    CanvasFactory,
   });
 
-  const pdf = await task.promise;
-
   try {
-    const pages: string[] = [];
-
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-      const page = await pdf.getPage(pageNumber);
-      try {
-        const content = await page.getTextContent();
-        let pageText = "";
-
-        for (const item of content.items) {
-          if (!("str" in item)) continue;
-          pageText += item.str;
-          pageText += item.hasEOL ? "\n" : " ";
-        }
-
-        const normalized = normalizeWhitespace(pageText);
-        if (normalized.length > 0) pages.push(normalized);
-      } finally {
-        page.cleanup();
-      }
-    }
-
-    return pages.join("\n\n");
+    // The default marker is "-- page N of M --"; page breaks are enough here.
+    const result = await parser.getText({ pageJoiner: "\n\n" });
+    return normalizeWhitespace(result.text);
   } finally {
-    await pdf.destroy();
+    await parser.destroy();
   }
 }
 

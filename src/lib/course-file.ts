@@ -4,7 +4,7 @@ import { z } from "zod";
  * Upload contract shared by the generator form and its server action.
  *
  * Deliberately free of Node-only imports so the browser can read the size cap
- * without pulling `pdfjs-dist` or `jszip` into the client bundle.
+ * without pulling `pdf-parse` or `jszip` into the client bundle.
  */
 
 /**

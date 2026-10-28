@@ -4,8 +4,8 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
 
-  // pdf.js loads its worker and standard-font assets dynamically; bundling it
-  // breaks those paths under Turbopack, so keep it as a runtime dependency.
+  // pdf-parse loads its worker and canvas bindings at runtime; bundling them
+  // breaks those paths under Turbopack, so keep them as runtime dependencies.
   serverExternalPackages: ["pdf-parse", "@napi-rs/canvas"],
 
   experimental: {
@@ -22,15 +22,6 @@ const nextConfig: NextConfig = {
             }`,
           ]
         : [],
-    },
-  },
-
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
     },
   },
 };
