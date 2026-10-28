@@ -49,6 +49,9 @@ describe("SortGame learner behavior", () => {
       variant: "sort",
       attempts: 1,
       order: [1, 0, 2],
+      hintsUsed: 0,
+      submission: "first",
+      playthrough: 1,
     });
   });
 
@@ -117,6 +120,46 @@ describe("SortGame learner behavior", () => {
           { text: "First", order: 1 },
         ],
       },
+    });
+  });
+
+  it("shows a correction and records hint use in a retry", () => {
+    const onFinish = vi.fn();
+    const view = render(
+      <I18nProvider locale="en" messages={en}>
+        <SortGame
+          completed={false}
+          items={[
+            { text: "First", order: 0 },
+            { text: "Second", order: 1 },
+          ]}
+          onComplete={vi.fn()}
+          onFinish={onFinish}
+        />
+      </I18nProvider>,
+    );
+    const rows = () => [...view.container.querySelectorAll("ol button")];
+    fireEvent.click(
+      within(view.container).getByRole("button", { name: "Hint" }),
+    );
+    fireEvent.click(
+      within(view.container).getByRole("button", { name: "Check order" }),
+    );
+    expect(view.getByText("Correction: First, Second")).toBeTruthy();
+    fireEvent.click(
+      within(view.container).getByRole("button", { name: "Replay" }),
+    );
+    fireEvent.keyDown(rows()[1], { key: "ArrowUp" });
+    fireEvent.click(
+      within(view.container).getByRole("button", { name: "Check order" }),
+    );
+    expect(onFinish).toHaveBeenLastCalledWith({
+      variant: "sort",
+      attempts: 1,
+      order: [0, 1],
+      hintsUsed: 0,
+      submission: "first",
+      playthrough: 2,
     });
   });
 });

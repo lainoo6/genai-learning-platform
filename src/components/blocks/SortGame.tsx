@@ -76,6 +76,9 @@ export function SortGame({
   const [attempts, setAttempts] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [solved, setSolved] = useState(false);
+  const [hintsUsed, setHintsUsed] = useState(0);
+  const [hint, setHint] = useState<string | null>(null);
+  const [playthrough, setPlaythrough] = useState(1);
 
   /** Positions that can still be moved: everything the check has not locked. */
   const freeSlots = rows
@@ -119,6 +122,9 @@ export function SortGame({
       variant: "sort",
       attempts: taken,
       order: rows.map((row) => row.id),
+      hintsUsed,
+      submission: taken === 1 ? "first" : "retry",
+      playthrough,
     });
 
     if (correct === nextRows.length) {
@@ -128,7 +134,24 @@ export function SortGame({
       return;
     }
 
-    setFeedback(t("block.sort.partial", { correct, total: nextRows.length }));
+    setFeedback(
+      t("block.sort.correction", {
+        order: [...items]
+          .sort((a, b) => a.order - b.order)
+          .map((item) => item.text)
+          .join(", "),
+      }),
+    );
+  }
+
+  function showHint(): void {
+    setHintsUsed((count) => count + 1);
+    onFinish({ kind: "hint", playthrough });
+    setHint(
+      t("block.sort.hint", {
+        first: [...items].sort((a, b) => a.order - b.order)[0]?.text ?? "",
+      }),
+    );
   }
 
   function startOver(): void {
@@ -137,6 +160,9 @@ export function SortGame({
     setAttempts(0);
     setFeedback(null);
     setSolved(false);
+    setHintsUsed(0);
+    setHint(null);
+    setPlaythrough((run) => run + 1);
   }
 
   return (
@@ -144,6 +170,24 @@ export function SortGame({
       <p className="text-xs text-muted-foreground">
         {t("block.sort.instruction")}
       </p>
+      <div
+        aria-label={t("block.sort.progress", {
+          current: rows.filter((row) => row.locked).length,
+          total: rows.length,
+        })}
+        aria-valuemax={rows.length}
+        aria-valuemin={0}
+        aria-valuenow={rows.filter((row) => row.locked).length}
+        className="h-1.5 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+      >
+        <div
+          className="h-full bg-primary transition-[width]"
+          style={{
+            width: `${(rows.filter((row) => row.locked).length / rows.length) * 100}%`,
+          }}
+        />
+      </div>
 
       <ol className="space-y-2">
         {rows.map((row, index) => (
@@ -217,9 +261,12 @@ export function SortGame({
           {t("block.sort.check")}
         </Button>
 
+        <Button disabled={solved} onClick={showHint} variant="ghost">
+          {t("common.hint")}
+        </Button>
         <Button onClick={startOver} variant="ghost">
           <RotateCcw aria-hidden="true" />
-          {t("common.startOver")}
+          {attempts > 0 ? t("common.replay") : t("common.startOver")}
         </Button>
 
         <span className="ml-auto text-xs text-muted-foreground tabular-nums">
@@ -233,8 +280,18 @@ export function SortGame({
             "text-xs",
             solved ? "text-emerald-600" : "text-muted-foreground",
           )}
+          role="status"
         >
           {feedback}
+        </p>
+      )}
+      {hint === null ? null : (
+        <p
+          aria-live="polite"
+          className="text-xs text-muted-foreground"
+          role="status"
+        >
+          {hint}
         </p>
       )}
 

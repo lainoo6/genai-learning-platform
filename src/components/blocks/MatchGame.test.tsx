@@ -52,8 +52,49 @@ describe("MatchGame learner behavior", () => {
         { left: 0, right: 0 },
         { left: 1, right: 1 },
       ],
+      hintsUsed: 0,
+      submission: "retry",
+      playthrough: 1,
     });
     expect(onComplete).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+
+  it("provides a grounded hint and correction while keeping matching available", () => {
+    vi.useFakeTimers();
+    const onFinish = vi.fn();
+    const view = render(
+      <I18nProvider locale="en" messages={en}>
+        <MatchGame
+          completed={false}
+          onComplete={vi.fn()}
+          onFinish={onFinish}
+          pairs={[
+            { left: "One", right: "First" },
+            { left: "Two", right: "Second" },
+          ]}
+        />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(
+      within(view.container).getByRole("button", { name: "Hint" }),
+    );
+    expect(view.getByText("Hint: One → First")).toBeTruthy();
+    const left = within(view.container).getByRole("button", { name: "One" });
+    const second = within(view.container).getByRole("button", { name: "Second" });
+    fireEvent.click(left);
+    fireEvent.click(second);
+    expect(view.getByText("Correction: One → First")).toBeTruthy();
+    vi.advanceTimersByTime(600);
+    expect(onFinish).toHaveBeenLastCalledWith({
+      variant: "match",
+      attempts: 1,
+      choices: [{ left: 0, right: 1 }],
+      hintsUsed: 1,
+      submission: "first",
+      playthrough: 1,
+    });
     vi.useRealTimers();
   });
 });

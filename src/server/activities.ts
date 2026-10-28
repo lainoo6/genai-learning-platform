@@ -23,7 +23,16 @@ export async function submitActivity(
     // A teacher preview is read-only: never create ActivityAttempt or
     // LessonProgress rows while the teacher is looking at the course.
     if (access.preview) return { ok: true as const, id: null };
-    const grade = gradeActivity(access.block, parsed.answer);
+    const grade =
+      parsed.feedback.kind === "hint"
+        ? {
+            score: null,
+            completed: false,
+            passed: null,
+            verification: "ungraded" as const,
+            feedback: parsed.feedback,
+          }
+        : gradeActivity(access.block, parsed.answer);
     const attempt = await persistActivity({
       ...access,
       courseId: access.courseId!,

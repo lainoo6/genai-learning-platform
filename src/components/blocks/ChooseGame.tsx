@@ -28,6 +28,9 @@ export function ChooseGame({
   const [solved, setSolved] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const [hintsUsed, setHintsUsed] = useState(0);
+  const [hint, setHint] = useState<string | null>(null);
+  const [playthrough, setPlaythrough] = useState(1);
 
   function choose(index: number): void {
     if (solved) return;
@@ -35,14 +38,35 @@ export function ChooseGame({
     const correct = options[index]?.correct === true;
     setAttempts(taken);
     setSelected(index);
-    onFinish({ variant: "choose", attempts: taken, option: index });
+    onFinish({
+      variant: "choose",
+      attempts: taken,
+      option: index,
+      hintsUsed,
+      submission: taken === 1 ? "first" : "retry",
+      playthrough,
+    });
 
     if (correct) {
       setSolved(true);
       setNotice(t("block.choose.correct"));
     } else {
-      setNotice(t("block.choose.incorrect"));
+      setNotice(
+        t("block.choose.correction", {
+          answer: options.find((option) => option.correct)?.text ?? "",
+        }),
+      );
     }
+  }
+
+  function showHint(): void {
+    setHintsUsed((count) => count + 1);
+    onFinish({ kind: "hint", playthrough });
+    setHint(
+      t("block.choose.hint", {
+        answer: options.find((option) => option.correct)?.text ?? "",
+      }),
+    );
   }
 
   function startOver(): void {
@@ -50,6 +74,9 @@ export function ChooseGame({
     setSolved(false);
     setAttempts(0);
     setNotice(null);
+    setHintsUsed(0);
+    setHint(null);
+    setPlaythrough((run) => run + 1);
   }
 
   return (
@@ -58,6 +85,22 @@ export function ChooseGame({
       <p className="text-xs text-muted-foreground">
         {t("block.choose.instruction")}
       </p>
+      <div
+        aria-label={t("block.choose.progress", {
+          current: solved ? 1 : 0,
+          total: 1,
+        })}
+        aria-valuemax={1}
+        aria-valuemin={0}
+        aria-valuenow={solved ? 1 : 0}
+        className="h-1.5 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+      >
+        <div
+          className="h-full bg-primary transition-[width]"
+          style={{ width: solved ? "100%" : "0%" }}
+        />
+      </div>
       <div className="grid gap-2">
         {options.map((option, index) => (
           <button
@@ -88,14 +131,34 @@ export function ChooseGame({
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={startOver} variant="outline">
           <RotateCcw aria-hidden="true" />
-          {t("common.startOver")}
+          {attempts > 0 ? t("common.replay") : t("common.startOver")}
         </Button>
         <span className="ml-auto text-xs text-muted-foreground tabular-nums">
           {t("block.choose.attempts", { count: attempts })}
         </span>
       </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button disabled={solved} onClick={showHint} variant="ghost">
+          {t("common.hint")}
+        </Button>
+        {hint === null ? null : (
+          <p
+            aria-live="polite"
+            className="text-xs text-muted-foreground"
+            role="status"
+          >
+            {hint}
+          </p>
+        )}
+      </div>
       {notice === null ? null : (
-        <p className={cn("text-xs", solved ? "text-emerald-600" : "text-muted-foreground")}>
+        <p
+          className={cn(
+            "text-xs",
+            solved ? "text-emerald-600" : "text-muted-foreground",
+          )}
+          role="status"
+        >
           {notice}
         </p>
       )}

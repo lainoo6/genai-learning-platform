@@ -80,6 +80,9 @@ export function MatchGame({
   const [attempts, setAttempts] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [solved, setSolved] = useState(false);
+  const [hintsUsed, setHintsUsed] = useState(0);
+  const [hint, setHint] = useState<string | null>(null);
+  const [playthrough, setPlaythrough] = useState(1);
 
   const resetTimerRef = useRef<number | null>(null);
 
@@ -110,11 +113,6 @@ export function MatchGame({
       return;
     }
 
-    // Ignore further picks while the previous miss is still shaking.
-    if (resetTimerRef.current !== null) {
-      return;
-    }
-
     const taken = attempts + 1;
     setAttempts(taken);
     choicesRef.current.push({ left: pickedLeft, right: index });
@@ -122,6 +120,9 @@ export function MatchGame({
       variant: "match",
       attempts: taken,
       choices: [...choicesRef.current],
+      hintsUsed,
+      submission: taken === 1 ? "first" : "retry",
+      playthrough,
     });
 
     if (pickedLeft === index) {
@@ -140,12 +141,25 @@ export function MatchGame({
     }
 
     setWrongRight(index);
-    setNotice(t("block.match.wrong"));
+    setNotice(
+      t("block.match.correction", {
+        left: pairs[pickedLeft].left,
+        right: pairs[pickedLeft].right,
+      }),
+    );
+    setPickedLeft(null);
     resetTimerRef.current = window.setTimeout(() => {
       resetTimerRef.current = null;
       setWrongRight(null);
-      setPickedLeft(null);
     }, WRONG_PAIR_DELAY_MS);
+  }
+
+  function showHint(): void {
+    const next = pairs.find((_, index) => !matched.includes(index));
+    if (!next) return;
+    setHintsUsed((count) => count + 1);
+    onFinish({ kind: "hint", playthrough });
+    setHint(t("block.match.hint", { left: next.left, right: next.right }));
   }
 
   function startOver(): void {
@@ -160,6 +174,9 @@ export function MatchGame({
     setAttempts(0);
     setNotice(null);
     setSolved(false);
+    setHintsUsed(0);
+    setHint(null);
+    setPlaythrough((run) => run + 1);
   }
 
   return (
@@ -167,6 +184,22 @@ export function MatchGame({
       <p className="text-xs text-muted-foreground">
         {t("block.match.instruction")}
       </p>
+      <div
+        aria-label={t("block.match.progress", {
+          current: matched.length,
+          total: pairs.length,
+        })}
+        aria-valuemax={pairs.length}
+        aria-valuemin={0}
+        aria-valuenow={matched.length}
+        className="h-1.5 overflow-hidden rounded-full bg-muted"
+        role="progressbar"
+      >
+        <div
+          className="h-full bg-primary transition-[width]"
+          style={{ width: `${(matched.length / pairs.length) * 100}%` }}
+        />
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <ul className="space-y-2">
@@ -242,9 +275,12 @@ export function MatchGame({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <Button disabled={solved} onClick={showHint} variant="ghost">
+          {t("common.hint")}
+        </Button>
         <Button onClick={startOver} variant="outline">
           <RotateCcw aria-hidden="true" />
-          {t("common.startOver")}
+          {attempts > 0 ? t("common.replay") : t("common.startOver")}
         </Button>
         <span className="ml-auto text-xs text-muted-foreground tabular-nums">
           {t("block.match.attempts", {
@@ -261,8 +297,18 @@ export function MatchGame({
             "text-xs",
             solved ? "text-emerald-600" : "text-muted-foreground",
           )}
+          role="status"
         >
           {notice}
+        </p>
+      )}
+      {hint === null ? null : (
+        <p
+          aria-live="polite"
+          className="text-xs text-muted-foreground"
+          role="status"
+        >
+          {hint}
         </p>
       )}
 

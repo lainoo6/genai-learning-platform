@@ -42,13 +42,57 @@ describe("ChooseGame learner behavior", () => {
       variant: "choose",
       attempts: 1,
       option: 0,
+      hintsUsed: 0,
+      submission: "first",
+      playthrough: 1,
     });
     expect(onFinish).toHaveBeenNthCalledWith(2, {
       variant: "choose",
       attempts: 2,
       option: 1,
+      hintsUsed: 0,
+      submission: "retry",
+      playthrough: 1,
     });
     expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("shows a correction and records a hint without penalizing the retry", () => {
+    const onFinish = vi.fn();
+    const view = render(
+      <I18nProvider locale="en" messages={en}>
+        <ChooseGame
+          completed={false}
+          onComplete={vi.fn()}
+          onFinish={onFinish}
+          options={[
+            { text: "Distractor", correct: false },
+            { text: "Correct", correct: true },
+          ]}
+          prompt="Pick one"
+        />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(
+      within(view.container).getByRole("button", { name: "Hint" }),
+    );
+    fireEvent.click(
+      within(view.container).getByRole("button", { name: "Distractor" }),
+    );
+
+    expect(view.getByText("Correction: Correct")).toBeTruthy();
+    fireEvent.click(
+      within(view.container).getByRole("button", { name: "Correct" }),
+    );
+    expect(onFinish).toHaveBeenLastCalledWith({
+      variant: "choose",
+      attempts: 2,
+      option: 1,
+      hintsUsed: 1,
+      submission: "retry",
+      playthrough: 1,
+    });
   });
 
   it("lets instructors edit the prompt and choose exactly one correct option", () => {

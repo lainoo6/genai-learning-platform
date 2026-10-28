@@ -24,7 +24,13 @@ export function GameBlock({
   const { payload } = block;
 
   function handleFinish(stats: Record<string, unknown>): void {
-    onAttempt?.({ answer: stats });
+    onAttempt?.({
+      answer: stats,
+      feedback:
+        stats.kind === "hint"
+          ? { kind: "hint", playthrough: stats.playthrough }
+          : {},
+    });
   }
 
   if (payload.variant === "sort") {
