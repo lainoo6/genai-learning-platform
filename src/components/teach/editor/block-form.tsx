@@ -958,7 +958,7 @@ function GameForm({ block, onChange }: FormProps<"game">) {
     updateItems(reorderSortItems(sortedItems, index, delta));
   }
 
-  function switchVariant(variant: "sort" | "match"): void {
+  function switchVariant(variant: "sort" | "match" | "choose"): void {
     if (payload.variant === variant) {
       return;
     }
@@ -974,7 +974,38 @@ function GameForm({ block, onChange }: FormProps<"game">) {
                   text: pair.left,
                   order: index,
                 }))
-              : payload.items,
+              : payload.variant === "choose"
+                ? payload.options.map((option, index) => ({
+                    text: option.text,
+                    order: index,
+                  }))
+                : payload.items,
+        },
+      });
+      return;
+    }
+
+    if (variant === "choose") {
+      onChange({
+        ...block,
+        payload: {
+          variant: "choose",
+          prompt:
+            payload.variant === "choose"
+              ? payload.prompt
+              : "Which option best answers the prompt?",
+          options:
+            payload.variant === "choose"
+              ? payload.options
+              : payload.variant === "match"
+                ? payload.pairs.map((pair, index) => ({
+                    text: pair.right,
+                    correct: index === 0,
+                  }))
+                : payload.items.map((item, index) => ({
+                    text: item.text,
+                    correct: index === 0,
+                  })),
         },
       });
       return;
@@ -987,7 +1018,12 @@ function GameForm({ block, onChange }: FormProps<"game">) {
         pairs:
           payload.variant === "sort"
             ? payload.items.map((item) => ({ left: item.text, right: "" }))
-            : payload.pairs,
+            : payload.variant === "choose"
+              ? payload.options.map((option) => ({
+                  left: option.text,
+                  right: "",
+                }))
+              : payload.pairs,
       },
     });
   }
@@ -998,12 +1034,19 @@ function GameForm({ block, onChange }: FormProps<"game">) {
         <select
           className={SELECT_CLASS}
           onChange={(event) => {
-            switchVariant(event.target.value === "match" ? "match" : "sort");
+            switchVariant(
+              event.target.value === "match"
+                ? "match"
+                : event.target.value === "choose"
+                  ? "choose"
+                  : "sort",
+            );
           }}
           value={payload.variant}
         >
           <option value="sort">{t("editor.game.sort")}</option>
           <option value="match">{t("editor.game.match")}</option>
+          <option value="choose">{t("editor.game.choose")}</option>
         </select>
       </Field>
 
@@ -1070,7 +1113,7 @@ function GameForm({ block, onChange }: FormProps<"game">) {
             }}
           />
         </div>
-      ) : (
+      ) : payload.variant === "match" ? (
         <div className="space-y-1.5">
           <p className="text-xs font-medium">{t("editor.game.pairs")}</p>
           {payload.pairs.map((pair, index) => (
@@ -1141,6 +1184,88 @@ function GameForm({ block, onChange }: FormProps<"game">) {
                 payload: {
                   variant: "match",
                   pairs: [...payload.pairs, { left: "", right: "" }],
+                },
+              });
+            }}
+          />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Field label={t("editor.game.prompt")}>
+            <Input
+              aria-label={t("editor.game.prompt")}
+              onChange={(event) => {
+                onChange({
+                  ...block,
+                  payload: { ...payload, prompt: event.target.value },
+                });
+              }}
+              value={payload.prompt}
+            />
+          </Field>
+          <p className="text-xs font-medium">{t("editor.game.options")}</p>
+          {payload.options.map((option, index) => (
+            <div className="flex items-center gap-1.5" key={`option-${String(index)}`}>
+              <Input
+                aria-label={t("editor.game.optionAria", { index: index + 1 })}
+                onChange={(event) => {
+                  onChange({
+                    ...block,
+                    payload: {
+                      ...payload,
+                      options: payload.options.map((entry, position) =>
+                        position === index ? { ...entry, text: event.target.value } : entry,
+                      ),
+                    },
+                  });
+                }}
+                placeholder={t("editor.game.optionPlaceholder")}
+                value={option.text}
+              />
+              <label className="flex items-center gap-1 text-xs">
+                <input
+                  checked={option.correct}
+                  onChange={() => {
+                    onChange({
+                      ...block,
+                      payload: {
+                        ...payload,
+                        options: payload.options.map((entry, position) => ({
+                          ...entry,
+                          correct: position === index,
+                        })),
+                      },
+                    });
+                  }}
+                  type="radio"
+                />
+                {t("editor.game.correct")}
+              </label>
+              <IconButton
+                disabled={payload.options.length <= 2}
+                label={t("editor.game.optionRemove")}
+                onClick={() => {
+                  onChange({
+                    ...block,
+                    payload: {
+                      ...payload,
+                      options: payload.options.filter((_, position) => position !== index),
+                    },
+                  });
+                }}
+              >
+                <Trash2 aria-hidden="true" />
+              </IconButton>
+            </div>
+          ))}
+          <AddRow
+            label={t("editor.game.optionAdd")}
+            onClick={() => {
+              onChange({
+                ...block,
+                payload: {
+                  ...payload,
+                  options: [...payload.options, { text: "", correct: false }],
                 },
               });
             }}

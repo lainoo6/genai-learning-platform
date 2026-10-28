@@ -184,6 +184,12 @@ export const matchPairSchema = z.object({
   right: z.string().min(1),
 });
 
+/** One option in a `choose` game. Exactly one option must be correct. */
+export const chooseOptionSchema = z.object({
+  text: z.string().min(1),
+  correct: z.boolean(),
+});
+
 const sortGamePayloadSchema = z.object({
   variant: z.literal("sort"),
   items: z.array(sortItemSchema).min(2),
@@ -194,13 +200,25 @@ const matchGamePayloadSchema = z.object({
   pairs: z.array(matchPairSchema).min(2),
 });
 
-/** `game` — either an ordering puzzle or a matching puzzle. */
+const chooseGamePayloadSchema = z
+  .object({
+    variant: z.literal("choose"),
+    prompt: z.string().min(1),
+    options: z.array(chooseOptionSchema).min(2),
+  })
+  .refine((payload) => payload.options.filter((option) => option.correct).length === 1, {
+    message: "Choose games must have exactly one correct option.",
+    path: ["options"],
+  });
+
+/** `game` — an ordering, matching, or single-correct choice puzzle. */
 export const gameBlockSchema = blockBaseSchema
   .extend({
     type: z.literal("game"),
     payload: z.discriminatedUnion("variant", [
       sortGamePayloadSchema,
       matchGamePayloadSchema,
+      chooseGamePayloadSchema,
     ]),
   })
   .refine(
@@ -353,6 +371,7 @@ export type CodingTest = z.infer<typeof codingTestSchema>;
 export type CodingBlock = z.infer<typeof codingBlockSchema>;
 export type SortItem = z.infer<typeof sortItemSchema>;
 export type MatchPair = z.infer<typeof matchPairSchema>;
+export type ChooseOption = z.infer<typeof chooseOptionSchema>;
 export type GameBlock = z.infer<typeof gameBlockSchema>;
 export type SimulationOption = z.infer<typeof simulationOptionSchema>;
 export type SimulationNode = z.infer<typeof simulationNodeSchema>;

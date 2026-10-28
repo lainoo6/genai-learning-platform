@@ -183,7 +183,8 @@ export function gradeActivity(
           feedback: { correct, total: order.length },
         };
       }
-      const choices = z
+      if (p.variant === "match") {
+        const choices = z
         .array(
           z.object({
             left: z.number().int().nonnegative(),
@@ -192,27 +193,42 @@ export function gradeActivity(
         )
         .min(1)
         .max(2000)
-        .parse(answer.choices);
-      if (
-        choices.some(
-          (c) => c.left >= p.pairs.length || c.right >= p.pairs.length,
+          .parse(answer.choices);
+        if (
+          choices.some(
+            (c) => c.left >= p.pairs.length || c.right >= p.pairs.length,
+          )
         )
-      )
-        throw new Error("Invalid pair.");
-      const matched = new Set(
-        choices.filter((c) => c.left === c.right).map((c) => c.left),
-      );
+          throw new Error("Invalid pair.");
+        const matched = new Set(
+          choices.filter((c) => c.left === c.right).map((c) => c.left),
+        );
+        return {
+          ...base,
+          score: normalizedScore(matched.size, 0, p.pairs.length),
+          completed: matched.size === p.pairs.length,
+          passed: matched.size === p.pairs.length,
+          verification: "server",
+          feedback: {
+            correct: matched.size,
+            total: p.pairs.length,
+            attempts: choices.length,
+          },
+        };
+      }
+      const option = z
+        .number()
+        .int()
+        .nonnegative()
+        .max(p.options.length - 1)
+        .parse(answer.option);
+      const correct = p.options[option]?.correct === true;
       return {
         ...base,
-        score: normalizedScore(matched.size, 0, p.pairs.length),
-        completed: matched.size === p.pairs.length,
-        passed: matched.size === p.pairs.length,
+        completed: correct,
+        passed: correct,
         verification: "server",
-        feedback: {
-          correct: matched.size,
-          total: p.pairs.length,
-          attempts: choices.length,
-        },
+        feedback: { correct, selected: option },
       };
     }
     case "reflection": {

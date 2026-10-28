@@ -33,11 +33,17 @@ function blockText(block: Block): string {
     case "coding":
       return `${block.payload.problem} ${block.payload.hints.join(" ")}`;
     case "game":
-      return block.payload.variant === "sort"
-        ? block.payload.items.map((item) => item.text).join(" ")
-        : block.payload.pairs
-            .map((pair) => `${pair.left} ${pair.right}`)
-            .join(" ");
+      if (block.payload.variant === "sort") {
+        return block.payload.items.map((item) => item.text).join(" ");
+      }
+      if (block.payload.variant === "match") {
+        return block.payload.pairs
+          .map((pair) => `${pair.left} ${pair.right}`)
+          .join(" ");
+      }
+      return `${block.payload.prompt} ${block.payload.options
+        .map((option) => option.text)
+        .join(" ")}`;
     case "simulation":
       return `${block.payload.intro} ${block.payload.nodes[block.payload.start]?.text ?? ""}`;
     case "roleplay":

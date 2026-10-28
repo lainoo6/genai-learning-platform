@@ -193,6 +193,34 @@ const validRoleplay = {
 };
 
 describe("blockSchema", () => {
+  it("requires exactly one correct option in choose games", () => {
+    const base = {
+      id: "choose",
+      title: "Choose",
+      type: "game" as const,
+      payload: {
+        variant: "choose" as const,
+        prompt: "Pick one",
+        options: [
+          { text: "A", correct: true },
+          { text: "B", correct: false },
+        ],
+      },
+    };
+    expect(blockSchema.safeParse(base).success).toBe(true);
+    expect(
+      blockSchema.safeParse({
+        ...base,
+        payload: {
+          ...base.payload,
+          options: base.payload.options.map((option) => ({
+            ...option,
+            correct: true,
+          })),
+        },
+      }).success,
+    ).toBe(false);
+  });
   it("accepts a reading block without an image", () => {
     expect(blockSchema.safeParse(validReading).success).toBe(true);
   });

@@ -110,6 +110,29 @@ describe("activity grades", () => {
       }).completed,
     ).toBe(false);
   });
+  it("grades a choose challenge from the saved correct option", () => {
+    const block: Block = {
+      id: "c",
+      title: "Choose",
+      type: "game",
+      payload: {
+        variant: "choose",
+        prompt: "Which is safest?",
+        options: [
+          { text: "Distractor", correct: false },
+          { text: "Correct", correct: true },
+        ],
+      },
+    };
+    expect(gradeActivity(block, { option: 0 }).completed).toBe(false);
+    expect(gradeActivity(block, { option: 1 })).toMatchObject({
+      completed: true,
+      passed: true,
+      score: null,
+      verification: "server",
+    });
+    expect(() => gradeActivity(block, { option: 3 })).toThrow();
+  });
   it("labels browser coding tests as unverified and rejects stale test sets", () => {
     const block: Block = {
       id: "c",

@@ -4,6 +4,7 @@ import type {
   BlockRenderProps,
   GameBlock as GameBlockData,
 } from "@/lib/blocks/schema";
+import { ChooseGame } from "./ChooseGame";
 import { MatchGame } from "./MatchGame";
 import { SortGame } from "./SortGame";
 
@@ -35,6 +36,20 @@ export function GameBlock({
           onComplete(block.id);
         }}
         onFinish={handleFinish}
+      />
+    );
+  }
+
+  if (payload.variant === "choose") {
+    return (
+      <ChooseGame
+        completed={completed}
+        onComplete={() => {
+          onComplete(block.id);
+        }}
+        onFinish={handleFinish}
+        options={payload.options}
+        prompt={payload.prompt}
       />
     );
   }
