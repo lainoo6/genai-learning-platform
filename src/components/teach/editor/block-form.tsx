@@ -940,6 +940,7 @@ function CodingForm({ block, onChange }: FormProps<"coding">) {
 function GameForm({ block, onChange }: FormProps<"game">) {
   const t = useT();
   const payload = block.payload;
+  const feedback = payload.feedback ?? { correct: "", incorrect: "" };
   const sortedItems =
     payload.variant === "sort"
       ? [...payload.items].sort((a, b) => a.order - b.order)
@@ -962,12 +963,17 @@ function GameForm({ block, onChange }: FormProps<"game">) {
     if (payload.variant === variant) {
       return;
     }
+    const metadata = {
+      ...(payload.feedback === undefined ? {} : { feedback: payload.feedback }),
+      ...(payload.hint === undefined ? {} : { hint: payload.hint }),
+    };
 
     if (variant === "sort") {
       onChange({
         ...block,
         payload: {
           variant: "sort",
+          ...metadata,
           items:
             payload.variant === "match"
               ? payload.pairs.map((pair, index) => ({
@@ -990,6 +996,7 @@ function GameForm({ block, onChange }: FormProps<"game">) {
         ...block,
         payload: {
           variant: "choose",
+          ...metadata,
           prompt:
             payload.variant === "choose"
               ? payload.prompt
@@ -1015,6 +1022,7 @@ function GameForm({ block, onChange }: FormProps<"game">) {
       ...block,
       payload: {
         variant: "match",
+        ...metadata,
         pairs:
           payload.variant === "sort"
             ? payload.items.map((item) => ({ left: item.text, right: "" }))
@@ -1030,6 +1038,51 @@ function GameForm({ block, onChange }: FormProps<"game">) {
 
   return (
     <div className="space-y-3">
+      <Field label="Correct feedback">
+        <Textarea
+          value={feedback.correct}
+          onChange={(event) => {
+            onChange({
+              ...block,
+              payload: {
+                ...payload,
+                feedback: { ...feedback, correct: event.target.value },
+              },
+            });
+          }}
+          placeholder="Explain why the answer is correct."
+          rows={2}
+        />
+      </Field>
+      <Field label="Incorrect feedback">
+        <Textarea
+          value={feedback.incorrect}
+          onChange={(event) => {
+            onChange({
+              ...block,
+              payload: {
+                ...payload,
+                feedback: { ...feedback, incorrect: event.target.value },
+              },
+            });
+          }}
+          placeholder="Guide the learner toward the lesson concept."
+          rows={2}
+        />
+      </Field>
+      <Field hint="Optional" label="Hint">
+        <Input
+          value={payload.hint ?? ""}
+          onChange={(event) => {
+            const hint = event.target.value;
+            onChange({
+              ...block,
+              payload: { ...payload, hint: hint.length > 0 ? hint : undefined },
+            });
+          }}
+          placeholder="Offer a small nudge without giving away the answer."
+        />
+      </Field>
       <Field label={t("editor.game.variant")}>
         <select
           className={SELECT_CLASS}

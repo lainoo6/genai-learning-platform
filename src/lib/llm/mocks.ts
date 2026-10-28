@@ -5,6 +5,7 @@ import { mockExplain } from "@/lib/llm/prompts/explain";
 import { mockLesson } from "@/lib/llm/prompts/lesson";
 import { mockCourseOutline } from "@/lib/llm/prompts/outline";
 import { mockRoleplayFeedback } from "@/lib/llm/prompts/roleplay";
+import { mockGameActivity } from "@/lib/llm/prompts/game-activity";
 
 /**
  * Registration point for the canned LLM fallbacks (P4.4, P4.5, P4.6, P4.7).
@@ -23,6 +24,9 @@ export function registerLlmMocks(): void {
   registerMock("roleplay-feedback", ({ prompt }) => mockRoleplayFeedback(prompt));
   registerMock("course-outline", ({ prompt }) => mockCourseOutline(prompt));
   registerMock("course-lesson", ({ prompt }) => mockLesson(prompt));
+  registerMock("course-game-activity", ({ prompt }) =>
+    mockGameActivity(readContentLanguage(prompt)),
+  );
   registerMock("learner-course", ({ prompt }) =>
     mockLearnerCourse(readContentLanguage(prompt)),
   );

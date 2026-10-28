@@ -29,6 +29,11 @@ import {
   lessonPrompt,
   type GeneratedLesson,
 } from "@/lib/llm/prompts/lesson";
+import {
+  gameActivityPrompt,
+  generatedGameActivitySchema,
+  type GeneratedGameActivity,
+} from "@/lib/llm/prompts/game-activity";
 import type { Translator } from "@/i18n/translate";
 import { prisma } from "@/lib/prisma";
 
@@ -51,6 +56,10 @@ export type OutlineResult =
 
 export type LessonResult =
   | { ok: true; lesson: GeneratedLesson }
+  | { ok: false; error: string };
+
+export type GameActivityResult =
+  | { ok: true; activity: GeneratedGameActivity }
   | { ok: false; error: string };
 
 export type SaveDraftResult =
@@ -82,6 +91,14 @@ const lessonInputSchema = z.object({
   lessonNumber: z.number().int().min(1).max(12),
   lessonCount: z.number().int().min(1).max(12),
 });
+
+const gameActivityInputSchema = z.object({
+  lessonTitle: z.string().trim().min(2).max(120),
+  objectives: z.string().trim().min(1).max(1200),
+  sourceContent: z.string().trim().min(20).max(20_000),
+});
+
+export type GameActivityInput = z.input<typeof gameActivityInputSchema>;
 
 export type LessonInput = z.input<typeof lessonInputSchema>;
 
@@ -306,6 +323,36 @@ export async function generateLessonBlocks(
     });
 
     return { ok: true, lesson };
+  } catch (error: unknown) {
+    return { ok: false, error: describeFailure("lesson", error, t) };
+  }
+}
+
+/** Generates the five-Challenge practice activity for an authored lesson. */
+export async function generateGameActivity(
+  input: GameActivityInput,
+): Promise<GameActivityResult> {
+  const { locale, t } = await getI18n();
+  const parsedInput = gameActivityInputSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { ok: false, error: t("server.teach.lessonInvalid") };
+  }
+
+  const instructor = await requireInstructor(t);
+  if (!instructor.ok) return { ok: false, error: instructor.error };
+
+  registerLlmMocks();
+  const language = contentLanguageFromLocale(locale);
+  const prompt = gameActivityPrompt({ ...parsedInput.data, language });
+
+  try {
+    const activity = await generateJson(generatedGameActivitySchema, prompt, {
+      usage: "course-game-activity",
+      userId: instructor.userId,
+      input: parsedInput.data,
+      temperature: 0.4,
+    });
+    return { ok: true, activity };
   } catch (error: unknown) {
     return { ok: false, error: describeFailure("lesson", error, t) };
   }

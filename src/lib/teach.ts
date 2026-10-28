@@ -107,6 +107,7 @@ const editorCourseSelect = {
   audience: true,
   difficulty: true,
   coverEmoji: true,
+  language: true,
   status: true,
   source: true,
   createdById: true,
@@ -174,6 +175,7 @@ export async function loadEditorCourse(
     audience: row.audience,
     difficulty: row.difficulty,
     coverEmoji: row.coverEmoji,
+    language: row.language === "zh" ? "zh" : "en",
     status: row.status,
     source: row.source,
     createdById: row.createdById,
@@ -194,4 +196,3 @@ export async function loadEditorCourse(
     })),
   };
 }
-

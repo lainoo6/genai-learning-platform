@@ -155,6 +155,11 @@ const ENGLISH: Record<BlockType, Template> = {
     title: "Put the steps in order",
     payload: {
       variant: "sort",
+      feedback: {
+        correct: "Correct. The steps follow the lesson's sequence.",
+        incorrect: "Not quite. Review the order described in the lesson.",
+      },
+      hint: "Look for the sequence in the lesson.",
       items: [
         { text: "First step", order: 0 },
         { text: "Second step", order: 1 },
@@ -280,6 +285,11 @@ const CHINESE: Record<BlockType, Template> = {
     title: "把步骤排好序",
     payload: {
       variant: "sort",
+      feedback: {
+        correct: "正确，这个顺序符合课程内容。",
+        incorrect: "还不对，请复习课程中介绍的顺序。",
+      },
+      hint: "找出课程中描述的先后顺序。",
       items: [
         { text: "第一步", order: 0 },
         { text: "第二步", order: 1 },

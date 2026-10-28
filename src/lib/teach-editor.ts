@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { blockListSchema, type Block } from "@/lib/blocks/schema";
+import { validateGameActivity } from "@/lib/game-activity";
+import type { ContentLanguage } from "@/lib/llm/language";
 
 /**
  * Shared model for the instructor course editor (P5.1).
@@ -86,6 +88,7 @@ export type EditorCourse = {
   audience: string;
   difficulty: string;
   coverEmoji: string;
+  language: ContentLanguage;
   status: EditorStatus;
   source: EditorSource;
   createdById: string;
@@ -139,6 +142,7 @@ export const editorCourseSchema = z
     audience: z.string().trim().min(1, "Say who the course is for.").max(80),
     difficulty: z.enum(EDITOR_DIFFICULTIES),
     coverEmoji: z.string().trim().min(1, "Pick a cover emoji.").max(8),
+    language: z.enum(["en", "zh"]).default("en"),
     status: z.enum(EDITOR_STATUSES),
     modules: z.array(editorModuleSchema).min(1, "A course needs a module."),
   })
@@ -160,6 +164,32 @@ export const editorCourseSchema = z
         message: "Add at least one block before publishing this course.",
       });
     }
+
+    if (course.status === "PUBLISHED") {
+      for (const [moduleIndex, courseModule] of course.modules.entries()) {
+        for (const [lessonIndex, lesson] of courseModule.lessons.entries()) {
+          const challenges = lesson.blocks.filter(
+            (block): block is Extract<Block, { type: "game" }> =>
+              block.type === "game",
+          );
+          if (challenges.length === 0) continue;
+          const result = validateGameActivity(challenges, course.language);
+          if (!result.ok) {
+            ctx.addIssue({
+              code: "custom",
+              path: [
+                "modules",
+                moduleIndex,
+                "lessons",
+                lessonIndex,
+                "blocks",
+              ],
+              message: result.errors.join(" "),
+            });
+          }
+        }
+      }
+    }
   });
 
-export type EditorCourseInput = z.infer<typeof editorCourseSchema>;
+export type EditorCourseInput = z.input<typeof editorCourseSchema>;

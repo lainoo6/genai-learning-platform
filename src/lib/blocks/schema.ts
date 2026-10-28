@@ -190,15 +190,26 @@ export const chooseOptionSchema = z.object({
   correct: z.boolean(),
 });
 
+/** Instructional guidance attached to a generated Game Challenge. */
+export const gameFeedbackSchema = z.object({
+  correct: z.string().min(1),
+  incorrect: z.string().min(1),
+});
+
+const gameChallengeMetadataSchema = z.object({
+  feedback: gameFeedbackSchema.optional(),
+  hint: z.string().min(1).optional(),
+});
+
 const sortGamePayloadSchema = z.object({
   variant: z.literal("sort"),
   items: z.array(sortItemSchema).min(2),
-});
+}).merge(gameChallengeMetadataSchema);
 
 const matchGamePayloadSchema = z.object({
   variant: z.literal("match"),
   pairs: z.array(matchPairSchema).min(2),
-});
+}).merge(gameChallengeMetadataSchema);
 
 const chooseGamePayloadSchema = z
   .object({
@@ -206,6 +217,7 @@ const chooseGamePayloadSchema = z
     prompt: z.string().min(1),
     options: z.array(chooseOptionSchema).min(2),
   })
+  .merge(gameChallengeMetadataSchema)
   .refine((payload) => payload.options.filter((option) => option.correct).length === 1, {
     message: "Choose games must have exactly one correct option.",
     path: ["options"],
