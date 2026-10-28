@@ -69,13 +69,12 @@ export async function saveCourse(
     };
   }
 
-  const draft = parsed.data;
-
   const course = await prisma.course.findUnique({
     where: { id: courseId },
     select: {
       id: true,
       createdById: true,
+      language: true,
       modules: { select: { id: true, lessons: { select: { id: true } } } },
     },
   });
@@ -89,6 +88,18 @@ export async function saveCourse(
   if (course.createdById !== user.id) {
     return { ok: false, error: t("server.editor.notOwner") };
   }
+
+  const persistedDraft = editorCourseSchema.safeParse({
+    ...input,
+    language: course.language === "zh" ? "zh" : "en",
+  });
+  if (!persistedDraft.success) {
+    return {
+      ok: false,
+      error: `Nothing was saved. ${describeIssues(persistedDraft.error)}`,
+    };
+  }
+  const draft = persistedDraft.data;
 
   const existingModuleIds = new Set(
     course.modules.map((courseModule) => courseModule.id),

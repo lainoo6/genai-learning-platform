@@ -5,6 +5,7 @@ import {
   validateGameActivity,
   type GameActivity,
 } from "./game-activity";
+import { mockGameActivity } from "./llm/prompts/game-activity";
 
 const challenge = (index: number): GameActivity[number] => ({
   id: `challenge-${index}`,
@@ -28,10 +29,16 @@ const challenge = (index: number): GameActivity[number] => ({
 
 describe("game activity validation", () => {
   it("accepts five complete challenges in one locale", () => {
-    const activity = Array.from({ length: 5 }, (_, index) => challenge(index));
+    const activity = mockGameActivity("en");
 
     expect(gameActivitySchema.safeParse(activity).success).toBe(true);
     expect(validateGameActivity(activity, "en")).toEqual({ ok: true });
+  });
+
+  it("requires Sort, Match, and Choose formats", () => {
+    const activity = Array.from({ length: 5 }, (_, index) => challenge(index));
+
+    expect(validateGameActivity(activity, "en").ok).toBe(false);
   });
 
   it("rejects an incomplete activity and missing instructional feedback", () => {

@@ -288,6 +288,7 @@ function toCourseInput(course: EditorCourse): EditorCourseInput {
     // the enum is rejected by the schema with a readable message.
     difficulty: course.difficulty as EditorDifficulty,
     coverEmoji: course.coverEmoji,
+    language: course.language,
     status: course.status,
     modules: course.modules.map((courseModule) => ({
       id: courseModule.id,

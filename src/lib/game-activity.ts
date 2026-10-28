@@ -46,6 +46,11 @@ export function validateGameActivity(
   }
 
   const errors: string[] = [];
+  const variants = new Set(parsed.data.map((block) => block.payload.variant));
+  for (const variant of ["sort", "match", "choose"] as const) {
+    if (!variants.has(variant))
+      errors.push(`The activity needs at least one ${variant} Challenge.`);
+  }
   for (const [index, block] of parsed.data.entries()) {
     const payload = block.payload;
     if (payload.variant === "choose" && payload.options.filter((option) => !option.correct).length < 2)
