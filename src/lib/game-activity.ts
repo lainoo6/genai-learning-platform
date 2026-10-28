@@ -30,10 +30,24 @@ function hasLatin(value: string): boolean {
 
 function stringsFor(block: GameBlock): string[] {
   const payload = block.payload;
-  if (payload.variant === "sort") return [block.title, ...payload.items.map((item) => item.text)];
+  const mediaText =
+    payload.supportingMedia?.decorative === true
+      ? []
+      : [payload.supportingMedia?.altText ?? ""];
+  if (payload.variant === "sort")
+    return [block.title, ...payload.items.map((item) => item.text), ...mediaText];
   if (payload.variant === "match")
-    return [block.title, ...payload.pairs.flatMap((pair) => [pair.left, pair.right])];
-  return [block.title, payload.prompt, ...payload.options.map((option) => option.text)];
+    return [
+      block.title,
+      ...payload.pairs.flatMap((pair) => [pair.left, pair.right]),
+      ...mediaText,
+    ];
+  return [
+    block.title,
+    payload.prompt,
+    ...payload.options.map((option) => option.text),
+    ...mediaText,
+  ];
 }
 
 export function validateGameActivity(

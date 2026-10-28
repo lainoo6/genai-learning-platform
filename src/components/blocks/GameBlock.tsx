@@ -5,12 +5,49 @@ import { useEffect, useState } from "react";
 import type {
   BlockRenderProps,
   GameBlock as GameBlockData,
+  SupportingMedia,
 } from "@/lib/blocks/schema";
 import { useT } from "@/i18n/client";
 import { loadLatestGamePlaythrough } from "@/server/activities";
 import { ChooseGame } from "./ChooseGame";
 import { MatchGame } from "./MatchGame";
 import { SortGame } from "./SortGame";
+
+function SupportingMediaView({
+  media,
+}: {
+  media: SupportingMedia | undefined;
+}) {
+  if (media === undefined) return null;
+
+  return media.kind === "image" ? (
+    /* eslint-disable-next-line @next/next/no-img-element -- media URLs are instructor-approved content */
+    <img
+      alt={media.decorative ? "" : media.altText}
+      className="mb-4 max-h-64 w-full rounded-lg object-contain"
+      src={media.url}
+    />
+  ) : (
+    <video
+      aria-label={media.decorative ? undefined : media.altText}
+      className="mb-4 max-h-64 w-full rounded-lg"
+      controls
+      muted
+      onSeeking={(event) => {
+        if (event.currentTarget.currentTime > 5) event.currentTarget.currentTime = 5;
+      }}
+      onTimeUpdate={(event) => {
+        if (event.currentTarget.currentTime >= 5) {
+          event.currentTarget.pause();
+          event.currentTarget.currentTime = 5;
+        }
+      }}
+      playsInline
+      preload="metadata"
+      src={media.url}
+    />
+  );
+}
 
 export type GameRecovery = {
   attempts: Array<{ answer: Record<string, unknown>; completed: boolean }>;
@@ -48,6 +85,8 @@ export function GameBlock({
     return <p className="text-sm text-muted-foreground">{t("block.renderer.saving")}</p>;
   }
 
+  const supportingMedia = payload.supportingMedia;
+
   function handleFinish(stats: Record<string, unknown>): void {
     onAttempt?.({
       answer: stats,
@@ -60,42 +99,51 @@ export function GameBlock({
 
   if (payload.variant === "sort") {
     return (
-      <SortGame
-        completed={completed}
-        items={payload.items}
-        onComplete={() => {
-          onComplete(block.id);
-        }}
-        onFinish={handleFinish}
-        recovery={recovery}
-      />
+      <>
+        <SupportingMediaView media={supportingMedia} />
+        <SortGame
+          completed={completed}
+          items={payload.items}
+          onComplete={() => {
+            onComplete(block.id);
+          }}
+          onFinish={handleFinish}
+          recovery={recovery}
+        />
+      </>
     );
   }
 
   if (payload.variant === "choose") {
     return (
-      <ChooseGame
+      <>
+        <SupportingMediaView media={supportingMedia} />
+        <ChooseGame
+          completed={completed}
+          onComplete={() => {
+            onComplete(block.id);
+          }}
+          onFinish={handleFinish}
+          options={payload.options}
+          prompt={payload.prompt}
+          recovery={recovery}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <SupportingMediaView media={supportingMedia} />
+      <MatchGame
         completed={completed}
         onComplete={() => {
           onComplete(block.id);
         }}
         onFinish={handleFinish}
-        options={payload.options}
-        prompt={payload.prompt}
+        pairs={payload.pairs}
         recovery={recovery}
       />
-    );
-  }
-
-  return (
-    <MatchGame
-      completed={completed}
-      onComplete={() => {
-        onComplete(block.id);
-      }}
-      onFinish={handleFinish}
-      pairs={payload.pairs}
-      recovery={recovery}
-    />
+    </>
   );
 }

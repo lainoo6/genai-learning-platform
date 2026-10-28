@@ -81,4 +81,69 @@ describe("game activity validation", () => {
     expect(validateGameActivity([ambiguous, ...Array.from({ length: 4 }, (_, i) => challenge(i + 1))], "en").ok).toBe(false);
     expect(validateGameActivity(mixed, "en").ok).toBe(false);
   });
+
+  it("requires approved, moderated, accessible supporting media", () => {
+    const activity = mockGameActivity("en");
+    activity[0].payload.supportingMedia = {
+      kind: "image",
+      url: "https://example.com/diagram.png",
+      approvalStatus: "approved",
+      moderationStatus: "passed",
+      provenance: {
+        source: "model-generated",
+        model: "image-model-v1",
+        generatedAt: "2026-10-28T12:00:00.000Z",
+      },
+      altText: "A diagram showing the sequence",
+      decorative: false,
+    };
+
+    expect(validateGameActivity(activity, "en")).toEqual({ ok: true });
+
+    const invalid = {
+      ...activity[0],
+      payload: {
+        ...activity[0].payload,
+        supportingMedia: {
+          ...activity[0].payload.supportingMedia,
+          approvalStatus: "pending",
+          moderationStatus: "pending",
+          altText: undefined,
+          decorative: false,
+        },
+      },
+    };
+    expect(validateGameActivity([invalid, ...activity.slice(1)], "en").ok).toBe(
+      false,
+    );
+  });
+
+  it("caps animations at five seconds and keeps challenge text independent", () => {
+    const activity = mockGameActivity("en");
+    activity[1].payload.supportingMedia = {
+      kind: "animation",
+      url: "https://example.com/sequence.mp4",
+      approvalStatus: "approved",
+      moderationStatus: "passed",
+      provenance: { source: "instructor-provided" },
+      altText: "The sequence in motion",
+      decorative: false,
+      durationSeconds: 5,
+    };
+    expect(validateGameActivity(activity, "en")).toEqual({ ok: true });
+
+    const overLimit = {
+      ...activity[1],
+      payload: {
+        ...activity[1].payload,
+        supportingMedia: {
+          ...activity[1].payload.supportingMedia,
+          durationSeconds: 5.1,
+        },
+      },
+    };
+    expect(validateGameActivity([activity[0], overLimit, ...activity.slice(2)], "en").ok).toBe(
+      false,
+    );
+  });
 });

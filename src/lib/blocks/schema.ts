@@ -196,9 +196,38 @@ export const gameFeedbackSchema = z.object({
   incorrect: z.string().min(1),
 });
 
+const supportingMediaBaseSchema = z.object({
+  url: z
+    .string()
+    .min(1)
+    .refine((value) => value.startsWith("/") || /^https?:\/\//u.test(value), {
+      message: "Supporting media URL must be an absolute URL or public path.",
+    }),
+  approvalStatus: z.enum(["approved", "pending", "rejected"]),
+  moderationStatus: z.enum(["passed", "pending", "failed"]),
+  provenance: z.object({
+    source: z.enum(["model-generated", "instructor-provided"]),
+    model: z.string().min(1).optional(),
+    generatedAt: z.string().datetime().optional(),
+  }),
+  altText: z.string().min(1).optional(),
+  decorative: z.boolean(),
+});
+
+export const supportingMediaSchema = z.discriminatedUnion("kind", [
+  supportingMediaBaseSchema.extend({
+    kind: z.literal("image"),
+  }),
+  supportingMediaBaseSchema.extend({
+    kind: z.literal("animation"),
+    durationSeconds: z.number().positive().max(5),
+  }),
+]);
+
 const gameChallengeMetadataSchema = z.object({
   feedback: gameFeedbackSchema.optional(),
   hint: z.string().min(1).optional(),
+  supportingMedia: supportingMediaSchema.optional(),
 });
 
 const sortGamePayloadSchema = z.object({
@@ -239,7 +268,43 @@ export const gameBlockSchema = blockBaseSchema
       new Set(block.payload.items.map((item) => item.order)).size ===
         block.payload.items.length,
     { message: "Sort items must all carry a distinct order value." },
-  );
+  )
+  .superRefine((block, ctx) => {
+    const media = block.payload.supportingMedia;
+    if (media === undefined) return;
+    if (media.approvalStatus !== "approved") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["payload", "supportingMedia", "approvalStatus"],
+        message: "Supporting media requires instructor approval.",
+      });
+    }
+    if (media.moderationStatus !== "passed") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["payload", "supportingMedia", "moderationStatus"],
+        message: "Supporting media must pass safety moderation.",
+      });
+    }
+    if (!media.decorative && media.altText === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["payload", "supportingMedia", "altText"],
+        message: "Supporting media needs editable alt text or a decorative designation.",
+      });
+    }
+    if (
+      media.provenance.source === "model-generated" &&
+      (media.provenance.model === undefined ||
+        media.provenance.generatedAt === undefined)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["payload", "supportingMedia", "provenance"],
+        message: "Model-generated media needs model and generation timestamp provenance.",
+      });
+    }
+  });
 
 /** One choice offered by a simulation node. */
 export const simulationOptionSchema = z.object({
@@ -384,6 +449,7 @@ export type CodingBlock = z.infer<typeof codingBlockSchema>;
 export type SortItem = z.infer<typeof sortItemSchema>;
 export type MatchPair = z.infer<typeof matchPairSchema>;
 export type ChooseOption = z.infer<typeof chooseOptionSchema>;
+export type SupportingMedia = z.infer<typeof supportingMediaSchema>;
 export type GameBlock = z.infer<typeof gameBlockSchema>;
 export type SimulationOption = z.infer<typeof simulationOptionSchema>;
 export type SimulationNode = z.infer<typeof simulationNodeSchema>;
