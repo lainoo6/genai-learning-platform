@@ -12,7 +12,7 @@ const m = vi.hoisted(() => ({
   enrollment: vi.fn(),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: { $transaction: m.transaction } }));
-import { persistActivity } from "./activity-store";
+import { contentVersionForBlock, persistActivity } from "./activity-store";
 import type { Block } from "./blocks/schema";
 const block: Block = {
   id: "g",
@@ -149,5 +149,31 @@ describe("atomic activity persistence", () => {
     expect(m.create.mock.calls[0][0].data.result.activitySnapshot.title).toBe(
       "Revised game",
     );
+  });
+
+  it("keeps the first substantive submission first-pass after a replay marker", async () => {
+    m.list.mockResolvedValue([
+      {
+        blockId: "g",
+        result: {
+          contentVersion: contentVersionForBlock(block),
+          playthroughId: "run-2",
+          answer: { kind: "replay" },
+        },
+      },
+    ]);
+
+    await persistActivity({
+      ...input,
+      answer: {
+        ...input.answer,
+        playthroughId: "run-2",
+      },
+    });
+
+    expect(m.create.mock.calls[0][0].data.result).toMatchObject({
+      firstPass: true,
+      attemptNumber: 2,
+    });
   });
 });

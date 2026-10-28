@@ -11,6 +11,11 @@ export function contentVersionForBlock(block: Block): string {
     .slice(0, 16);
 }
 
+function isSubstantiveAttempt(row: { result: unknown }): boolean {
+  const previous = row.result as { answer?: { kind?: unknown } };
+  return previous.answer?.kind !== "hint" && previous.answer?.kind !== "replay";
+}
+
 export async function persistActivity(input: {
   userId: string;
   courseId: string;
@@ -72,11 +77,7 @@ export async function persistActivity(input: {
             contentVersion,
             playthroughId,
             attemptNumber: priorPlaythroughAttempts.length + 1,
-            firstPass:
-              !isSignal && priorPlaythroughAttempts.every((row) => {
-                const previous = row.result as { answer?: { kind?: unknown } };
-                return previous.answer?.kind === "hint";
-              }),
+            firstPass: !isSignal && !priorPlaythroughAttempts.some(isSubstantiveAttempt),
             answer,
             ...grade,
             activitySnapshot: block,
@@ -154,11 +155,7 @@ export async function persistActivity(input: {
             contentVersion,
             playthroughId,
             attemptNumber: priorPlaythroughAttempts.length + 1,
-            firstPass:
-              !isSignal && priorPlaythroughAttempts.every((row) => {
-                const previous = row.result as { answer?: { kind?: unknown } };
-                return previous.answer?.kind === "hint";
-              }),
+            firstPass: !isSignal && !priorPlaythroughAttempts.some(isSubstantiveAttempt),
             ...grade.feedback,
           } as Prisma.InputJsonValue;
           await tx.engagementEvent.create({

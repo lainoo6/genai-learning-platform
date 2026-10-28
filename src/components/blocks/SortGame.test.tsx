@@ -162,4 +162,65 @@ describe("SortGame learner behavior", () => {
       playthrough: 2,
     }));
   });
+
+  it("renders generated feedback and hint guidance", () => {
+    const view = render(
+      <I18nProvider locale="en" messages={en}>
+        <SortGame
+          completed={false}
+          feedback={{
+            correct: "Generated success guidance",
+            incorrect: "Generated correction guidance",
+          }}
+          hint="Generated hint guidance"
+          items={[
+            { text: "First", order: 0 },
+            { text: "Second", order: 1 },
+          ]}
+          onComplete={vi.fn()}
+          onFinish={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(within(view.container).getByRole("button", { name: "Hint" }));
+    expect(view.getByText("Generated hint guidance")).toBeTruthy();
+    fireEvent.click(
+      within(view.container).getByRole("button", { name: "Check order" }),
+    );
+    expect(view.getByText("Generated correction guidance")).toBeTruthy();
+  });
+
+  it("does not restore a replay marker as a learner attempt", async () => {
+    const onFinish = vi.fn();
+    const view = render(
+      <I18nProvider locale="en" messages={en}>
+        <SortGame
+          completed={false}
+          items={[
+            { text: "First", order: 0 },
+            { text: "Second", order: 1 },
+          ]}
+          onComplete={vi.fn()}
+          onFinish={onFinish}
+          recovery={{
+            attempts: [{ answer: { kind: "replay" }, completed: false }],
+            playthroughId: "recovered-run",
+          }}
+        />
+      </I18nProvider>,
+    );
+
+    await view.findByText("Attempts: 0");
+    fireEvent.keyDown(
+      [...view.container.querySelectorAll("ol button")][1],
+      { key: "ArrowUp" },
+    );
+    fireEvent.click(
+      within(view.container).getByRole("button", { name: "Check order" }),
+    );
+    expect(onFinish).toHaveBeenCalledWith(
+      expect.objectContaining({ playthroughId: "recovered-run" }),
+    );
+  });
 });

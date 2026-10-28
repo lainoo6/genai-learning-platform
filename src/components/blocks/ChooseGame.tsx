@@ -8,6 +8,7 @@ import { useT } from "@/i18n/client";
 import type { ChooseOption } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
 import type { GameRecovery } from "./GameBlock";
+import { isGameSubmission } from "./game-recovery";
 
 export type ChooseGameProps = {
   prompt: string;
@@ -15,6 +16,8 @@ export type ChooseGameProps = {
   completed: boolean;
   onComplete: () => void;
   onFinish: (payload: Record<string, unknown>) => void;
+  feedback?: { correct: string; incorrect: string };
+  hint?: string;
   recovery?: GameRecovery;
 };
 
@@ -24,6 +27,8 @@ export function ChooseGame({
   completed,
   onComplete,
   onFinish,
+  feedback: generatedFeedback,
+  hint: generatedHint,
   recovery,
 }: ChooseGameProps) {
   const t = useT();
@@ -38,8 +43,10 @@ export function ChooseGame({
 
   useEffect(() => {
     const attempts = recovery?.attempts ?? [];
+    if (typeof recovery?.playthroughId === "string")
+      playthroughId.current = recovery.playthroughId;
     if (attempts.length === 0) return;
-    const submissions = attempts.filter((attempt) => attempt.answer.kind !== "hint");
+    const submissions = attempts.filter((attempt) => isGameSubmission(attempt.answer));
     const latest = submissions.at(-1);
     if (!latest) return;
     const answer = latest.answer;
@@ -76,12 +83,13 @@ export function ChooseGame({
 
     if (correct) {
       setSolved(true);
-      setNotice(t("block.choose.correct"));
+      setNotice(generatedFeedback?.correct ?? t("block.choose.correct"));
     } else {
       setNotice(
-        t("block.choose.correction", {
-          answer: options.find((option) => option.correct)?.text ?? "",
-        }),
+        generatedFeedback?.incorrect ??
+          t("block.choose.correction", {
+            answer: options.find((option) => option.correct)?.text ?? "",
+          }),
       );
     }
   }
@@ -94,9 +102,10 @@ export function ChooseGame({
       playthroughId: playthroughId.current,
     });
     setHint(
-      t("block.choose.hint", {
-        answer: options.find((option) => option.correct)?.text ?? "",
-      }),
+      generatedHint ??
+        t("block.choose.hint", {
+          answer: options.find((option) => option.correct)?.text ?? "",
+        }),
     );
   }
 

@@ -8,6 +8,7 @@ import { useT } from "@/i18n/client";
 import type { MatchPair } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
 import type { GameRecovery } from "./GameBlock";
+import { isGameSubmission } from "./game-recovery";
 
 /**
  * Match game: connect each item on the left with its partner on the right.
@@ -45,6 +46,8 @@ export type MatchGameProps = {
   onComplete: () => void;
   /** Raised once per run so the page can record the finish event. */
   onFinish: (payload: Record<string, unknown>) => void;
+  feedback?: { correct: string; incorrect: string };
+  hint?: string;
   recovery?: GameRecovery;
 };
 
@@ -60,6 +63,8 @@ export function MatchGame({
   completed,
   onComplete,
   onFinish,
+  feedback: generatedFeedback,
+  hint: generatedHint,
   recovery,
 }: MatchGameProps) {
   /** Indices of the right-hand column, in the order they are displayed. */
@@ -90,8 +95,10 @@ export function MatchGame({
 
   useEffect(() => {
     const attempts = recovery?.attempts ?? [];
+    if (typeof recovery?.playthroughId === "string")
+      playthroughId.current = recovery.playthroughId;
     if (attempts.length === 0) return;
-    const submissions = attempts.filter((attempt) => attempt.answer.kind !== "hint");
+    const submissions = attempts.filter((attempt) => isGameSubmission(attempt.answer));
     const latest = submissions.at(-1);
     if (!latest) return;
     const answer = latest.answer;
@@ -179,7 +186,8 @@ export function MatchGame({
       if (nextMatched.length === pairs.length) {
         setSolved(true);
         setNotice(
-          t("block.match.solved", { count: pairs.length, attempts: taken }),
+          generatedFeedback?.correct ??
+            t("block.match.solved", { count: pairs.length, attempts: taken }),
         );
       }
       return;
@@ -187,10 +195,11 @@ export function MatchGame({
 
     setWrongRight(index);
     setNotice(
-      t("block.match.correction", {
-        left: pairs[pickedLeft].left,
-        right: pairs[pickedLeft].right,
-      }),
+      generatedFeedback?.incorrect ??
+        t("block.match.correction", {
+          left: pairs[pickedLeft].left,
+          right: pairs[pickedLeft].right,
+        }),
     );
     setPickedLeft(null);
     resetTimerRef.current = window.setTimeout(() => {
@@ -208,7 +217,9 @@ export function MatchGame({
       playthrough,
       playthroughId: playthroughId.current,
     });
-    setHint(t("block.match.hint", { left: next.left, right: next.right }));
+    setHint(
+      generatedHint ?? t("block.match.hint", { left: next.left, right: next.right }),
+    );
   }
 
   function startOver(): void {

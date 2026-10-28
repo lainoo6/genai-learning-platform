@@ -16,6 +16,7 @@ import { moveSortRow } from "@/lib/blocks/sort";
 import type { SortItem } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
 import type { GameRecovery } from "./GameBlock";
+import { isGameSubmission } from "./game-recovery";
 
 /**
  * Sort game: put the rows in the right order.
@@ -36,6 +37,8 @@ export type SortGameProps = {
   onComplete: () => void;
   /** Raised once per run so the page can record the finish event. */
   onFinish: (payload: Record<string, unknown>) => void;
+  feedback?: { correct: string; incorrect: string };
+  hint?: string;
   recovery?: GameRecovery;
 };
 
@@ -64,6 +67,8 @@ export function SortGame({
   completed,
   onComplete,
   onFinish,
+  feedback: generatedFeedback,
+  hint: generatedHint,
   recovery,
 }: SortGameProps) {
   /** `order` values in the order the rows should end up in. */
@@ -86,8 +91,10 @@ export function SortGame({
 
   useEffect(() => {
     const attempts = recovery?.attempts ?? [];
+    if (typeof recovery?.playthroughId === "string")
+      playthroughId.current = recovery.playthroughId;
     if (attempts.length === 0) return;
-    const submissions = attempts.filter((attempt) => attempt.answer.kind !== "hint");
+    const submissions = attempts.filter((attempt) => isGameSubmission(attempt.answer));
     const latest = submissions.at(-1);
     if (!latest) return;
     const answer = latest.answer;
@@ -173,17 +180,20 @@ export function SortGame({
     if (correct === nextRows.length) {
       setSolved(true);
       setSelected(null);
-      setFeedback(t("block.sort.solved", { attempts: taken }));
+      setFeedback(
+        generatedFeedback?.correct ?? t("block.sort.solved", { attempts: taken }),
+      );
       return;
     }
 
     setFeedback(
-      t("block.sort.correction", {
-        order: [...items]
-          .sort((a, b) => a.order - b.order)
-          .map((item) => item.text)
-          .join(", "),
-      }),
+      generatedFeedback?.incorrect ??
+        t("block.sort.correction", {
+          order: [...items]
+            .sort((a, b) => a.order - b.order)
+            .map((item) => item.text)
+            .join(", "),
+        }),
     );
   }
 
@@ -195,9 +205,10 @@ export function SortGame({
       playthroughId: playthroughId.current,
     });
     setHint(
-      t("block.sort.hint", {
-        first: [...items].sort((a, b) => a.order - b.order)[0]?.text ?? "",
-      }),
+      generatedHint ??
+        t("block.sort.hint", {
+          first: [...items].sort((a, b) => a.order - b.order)[0]?.text ?? "",
+        }),
     );
   }
 

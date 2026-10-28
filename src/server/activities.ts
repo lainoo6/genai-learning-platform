@@ -107,7 +107,6 @@ export async function loadLatestGamePlaythrough(
       const rows = await prisma.activityAttempt.findMany({
         where: { userId: access.userId, lessonId, blockId },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: 100,
       });
       const version = contentVersionForBlock(access.block);
       const latest = rows.find((row) => {

@@ -51,6 +51,7 @@ function SupportingMediaView({
 
 export type GameRecovery = {
   attempts: Array<{ answer: Record<string, unknown>; completed: boolean }>;
+  playthroughId?: string | null;
 };
 
 /**
@@ -75,8 +76,11 @@ export function GameBlock({
   useEffect(() => {
     if (context.preview) return;
     void loadLatestGamePlaythrough(context.lessonId, block.id).then((result) => {
-      if (result.ok && result.attempts.length > 0)
-        setRecovery({ attempts: result.attempts });
+      if (result.ok && (result.attempts.length > 0 || result.playthroughId))
+        setRecovery({
+          attempts: result.attempts,
+          playthroughId: result.playthroughId,
+        });
       setRecoveryReady(true);
     });
   }, [block.id, context.lessonId, context.preview]);
@@ -103,6 +107,8 @@ export function GameBlock({
         <SupportingMediaView media={supportingMedia} />
         <SortGame
           completed={completed}
+          feedback={payload.feedback}
+          hint={payload.hint}
           items={payload.items}
           onComplete={() => {
             onComplete(block.id);
@@ -126,6 +132,8 @@ export function GameBlock({
           onFinish={handleFinish}
           options={payload.options}
           prompt={payload.prompt}
+          feedback={payload.feedback}
+          hint={payload.hint}
           recovery={recovery}
         />
       </>
@@ -142,6 +150,8 @@ export function GameBlock({
         }}
         onFinish={handleFinish}
         pairs={payload.pairs}
+        feedback={payload.feedback}
+        hint={payload.hint}
         recovery={recovery}
       />
     </>
