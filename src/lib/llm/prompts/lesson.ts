@@ -35,7 +35,7 @@ export const generatedLessonSchema = z
   .object({
     title: z.string().min(2).max(120),
     estimatedMinutes: z.number().int().min(3).max(45),
-    blocks: z.array(blockSchema).min(3).max(6),
+    blocks: z.array(blockSchema).min(3).max(11),
   })
   .superRefine((lesson, ctx) => {
     const ids = lesson.blocks.map((block) => block.id);
@@ -173,6 +173,10 @@ export function lessonPrompt(request: LessonRequest): string {
     "- Flashcards: six to eight cards. Game: five pairs (match) or five items",
     "  with distinct orders 1-5 (sort). Slides: four to six pages, each with a",
     "  plain-text narration of 40 to 80 words.",
+    "- When the lesson includes game practice, generate a five-Challenge Game",
+    "  Activity using Sort, Match, and Choose formats. Each Challenge needs",
+    "  deterministic answer metadata, correct and incorrect feedback, and an",
+    "  optional hint. Choose Challenges need at least two plausible distractors.",
     "- Coding: `starter` is runnable JavaScript that declares the function the",
     "  learner must fix; every test `expression` is a boolean expression",
     "  evaluated after the code runs, for example reverse(\"abc\") === \"cba\".",

@@ -1,25 +1,10 @@
 import { z } from "zod";
 
-import {
-  gameBlockSchema,
-  type GameBlock,
-} from "@/lib/blocks/schema";
+import { gameBlockSchema, type GameBlock } from "@/lib/blocks/schema";
 import type { ContentLanguage } from "@/lib/llm/language";
 
-const feedbackSchema = z.object({
-  correct: z.string().trim().min(1),
-  incorrect: z.string().trim().min(1),
-});
-
-const challengeMetadataSchema = z.object({
-  feedback: feedbackSchema,
-  hint: z.string().trim().min(1).optional(),
-});
-
-const generatedGameBlockSchema = gameBlockSchema.superRefine((block, ctx) => {
-  const payload = block.payload;
-  const metadata = "feedback" in payload ? payload.feedback : undefined;
-  if (metadata === undefined) {
+export const gameChallengeSchema = gameBlockSchema.superRefine((block, ctx) => {
+  if (block.payload.feedback === undefined) {
     ctx.addIssue({
       code: "custom",
       path: ["payload", "feedback"],
@@ -27,37 +12,6 @@ const generatedGameBlockSchema = gameBlockSchema.superRefine((block, ctx) => {
     });
   }
 });
-
-export const gameChallengeSchema = z.intersection(
-  generatedGameBlockSchema,
-  z.object({
-    type: z.literal("game"),
-    payload: z.union([
-      z.intersection(
-        z.object({
-          variant: z.literal("sort"),
-          items: z.array(z.object({ text: z.string(), order: z.number() })),
-        }),
-        challengeMetadataSchema,
-      ),
-      z.intersection(
-        z.object({
-          variant: z.literal("match"),
-          pairs: z.array(z.object({ left: z.string(), right: z.string() })),
-        }),
-        challengeMetadataSchema,
-      ),
-      z.intersection(
-        z.object({
-          variant: z.literal("choose"),
-          prompt: z.string(),
-          options: z.array(z.object({ text: z.string(), correct: z.boolean() })),
-        }),
-        challengeMetadataSchema,
-      ),
-    ]),
-  }),
-);
 
 export const gameActivitySchema = z.array(gameChallengeSchema).length(5);
 export type GameActivity = z.infer<typeof gameActivitySchema>;
@@ -103,11 +57,17 @@ export function validateGameActivity(
         errors.push(`Challenge ${index + 1} has ambiguous matching keys.`);
     }
 
-    const text = stringsFor(block).join(" ");
-    if ((language === "en" && hasChinese(text)) || (language === "zh" && hasLatin(text)))
-      errors.push(`Challenge ${index + 1} does not match the lesson locale.`);
+      const text = [
+        ...stringsFor(block),
+        block.payload.feedback?.correct ?? "",
+        block.payload.feedback?.incorrect ?? "",
+        block.payload.hint ?? "",
+      ].join(" ");
+      if ((language === "en" && hasChinese(text)) || (language === "zh" && hasLatin(text)))
+        errors.push(`Challenge ${index + 1} does not match the lesson locale.`);
+      if (/(?:click|color|colour|audio-only|sound-only)/iu.test(text))
+        errors.push(`Challenge ${index + 1} contains an inaccessible interaction cue.`);
   }
 
   return errors.length === 0 ? { ok: true } : { ok: false, errors };
 }
-

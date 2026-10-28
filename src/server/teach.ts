@@ -36,6 +36,7 @@ import {
 } from "@/lib/llm/prompts/game-activity";
 import type { Translator } from "@/i18n/translate";
 import { prisma } from "@/lib/prisma";
+import { validateGameActivity } from "@/lib/game-activity";
 
 /**
  * Server actions behind the instructor course wizard (P4.6).
@@ -313,6 +314,31 @@ export async function generateLessonBlocks(
       input: jobInput,
       temperature: 0.5,
     });
+    const activityPrompt = gameActivityPrompt({
+      lessonTitle: request.lessonTitle,
+      objectives: request.lessonSummary,
+      sourceContent: JSON.stringify(
+        lesson.blocks.filter((block) => block.type !== "game"),
+      ).slice(0, 20_000),
+      language,
+    });
+    const activity = await generateJson(
+      generatedGameActivitySchema,
+      activityPrompt,
+      {
+        usage: "course-game-activity",
+        userId: instructor.userId,
+        input: jobInput,
+        temperature: 0.4,
+      },
+    );
+    const activityValidation = validateGameActivity(activity, language);
+    if (!activityValidation.ok) {
+      return {
+        ok: false,
+        error: `Generated activity needs review: ${activityValidation.errors.join(" ")}`,
+      };
+    }
 
     await recordMockJob({
       usage: "course-lesson",
@@ -322,7 +348,16 @@ export async function generateLessonBlocks(
       output: lesson,
     });
 
-    return { ok: true, lesson };
+    return {
+      ok: true,
+      lesson: {
+        ...lesson,
+        blocks: [
+          ...lesson.blocks.filter((block) => block.type !== "game"),
+          ...activity,
+        ],
+      },
+    };
   } catch (error: unknown) {
     return { ok: false, error: describeFailure("lesson", error, t) };
   }
@@ -352,6 +387,13 @@ export async function generateGameActivity(
       input: parsedInput.data,
       temperature: 0.4,
     });
+    const validation = validateGameActivity(activity, language);
+    if (!validation.ok) {
+      return {
+        ok: false,
+        error: `Generated activity needs review: ${validation.errors.join(" ")}`,
+      };
+    }
     return { ok: true, activity };
   } catch (error: unknown) {
     return { ok: false, error: describeFailure("lesson", error, t) };
