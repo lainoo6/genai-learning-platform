@@ -45,14 +45,14 @@ describe("SortGame learner behavior", () => {
     fireEvent.click(
       within(view.container).getByRole("button", { name: "Check order" }),
     );
-    expect(onFinish).toHaveBeenCalledWith({
+    expect(onFinish).toHaveBeenCalledWith(expect.objectContaining({
       variant: "sort",
       attempts: 1,
       order: [1, 0, 2],
       hintsUsed: 0,
       submission: "first",
       playthrough: 1,
-    });
+    }));
   });
 
   it("completes after the learner sorts every row and confirms it", () => {
@@ -153,13 +153,13 @@ describe("SortGame learner behavior", () => {
     fireEvent.click(
       within(view.container).getByRole("button", { name: "Check order" }),
     );
-    expect(onFinish).toHaveBeenLastCalledWith({
+    expect(onFinish).toHaveBeenLastCalledWith(expect.objectContaining({
       variant: "sort",
       attempts: 1,
       order: [0, 1],
       hintsUsed: 0,
       submission: "first",
       playthrough: 2,
-    });
+    }));
   });
 });

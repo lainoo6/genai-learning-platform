@@ -1,12 +1,13 @@
 "use client";
 
 import { Check, RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/client";
 import type { ChooseOption } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
+import type { GameRecovery } from "./GameBlock";
 
 export type ChooseGameProps = {
   prompt: string;
@@ -14,6 +15,7 @@ export type ChooseGameProps = {
   completed: boolean;
   onComplete: () => void;
   onFinish: (payload: Record<string, unknown>) => void;
+  recovery?: GameRecovery;
 };
 
 export function ChooseGame({
@@ -22,6 +24,7 @@ export function ChooseGame({
   completed,
   onComplete,
   onFinish,
+  recovery,
 }: ChooseGameProps) {
   const t = useT();
   const [selected, setSelected] = useState<number | null>(null);
@@ -31,6 +34,29 @@ export function ChooseGame({
   const [hintsUsed, setHintsUsed] = useState(0);
   const [hint, setHint] = useState<string | null>(null);
   const [playthrough, setPlaythrough] = useState(1);
+  const playthroughId = useRef(crypto.randomUUID());
+
+  useEffect(() => {
+    const attempts = recovery?.attempts ?? [];
+    if (attempts.length === 0) return;
+    const submissions = attempts.filter((attempt) => attempt.answer.kind !== "hint");
+    const latest = submissions.at(-1);
+    if (!latest) return;
+    const answer = latest.answer;
+    queueMicrotask(() => {
+      if (typeof answer.option === "number") setSelected(answer.option);
+      setAttempts(
+        typeof answer.attempts === "number" ? answer.attempts : submissions.length,
+      );
+      setHintsUsed(
+        attempts.filter((attempt) => attempt.answer.kind === "hint").length,
+      );
+      setSolved(latest.completed);
+      if (typeof answer.playthrough === "number") setPlaythrough(answer.playthrough);
+      if (typeof answer.playthroughId === "string")
+        playthroughId.current = answer.playthroughId;
+    });
+  }, [recovery]);
 
   function choose(index: number): void {
     if (solved) return;
@@ -45,6 +71,7 @@ export function ChooseGame({
       hintsUsed,
       submission: taken === 1 ? "first" : "retry",
       playthrough,
+      playthroughId: playthroughId.current,
     });
 
     if (correct) {
@@ -61,7 +88,11 @@ export function ChooseGame({
 
   function showHint(): void {
     setHintsUsed((count) => count + 1);
-    onFinish({ kind: "hint", playthrough });
+    onFinish({
+      kind: "hint",
+      playthrough,
+      playthroughId: playthroughId.current,
+    });
     setHint(
       t("block.choose.hint", {
         answer: options.find((option) => option.correct)?.text ?? "",
@@ -76,7 +107,10 @@ export function ChooseGame({
     setNotice(null);
     setHintsUsed(0);
     setHint(null);
+    const nextPlaythroughId = crypto.randomUUID();
     setPlaythrough((run) => run + 1);
+    playthroughId.current = nextPlaythroughId;
+    onFinish({ kind: "replay", playthroughId: nextPlaythroughId });
   }
 
   return (

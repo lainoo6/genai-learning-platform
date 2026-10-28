@@ -8,13 +8,14 @@ import {
   RotateCcw,
   Shuffle,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/client";
 import { moveSortRow } from "@/lib/blocks/sort";
 import type { SortItem } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
+import type { GameRecovery } from "./GameBlock";
 
 /**
  * Sort game: put the rows in the right order.
@@ -35,6 +36,7 @@ export type SortGameProps = {
   onComplete: () => void;
   /** Raised once per run so the page can record the finish event. */
   onFinish: (payload: Record<string, unknown>) => void;
+  recovery?: GameRecovery;
 };
 
 type Row = {
@@ -62,6 +64,7 @@ export function SortGame({
   completed,
   onComplete,
   onFinish,
+  recovery,
 }: SortGameProps) {
   /** `order` values in the order the rows should end up in. */
   const targetOrders = useMemo(
@@ -79,6 +82,44 @@ export function SortGame({
   const [hintsUsed, setHintsUsed] = useState(0);
   const [hint, setHint] = useState<string | null>(null);
   const [playthrough, setPlaythrough] = useState(1);
+  const playthroughId = useRef(crypto.randomUUID());
+
+  useEffect(() => {
+    const attempts = recovery?.attempts ?? [];
+    if (attempts.length === 0) return;
+    const submissions = attempts.filter((attempt) => attempt.answer.kind !== "hint");
+    const latest = submissions.at(-1);
+    if (!latest) return;
+    const answer = latest.answer;
+    if (Array.isArray(answer.order)) {
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const locked = new Set(
+        Array.isArray(answer.locked) ? answer.locked : latest.completed ? answer.order : [],
+      );
+      const recovered = answer.order.flatMap((id) => {
+        const row = byId.get(id);
+        return typeof id === "number" && row
+          ? [{ ...row, locked: locked.has(id) }]
+          : [];
+      });
+      if (recovered.length === rows.length)
+        queueMicrotask(() => setRows(recovered));
+    }
+    queueMicrotask(() => {
+      setAttempts(
+        typeof answer.attempts === "number" ? answer.attempts : submissions.length,
+      );
+      setHintsUsed(
+        attempts.filter((attempt) => attempt.answer.kind === "hint").length,
+      );
+      setSolved(latest.completed);
+      if (typeof answer.playthrough === "number") setPlaythrough(answer.playthrough);
+      if (typeof answer.playthroughId === "string")
+        playthroughId.current = answer.playthroughId;
+    });
+    // `rows` is intentionally the initial local layout used to rebuild a run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recovery]);
 
   /** Positions that can still be moved: everything the check has not locked. */
   const freeSlots = rows
@@ -122,9 +163,11 @@ export function SortGame({
       variant: "sort",
       attempts: taken,
       order: rows.map((row) => row.id),
+      locked: nextRows.filter((row) => row.locked).map((row) => row.id),
       hintsUsed,
       submission: taken === 1 ? "first" : "retry",
       playthrough,
+      playthroughId: playthroughId.current,
     });
 
     if (correct === nextRows.length) {
@@ -146,7 +189,11 @@ export function SortGame({
 
   function showHint(): void {
     setHintsUsed((count) => count + 1);
-    onFinish({ kind: "hint", playthrough });
+    onFinish({
+      kind: "hint",
+      playthrough,
+      playthroughId: playthroughId.current,
+    });
     setHint(
       t("block.sort.hint", {
         first: [...items].sort((a, b) => a.order - b.order)[0]?.text ?? "",
@@ -162,7 +209,10 @@ export function SortGame({
     setSolved(false);
     setHintsUsed(0);
     setHint(null);
+    const nextPlaythroughId = crypto.randomUUID();
     setPlaythrough((run) => run + 1);
+    playthroughId.current = nextPlaythroughId;
+    onFinish({ kind: "replay", playthroughId: nextPlaythroughId });
   }
 
   return (

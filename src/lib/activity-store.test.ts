@@ -73,6 +73,8 @@ describe("atomic activity persistence", () => {
       answer: input.answer,
       activitySnapshot: block,
       score: { normalized: 1 },
+      contentVersion: expect.stringMatching(/^[a-f0-9]{16}$/),
+      firstPass: true,
     });
     expect(m.event.mock.calls.map((c) => c[0].data.type)).toEqual([
       "GAME_FINISH",
@@ -124,5 +126,28 @@ describe("atomic activity persistence", () => {
     m.create.mockRejectedValue(new Error("offline"));
     await expect(persistActivity(input)).rejects.toThrow("offline");
     expect(m.event).not.toHaveBeenCalled();
+  });
+
+  it("keeps a different content version separate from earlier history", async () => {
+    await persistActivity({
+      ...input,
+      answer: { ...input.answer, playthroughId: "run-1" },
+    });
+    const firstVersion = m.create.mock.calls[0][0].data.result.contentVersion;
+    m.create.mockClear();
+    m.list.mockResolvedValue([]);
+
+    await persistActivity({
+      ...input,
+      block: { ...block, title: "Revised game" },
+      answer: { ...input.answer, playthroughId: "run-2" },
+    });
+
+    expect(m.create.mock.calls[0][0].data.result.contentVersion).not.toBe(
+      firstVersion,
+    );
+    expect(m.create.mock.calls[0][0].data.result.activitySnapshot.title).toBe(
+      "Revised game",
+    );
   });
 });

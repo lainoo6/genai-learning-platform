@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/client";
 import type { MatchPair } from "@/lib/blocks/schema";
 import { cn } from "@/lib/utils";
+import type { GameRecovery } from "./GameBlock";
 
 /**
  * Match game: connect each item on the left with its partner on the right.
@@ -44,6 +45,7 @@ export type MatchGameProps = {
   onComplete: () => void;
   /** Raised once per run so the page can record the finish event. */
   onFinish: (payload: Record<string, unknown>) => void;
+  recovery?: GameRecovery;
 };
 
 const CARD_BASE =
@@ -58,6 +60,7 @@ export function MatchGame({
   completed,
   onComplete,
   onFinish,
+  recovery,
 }: MatchGameProps) {
   /** Indices of the right-hand column, in the order they are displayed. */
   const rightOrder = useMemo(
@@ -83,6 +86,47 @@ export function MatchGame({
   const [hintsUsed, setHintsUsed] = useState(0);
   const [hint, setHint] = useState<string | null>(null);
   const [playthrough, setPlaythrough] = useState(1);
+  const playthroughId = useRef(crypto.randomUUID());
+
+  useEffect(() => {
+    const attempts = recovery?.attempts ?? [];
+    if (attempts.length === 0) return;
+    const submissions = attempts.filter((attempt) => attempt.answer.kind !== "hint");
+    const latest = submissions.at(-1);
+    if (!latest) return;
+    const answer = latest.answer;
+    if (Array.isArray(answer.choices)) {
+      const choices = answer.choices.filter(
+        (choice): choice is { left: number; right: number } =>
+          typeof choice === "object" &&
+          choice !== null &&
+          typeof choice.left === "number" &&
+          typeof choice.right === "number",
+      );
+      queueMicrotask(() => {
+        setMatched([
+          ...new Set(
+            choices
+              .filter((choice) => choice.left === choice.right)
+              .map((choice) => choice.left),
+          ),
+        ]);
+        choicesRef.current = choices;
+      });
+    }
+    queueMicrotask(() => {
+      setAttempts(
+        typeof answer.attempts === "number" ? answer.attempts : submissions.length,
+      );
+      setHintsUsed(
+        attempts.filter((attempt) => attempt.answer.kind === "hint").length,
+      );
+      setSolved(latest.completed);
+      if (typeof answer.playthrough === "number") setPlaythrough(answer.playthrough);
+      if (typeof answer.playthroughId === "string")
+        playthroughId.current = answer.playthroughId;
+    });
+  }, [recovery]);
 
   const resetTimerRef = useRef<number | null>(null);
 
@@ -123,6 +167,7 @@ export function MatchGame({
       hintsUsed,
       submission: taken === 1 ? "first" : "retry",
       playthrough,
+      playthroughId: playthroughId.current,
     });
 
     if (pickedLeft === index) {
@@ -158,7 +203,11 @@ export function MatchGame({
     const next = pairs.find((_, index) => !matched.includes(index));
     if (!next) return;
     setHintsUsed((count) => count + 1);
-    onFinish({ kind: "hint", playthrough });
+    onFinish({
+      kind: "hint",
+      playthrough,
+      playthroughId: playthroughId.current,
+    });
     setHint(t("block.match.hint", { left: next.left, right: next.right }));
   }
 
@@ -176,7 +225,10 @@ export function MatchGame({
     setSolved(false);
     setHintsUsed(0);
     setHint(null);
+    const nextPlaythroughId = crypto.randomUUID();
     setPlaythrough((run) => run + 1);
+    playthroughId.current = nextPlaythroughId;
+    onFinish({ kind: "replay", playthroughId: nextPlaythroughId });
   }
 
   return (

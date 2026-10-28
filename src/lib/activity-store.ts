@@ -1,7 +1,15 @@
 import { Prisma } from "@prisma/client";
+import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { Block } from "@/lib/blocks/schema";
 import type { ActivityGrade } from "@/lib/blocks/activity-result";
+
+export function contentVersionForBlock(block: Block): string {
+  return createHash("sha256")
+    .update(JSON.stringify(block))
+    .digest("hex")
+    .slice(0, 16);
+}
 
 export async function persistActivity(input: {
   userId: string;
@@ -23,17 +31,7 @@ export async function persistActivity(input: {
     answer,
     grade,
   } = input;
-  const result = {
-    version: 1,
-    attemptId,
-    activityType: block.type,
-    blockId: block.id,
-    lessonId,
-    courseId,
-    answer,
-    ...grade,
-    activitySnapshot: block,
-  };
+  const contentVersion = contentVersionForBlock(block);
   // Serializable + bounded retry prevents parallel blocks overwriting completedBlocks.
   for (let retry = 0; ; retry++) {
     try {
@@ -44,6 +42,45 @@ export async function persistActivity(input: {
             where: { userId_lessonId_blockId_attemptId: key },
           });
           if (existing) return existing;
+          const previousAttempts = await tx.activityAttempt.findMany({
+            where: { userId, lessonId, blockId: block.id },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          });
+          const playthroughId =
+            typeof answer.playthroughId === "string" &&
+            answer.playthroughId.length > 0
+              ? answer.playthroughId
+              : null;
+          const priorPlaythroughAttempts = previousAttempts.filter((row) => {
+            const previous = row.result as {
+              playthroughId?: unknown;
+              contentVersion?: unknown;
+            };
+            return (
+              previous.contentVersion === contentVersion &&
+              previous.playthroughId === playthroughId
+            );
+          });
+          const isSignal = answer.kind === "hint" || answer.kind === "replay";
+          const result = {
+            version: 1,
+            attemptId,
+            activityType: block.type,
+            blockId: block.id,
+            lessonId,
+            courseId,
+            contentVersion,
+            playthroughId,
+            attemptNumber: priorPlaythroughAttempts.length + 1,
+            firstPass:
+              !isSignal && priorPlaythroughAttempts.every((row) => {
+                const previous = row.result as { answer?: { kind?: unknown } };
+                return previous.answer?.kind === "hint";
+              }),
+            answer,
+            ...grade,
+            activitySnapshot: block,
+          };
           const attempt = await tx.activityAttempt.create({
             data: {
               ...key,
@@ -114,6 +151,14 @@ export async function persistActivity(input: {
             score: grade.score?.normalized ?? null,
             completed: grade.completed,
             passed: grade.passed,
+            contentVersion,
+            playthroughId,
+            attemptNumber: priorPlaythroughAttempts.length + 1,
+            firstPass:
+              !isSignal && priorPlaythroughAttempts.every((row) => {
+                const previous = row.result as { answer?: { kind?: unknown } };
+                return previous.answer?.kind === "hint";
+              }),
             ...grade.feedback,
           } as Prisma.InputJsonValue;
           await tx.engagementEvent.create({

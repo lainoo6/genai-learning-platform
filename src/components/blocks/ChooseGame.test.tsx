@@ -38,22 +38,22 @@ describe("ChooseGame learner behavior", () => {
       within(view.container).getByRole("button", { name: "Mark as complete" }),
     );
 
-    expect(onFinish).toHaveBeenNthCalledWith(1, {
+    expect(onFinish).toHaveBeenNthCalledWith(1, expect.objectContaining({
       variant: "choose",
       attempts: 1,
       option: 0,
       hintsUsed: 0,
       submission: "first",
       playthrough: 1,
-    });
-    expect(onFinish).toHaveBeenNthCalledWith(2, {
+    }));
+    expect(onFinish).toHaveBeenNthCalledWith(2, expect.objectContaining({
       variant: "choose",
       attempts: 2,
       option: 1,
       hintsUsed: 0,
       submission: "retry",
       playthrough: 1,
-    });
+    }));
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
@@ -85,14 +85,14 @@ describe("ChooseGame learner behavior", () => {
     fireEvent.click(
       within(view.container).getByRole("button", { name: "Correct" }),
     );
-    expect(onFinish).toHaveBeenLastCalledWith({
+    expect(onFinish).toHaveBeenLastCalledWith(expect.objectContaining({
       variant: "choose",
       attempts: 2,
       option: 1,
       hintsUsed: 1,
       submission: "retry",
       playthrough: 1,
-    });
+    }));
   });
 
   it("lets instructors edit the prompt and choose exactly one correct option", () => {

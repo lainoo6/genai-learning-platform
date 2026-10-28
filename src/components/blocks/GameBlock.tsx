@@ -1,12 +1,20 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import type {
   BlockRenderProps,
   GameBlock as GameBlockData,
 } from "@/lib/blocks/schema";
+import { useT } from "@/i18n/client";
+import { loadLatestGamePlaythrough } from "@/server/activities";
 import { ChooseGame } from "./ChooseGame";
 import { MatchGame } from "./MatchGame";
 import { SortGame } from "./SortGame";
+
+export type GameRecovery = {
+  attempts: Array<{ answer: Record<string, unknown>; completed: boolean }>;
+};
 
 /**
  * Game block: a thin dispatcher over the two mini-games.
@@ -20,8 +28,25 @@ export function GameBlock({
   completed,
   onAttempt,
   onComplete,
+  context,
 }: BlockRenderProps<GameBlockData>) {
   const { payload } = block;
+  const t = useT();
+  const [recoveryReady, setRecoveryReady] = useState(context.preview === true);
+  const [recovery, setRecovery] = useState<GameRecovery>();
+
+  useEffect(() => {
+    if (context.preview) return;
+    void loadLatestGamePlaythrough(context.lessonId, block.id).then((result) => {
+      if (result.ok && result.attempts.length > 0)
+        setRecovery({ attempts: result.attempts });
+      setRecoveryReady(true);
+    });
+  }, [block.id, context.lessonId, context.preview]);
+
+  if (!recoveryReady) {
+    return <p className="text-sm text-muted-foreground">{t("block.renderer.saving")}</p>;
+  }
 
   function handleFinish(stats: Record<string, unknown>): void {
     onAttempt?.({
@@ -42,6 +67,7 @@ export function GameBlock({
           onComplete(block.id);
         }}
         onFinish={handleFinish}
+        recovery={recovery}
       />
     );
   }
@@ -56,6 +82,7 @@ export function GameBlock({
         onFinish={handleFinish}
         options={payload.options}
         prompt={payload.prompt}
+        recovery={recovery}
       />
     );
   }
@@ -68,6 +95,7 @@ export function GameBlock({
       }}
       onFinish={handleFinish}
       pairs={payload.pairs}
+      recovery={recovery}
     />
   );
 }

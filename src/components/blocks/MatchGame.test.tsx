@@ -44,7 +44,7 @@ describe("MatchGame learner behavior", () => {
       within(view.container).getByRole("button", { name: "Mark as complete" }),
     );
 
-    expect(onFinish).toHaveBeenLastCalledWith({
+    expect(onFinish).toHaveBeenLastCalledWith(expect.objectContaining({
       variant: "match",
       attempts: 3,
       choices: [
@@ -55,7 +55,7 @@ describe("MatchGame learner behavior", () => {
       hintsUsed: 0,
       submission: "retry",
       playthrough: 1,
-    });
+    }));
     expect(onComplete).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });
@@ -87,14 +87,14 @@ describe("MatchGame learner behavior", () => {
     fireEvent.click(second);
     expect(view.getByText("Correction: One → First")).toBeTruthy();
     vi.advanceTimersByTime(600);
-    expect(onFinish).toHaveBeenLastCalledWith({
+    expect(onFinish).toHaveBeenLastCalledWith(expect.objectContaining({
       variant: "match",
       attempts: 1,
       choices: [{ left: 0, right: 1 }],
       hintsUsed: 1,
       submission: "first",
       playthrough: 1,
-    });
+    }));
     vi.useRealTimers();
   });
 });
