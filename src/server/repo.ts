@@ -434,6 +434,13 @@ export async function generateCourseFromRepoAction(
     const result = await generateLearnerCourse({
       topic: topicFromRepo(ref.owner, ref.repo),
       sourceText,
+      repo: {
+        // Canonical repository URL; the branch and subpath live separately.
+        repoUrl: `https://github.com/${ref.owner}/${ref.repo}`,
+        repoBranch: branch,
+        // Only files that were actually read and grounded the course.
+        repoSelectedPaths: selected.files.map((file) => file.path),
+      },
     });
 
     if (!result.ok) {

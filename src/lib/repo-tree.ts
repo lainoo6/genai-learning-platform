@@ -100,6 +100,42 @@ export function flattenFiles(nodes: RepoTreeNode[]): RepoFileNode[] {
   return files;
 }
 
+/**
+ * Every directory path in the tree, in render order. "Expand all" seeds the
+ * expanded set from this, so the collapsed default is simply an empty set.
+ */
+export function collectFolderPaths(nodes: RepoTreeNode[]): string[] {
+  const paths: string[] = [];
+
+  for (const node of nodes) {
+    if (node.kind === "dir") {
+      paths.push(node.path);
+      paths.push(...collectFolderPaths(node.children));
+    }
+  }
+
+  return paths;
+}
+
+/**
+ * Adds or removes one folder from the expanded set. Always returns a new Set so
+ * React sees a state change; callers keep the old set untouched.
+ */
+export function toggleExpandedPath(
+  current: ReadonlySet<string>,
+  path: string,
+): Set<string> {
+  const next = new Set(current);
+
+  if (next.has(path)) {
+    next.delete(path);
+  } else {
+    next.add(path);
+  }
+
+  return next;
+}
+
 /** Compact file size for the tree rows: "512 B", "3.4 KB", "1.2 MB". */
 export function formatBytes(size: number): string {
   if (!Number.isFinite(size) || size < 0) {

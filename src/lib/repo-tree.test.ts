@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { RepoTreeEntry } from "@/lib/github-repo";
-import { buildRepoTree, flattenFiles, formatBytes } from "@/lib/repo-tree";
+import {
+  buildRepoTree,
+  collectFolderPaths,
+  flattenFiles,
+  formatBytes,
+  toggleExpandedPath,
+} from "@/lib/repo-tree";
 
 function entry(path: string, size?: number): RepoTreeEntry {
   return size === undefined
@@ -57,6 +63,44 @@ describe("buildRepoTree", () => {
 
   it("ignores empty paths", () => {
     expect(buildRepoTree([entry("")])).toEqual([]);
+  });
+});
+
+describe("collectFolderPaths", () => {
+  it("lists every directory in render order, parents before children", () => {
+    const tree = buildRepoTree([
+      entry("README.md"),
+      entry("src/app.ts"),
+      entry("src/components/Button.tsx"),
+    ]);
+
+    expect(collectFolderPaths(tree)).toEqual([
+      "src",
+      "src/components",
+    ]);
+  });
+
+  it("returns an empty list when the repository has no folders", () => {
+    expect(collectFolderPaths(buildRepoTree([entry("README.md")]))).toEqual([]);
+  });
+});
+
+describe("toggleExpandedPath", () => {
+  it("expands a collapsed folder and collapses it again", () => {
+    const collapsed = new Set<string>();
+    const expanded = toggleExpandedPath(collapsed, "src");
+
+    expect([...expanded]).toEqual(["src"]);
+    expect(expanded.has("src")).toBe(true);
+    expect(collapsed.size).toBe(0);
+
+    expect(toggleExpandedPath(expanded, "src").has("src")).toBe(false);
+  });
+
+  it("leaves other expanded folders alone", () => {
+    const current = new Set(["src", "tests"]);
+
+    expect([...toggleExpandedPath(current, "src")]).toEqual(["tests"]);
   });
 });
 

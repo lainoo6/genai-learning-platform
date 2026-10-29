@@ -1,5 +1,5 @@
 import { readContentLanguage } from "@/lib/llm/language";
-import { registerMock } from "@/lib/llm/mock";
+import { mockText, registerMock } from "@/lib/llm/mock";
 import { mockLearnerCourse } from "@/lib/llm/prompts/course";
 import { mockExplain } from "@/lib/llm/prompts/explain";
 import { mockLesson } from "@/lib/llm/prompts/lesson";
@@ -36,4 +36,9 @@ export function registerLlmMocks(): void {
   registerMock("repo-analysis", ({ prompt }) =>
     mockRepoAnalysis(repoLabelFromPrompt(prompt)),
   );
+  registerMock("explain-code", () => ({
+    explanation: mockText(
+      "Demo explanation only; no AI analysis of the source file has run. Read the file top to bottom, note its exports, then follow how they are imported elsewhere in the project.",
+    ),
+  }));
 }

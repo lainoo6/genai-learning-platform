@@ -18,6 +18,7 @@ export const LLM_USAGES = [
   "course-lesson",
   "learner-course",
   "repo-analysis",
+  "explain-code",
 ] as const;
 
 export type LlmUsage = (typeof LLM_USAGES)[number];

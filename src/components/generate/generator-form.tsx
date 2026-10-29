@@ -540,6 +540,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
 
                 <div className="max-h-72 overflow-y-auto rounded-lg border p-2">
                   <RepoFileTree
+                    key={`${repoPreview.meta.owner}/${repoPreview.meta.repo}@${repoPreview.meta.branch}`}
                     disabled={isRunning}
                     limitReached={selectionLimitReached}
                     nodes={repoTrees}

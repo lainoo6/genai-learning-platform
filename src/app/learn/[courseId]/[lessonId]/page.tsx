@@ -13,6 +13,7 @@ import { Suspense } from "react";
 
 import { BlockRenderer } from "@/components/blocks/BlockRenderer";
 import { CourseDetail } from "@/components/courses/course-detail";
+import { ExploreSourceButton } from "@/components/learn/explore-source-button";
 import {
   LessonOutline,
   type OutlineModule,
@@ -261,6 +262,13 @@ async function LessonPlayer({ params, searchParams }: LessonPageProps) {
                 total: blocks.length,
               })}
             </Badge>
+            {course.repoUrl !== null ? (
+              <ExploreSourceButton
+                branch={course.repoBranch}
+                filePaths={course.repoSelectedPaths}
+                repoUrl={course.repoUrl}
+              />
+            ) : null}
           </div>
           <Progress
             aria-label={t("lesson.progress")}

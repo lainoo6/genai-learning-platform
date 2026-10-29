@@ -28,6 +28,7 @@ import {
   type ExtractedImage,
 } from "@/lib/ppt-image-extractor";
 import { prisma } from "@/lib/prisma";
+import { MAX_SELECTED_FILES } from "@/lib/repo-tree";
 
 /**
  * Learner self-service course generation (P4.7).
@@ -62,7 +63,33 @@ type GenerateCourseInput = z.input<typeof generateInputSchema> & {
    * existing caller keeps working.
    */
   sourceText?: string;
+  /**
+   * GitHub metadata for repo-generated courses (Phase 4). Also outside the
+   * Zod schema for the same reason: the existing flows never pass it.
+   */
+  repo?: RepoCourseMetadata;
 };
+
+/** Source repository stored on a generated course, used by the code explorer. */
+export type RepoCourseMetadata = {
+  /** Canonical `https://github.com/owner/repo` URL, without `/tree/...`. */
+  repoUrl: string;
+  repoBranch: string;
+  /** Repo-relative paths that were actually read into the course prompt. */
+  repoSelectedPaths: string[];
+};
+
+/**
+ * A server action is a public endpoint, so the optional repository metadata is
+ * re-validated even though `repo.ts` already checked it.
+ */
+const repoMetadataSchema = z.object({
+  repoUrl: z.string().trim().min(1).max(500),
+  repoBranch: z.string().trim().min(1).max(200),
+  repoSelectedPaths: z
+    .array(z.string().trim().min(1).max(500))
+    .max(MAX_SELECTED_FILES),
+});
 
 const deleteInputSchema = z.string().min(1);
 
@@ -287,6 +314,13 @@ export async function generateLearnerCourse(
   const sourceText =
     typeof input?.sourceText === "string" ? input.sourceText : "";
 
+  const parsedRepo =
+    input.repo === undefined ? null : repoMetadataSchema.safeParse(input.repo);
+  if (parsedRepo !== null && !parsedRepo.success) {
+    return { ok: false, error: t("server.generate.failed") };
+  }
+  const repo = parsedRepo?.data ?? null;
+
   registerLlmMocks();
 
   try {
@@ -314,6 +348,9 @@ export async function generateLearnerCourse(
         status: "PUBLISHED",
         source: "LEARNER",
         createdById: userId,
+        repoUrl: repo?.repoUrl ?? null,
+        repoBranch: repo?.repoBranch ?? null,
+        repoSelectedPaths: repo?.repoSelectedPaths ?? [],
         modules: {
           create: [
             {

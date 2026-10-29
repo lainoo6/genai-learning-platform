@@ -67,6 +67,9 @@ export type CourseWithLessons = Pick<
   | "source"
   | "status"
   | "createdById"
+  | "repoUrl"
+  | "repoBranch"
+  | "repoSelectedPaths"
 > & {
   modules: CourseModule[];
 };
@@ -84,6 +87,9 @@ const courseWithLessonsSelect = {
   source: true,
   status: true,
   createdById: true,
+  repoUrl: true,
+  repoBranch: true,
+  repoSelectedPaths: true,
   modules: {
     orderBy: { order: "asc" },
     select: {
@@ -132,6 +138,9 @@ function toCourseWithLessons(row: CourseRow): CourseWithLessons {
     source: row.source,
     status: row.status,
     createdById: row.createdById,
+    repoUrl: row.repoUrl,
+    repoBranch: row.repoBranch,
+    repoSelectedPaths: row.repoSelectedPaths,
     modules: row.modules.map((courseModule) => ({
       id: courseModule.id,
       title: courseModule.title,
