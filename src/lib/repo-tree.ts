@@ -154,3 +154,87 @@ export function formatBytes(size: number): string {
   const megabytes = kilobytes / 1024;
   return `${megabytes < 10 ? megabytes.toFixed(1) : Math.round(megabytes)} MB`;
 }
+
+/** Paths sent with an AI explanation: enough context without a tree dump. */
+export const MAX_EXPLAIN_NEIGHBORS = 50;
+/** Reserve part of the budget for nearby modules instead of one huge folder. */
+const MAX_SIBLING_NEIGHBORS = 30;
+
+function directoryOf(path: string): string {
+  const index = path.lastIndexOf("/");
+  return index === -1 ? "" : path.slice(0, index);
+}
+
+/** Leading path segments two files share; "src/lib/a.ts" vs "src/app/b.ts" → 1. */
+function sharedPathSegments(a: string, b: string): number {
+  const left = a.split("/");
+  const right = b.split("/");
+  const max = Math.min(left.length, right.length);
+  let shared = 0;
+
+  while (shared < max && left[shared] === right[shared]) {
+    shared += 1;
+  }
+
+  return shared;
+}
+
+/**
+ * Picks the tree context for an AI explanation of `activePath`.
+ *
+ * The file's own directory comes first (at most 30 files), then the remaining
+ * budget is filled with the closest files elsewhere: most shared leading
+ * segments, then shallower paths, then alphabetical order. The active file is
+ * excluded because the prompt already names it, and the list is capped so a
+ * large monorepo cannot flood the prompt.
+ */
+export function collectExplainNeighbors(
+  nodes: RepoTreeNode[],
+  activePath: string,
+  limit: number = MAX_EXPLAIN_NEIGHBORS,
+): string[] {
+  const target = Math.max(
+    0,
+    Math.min(limit, MAX_EXPLAIN_NEIGHBORS),
+  );
+
+  if (target === 0) {
+    return [];
+  }
+
+  const activeDirectory = directoryOf(activePath);
+  const siblings: string[] = [];
+  const others: string[] = [];
+
+  for (const path of new Set(flattenFiles(nodes).map((file) => file.path))) {
+    if (path === activePath) {
+      continue;
+    }
+
+    if (directoryOf(path) === activeDirectory) {
+      siblings.push(path);
+    } else {
+      others.push(path);
+    }
+  }
+
+  const selected = siblings.slice(
+    0,
+    Math.min(MAX_SIBLING_NEIGHBORS, target),
+  );
+
+  others.sort((a, b) => {
+    const byShared =
+      sharedPathSegments(b, activePath) - sharedPathSegments(a, activePath);
+    if (byShared !== 0) {
+      return byShared;
+    }
+
+    const byDepth = a.split("/").length - b.split("/").length;
+    return byDepth !== 0 ? byDepth : a.localeCompare(b);
+  });
+
+  selected.push(...others.slice(0, target - selected.length));
+
+  return selected;
+}

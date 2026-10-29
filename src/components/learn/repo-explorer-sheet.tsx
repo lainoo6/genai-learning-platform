@@ -25,6 +25,7 @@ import { useT } from "@/i18n/client";
 import { MAX_FOLDER_FILES } from "@/lib/folder-preview";
 import {
   buildRepoTree,
+  collectExplainNeighbors,
   collectFolderPaths,
   flattenFiles,
   toggleExpandedPath,
@@ -43,7 +44,8 @@ import {
  *
  * The left pane is the same readable-file list the generator used (the server
  * filters it), with the files that actually grounded the course highlighted.
- * Picking a file loads at most 3,000 characters; "Explain with AI" then asks
+ * Picking a file loads the whole file (up to a 50,000-character safety cap);
+ * "Explain with AI" then asks
  * `explainCodeAction` for a short, learner-facing explanation. Highlighting a
  * snippet inside the code viewer offers a second action that explains only that
  * part.
@@ -414,6 +416,9 @@ export function RepoExplorerSheet({
         branch: resolvedBranch ?? branch ?? "",
         filePath: activePath,
         selectedCode: selection,
+        // Up to 50 paths: siblings first, then the closest modules. This is
+        // labelled as a partial list in the prompt.
+        fileTree: collectExplainNeighbors(treeNodes, activePath),
       });
 
       if (request !== explainRequest.current) {
@@ -657,7 +662,7 @@ export function RepoExplorerSheet({
                   {fileState.status === "ready" ? (
                     <div className="space-y-2">
                       <pre
-                        className="max-h-[45vh] overflow-auto rounded-lg bg-muted/50 p-3 font-mono text-xs leading-relaxed"
+                        className="max-h-[60vh] overflow-auto rounded-lg bg-muted/50 p-3 font-mono text-xs leading-relaxed"
                         onMouseUp={handleCodeMouseUp}
                         ref={preRef}
                       >

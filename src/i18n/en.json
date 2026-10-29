@@ -676,7 +676,7 @@
   "lesson.source.explanation": "AI explanation",
   "lesson.source.explainSelection": "Explain selected code",
   "lesson.source.fileLoading": "Loading file…",
-  "lesson.source.fileTruncated": "Showing the first 3,000 characters.",
+  "lesson.source.fileTruncated": "Showing the first 50,000 characters.",
   "lesson.source.fileTree": "Repository files",
   "lesson.source.folder.empty": "No files directly in this folder.",
   "lesson.source.folder.explain": "Explain this folder",

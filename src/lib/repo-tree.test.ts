@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { RepoTreeEntry } from "@/lib/github-repo";
 import {
   buildRepoTree,
+  collectExplainNeighbors,
   collectFolderPaths,
   flattenFiles,
   formatBytes,
@@ -117,5 +118,66 @@ describe("formatBytes", () => {
   it("returns an empty string for unusable values", () => {
     expect(formatBytes(-1)).toBe("");
     expect(formatBytes(Number.NaN)).toBe("");
+  });
+});
+
+describe("collectExplainNeighbors", () => {
+  it("lists siblings first, excludes the active file, then nearby modules", () => {
+    const tree = buildRepoTree([
+      entry("src/lib/auth.ts"),
+      entry("src/lib/session.ts"),
+      entry("src/lib/tokens.ts"),
+      entry("src/app/page.tsx"),
+      entry("docs/guide.md"),
+    ]);
+
+    expect(collectExplainNeighbors(tree, "src/lib/auth.ts")).toEqual([
+      "src/lib/session.ts",
+      "src/lib/tokens.ts",
+      "src/app/page.tsx",
+      "docs/guide.md",
+    ]);
+  });
+
+  it("caps siblings at 30 and fills the rest with nearby files", () => {
+    const entries = [
+      ...Array.from({ length: 35 }, (_, index) =>
+        entry(`src/lib/file-${String(index).padStart(2, "0")}.ts`),
+      ),
+      ...Array.from({ length: 25 }, (_, index) =>
+        entry(`src/app/file-${String(index).padStart(2, "0")}.tsx`),
+      ),
+    ];
+
+    const neighbors = collectExplainNeighbors(
+      buildRepoTree(entries),
+      "src/lib/file-00.ts",
+    );
+
+    expect(neighbors).toHaveLength(50);
+    expect(
+      neighbors.filter((path) => path.startsWith("src/lib/")),
+    ).toHaveLength(30);
+    expect(
+      neighbors.filter((path) => path.startsWith("src/app/")),
+    ).toHaveLength(20);
+  });
+
+  it("honours a smaller limit and deduplicates paths", () => {
+    const tree = buildRepoTree([
+      entry("src/lib/auth.ts"),
+      entry("src/lib/session.ts"),
+      entry("src/lib/session.ts"),
+      entry("src/lib/tokens.ts"),
+    ]);
+
+    expect(collectExplainNeighbors(tree, "src/lib/auth.ts", 2)).toEqual([
+      "src/lib/session.ts",
+      "src/lib/tokens.ts",
+    ]);
+  });
+
+  it("returns nothing when the tree is empty", () => {
+    expect(collectExplainNeighbors([], "src/lib/auth.ts")).toEqual([]);
   });
 });

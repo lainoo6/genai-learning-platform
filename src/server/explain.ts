@@ -23,6 +23,10 @@ import {
 } from "@/lib/github-repo";
 import { registerLlmMocks } from "@/lib/llm/mocks";
 import { LlmError, generateJson } from "@/lib/llm/provider";
+import {
+  explainFilePrompt,
+  explainSelectionPrompt,
+} from "@/lib/llm/prompts/explain-code";
 
 /**
  * "Explain this file" for the source-code explorer (Phase 4).
@@ -33,10 +37,14 @@ import { LlmError, generateJson } from "@/lib/llm/provider";
  * never throws and turns each failure into a message that is safe to show.
  */
 
-/** GitHub content is passed to the model in full up to this length. */
-const MAX_EXPLAIN_CHARS = 3_000;
+/** Viewer safety cap: the full file is returned up to this length. */
+const MAX_VIEWER_CHARS = 50_000;
+/** Whole-file prompt budget: tighter than the viewer so the model focuses. */
+const MAX_PROMPT_FILE_CHARS = 2_000;
 /** A highlighted snippet is small by design; the explorer caps it client-side too. */
 const MAX_SELECTED_CHARS = 1_000;
+/** Hard ceiling for caller-supplied paths; the explorer sends at most 50. */
+const MAX_PROMPT_TREE_PATHS = 100;
 
 const explainCodeInputSchema = z.object({
   repoUrl: z.string().trim().min(1).max(500),
@@ -44,6 +52,11 @@ const explainCodeInputSchema = z.object({
   filePath: z.string().trim().min(1).max(500),
   /** Optional highlighted snippet from the file currently open in the explorer. */
   selectedCode: z.string().trim().max(MAX_SELECTED_CHARS).optional(),
+  /** Optional project context: paths of neighbouring files. */
+  fileTree: z
+    .array(z.string().trim().min(1).max(500))
+    .max(MAX_PROMPT_TREE_PATHS)
+    .optional(),
 });
 
 export type ExplainCodeInput = z.input<typeof explainCodeInputSchema>;
@@ -55,25 +68,6 @@ export type ExplainCodeResult =
 const explainCodeSchema = z.object({
   explanation: z.string().trim().min(1).max(8_000),
 });
-
-function explainFilePrompt(filePath: string, content: string): string {
-  return `You are a helpful teaching assistant. Explain the following code from the file ${filePath} in the context of the repository. Focus on its purpose and how it fits into the project.
-
-\`\`\`
-${content}
-\`\`\``;
-}
-
-function explainSelectionPrompt(
-  filePath: string,
-  selectedCode: string,
-): string {
-  return `The user selected the following code from ${filePath}. Explain what this specific snippet does and how it fits into the file.
-
-\`\`\`
-${selectedCode}
-\`\`\``;
-}
 
 /**
  * Explains one repository file for a signed-in learner.
@@ -99,7 +93,8 @@ export async function explainCodeAction(
     return { ok: false, error: t("server.explain.codeInvalid") };
   }
 
-  const { repoUrl, branch, filePath, selectedCode } = parsedInput.data;
+  const { repoUrl, branch, filePath, selectedCode, fileTree } =
+    parsedInput.data;
   const selection =
     selectedCode !== undefined && selectedCode.length > 0
       ? selectedCode
@@ -114,6 +109,19 @@ export async function explainCodeAction(
     return { ok: false, error: t("server.explain.codeInvalid") };
   }
 
+  // Neighbouring paths are only prompt context, but a server action is public:
+  // drop the active file, ignored paths and duplicates before trusting them.
+  const treeContext = [
+    ...new Set(
+      (fileTree ?? [])
+        .map((path) => path.trim())
+        .filter(
+          (path) =>
+            path.length > 0 && path !== filePath && isRelevantPath(path),
+        ),
+    ),
+  ].slice(0, MAX_PROMPT_TREE_PATHS);
+
   try {
     let prompt: string;
     let truncated = false;
@@ -121,7 +129,7 @@ export async function explainCodeAction(
     if (selection !== undefined) {
       // The snippet already contains everything the prompt needs, so the
       // extra Contents request is skipped for selected-code explanations.
-      prompt = explainSelectionPrompt(filePath, selection);
+      prompt = explainSelectionPrompt(filePath, selection, treeContext);
     } else {
       const content = await fetchFileContent(
         ref.owner,
@@ -130,9 +138,9 @@ export async function explainCodeAction(
         branch,
       );
 
-      const capped = content.slice(0, MAX_EXPLAIN_CHARS);
+      const capped = content.slice(0, MAX_PROMPT_FILE_CHARS);
       truncated = content.length > capped.length;
-      prompt = explainFilePrompt(filePath, capped);
+      prompt = explainFilePrompt(filePath, capped, treeContext);
     }
 
     registerLlmMocks();
@@ -147,6 +155,7 @@ export async function explainCodeAction(
         filePath,
         mode: selection === undefined ? "file" : "selection",
         selectedChars: selection?.length ?? 0,
+        fileTree: treeContext.length,
         truncated,
       },
     });
@@ -307,9 +316,10 @@ export type FetchFileContentResult =
  *
  * The explorer sends the same path it renders in the tree, so the relevance
  * guard is repeated here: a server action is a public endpoint and must not
- * hand out dotfiles, dependencies or binary payloads. Content is capped at the
- * same 3,000 characters used by the explanation prompt, which keeps the sheet
- * responsive for large files.
+ * hand out dotfiles, dependencies or binary payloads. The whole file is
+ * returned, up to a 50,000-character safety cap so one huge file cannot freeze
+ * the browser. The explanation prompt still uses only its first 2,000
+ * characters, so showing more code costs no extra tokens.
  */
 export async function fetchFileContentAction(
   input: FetchFileContentInput,
@@ -341,7 +351,7 @@ export async function fetchFileContentAction(
       branch ?? undefined,
     );
 
-    const capped = content.slice(0, MAX_EXPLAIN_CHARS);
+    const capped = content.slice(0, MAX_VIEWER_CHARS);
 
     return {
       ok: true,
