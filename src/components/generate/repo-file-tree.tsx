@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronRight, FileCode2, Folder } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { useT } from "@/i18n/client";
@@ -32,6 +32,11 @@ type RepoFileTreeProps = {
   disabled: boolean;
   /** The selection limit is reached, so unchecked rows are blocked. */
   limitReached: boolean;
+  /**
+   * Bump this to expand every folder. Used after an AI suggestion so the chosen
+   * files are visible without a manual "Expand all".
+   */
+  revealNonce?: number;
 };
 
 type TreeLevelProps = RepoFileTreeProps & {
@@ -45,12 +50,26 @@ export function RepoFileTree({
   onToggle,
   disabled,
   limitReached,
+  revealNonce,
 }: RepoFileTreeProps) {
   const t = useT();
   const folderPaths = useMemo(() => collectFolderPaths(nodes), [nodes]);
   const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const lastReveal = useRef(revealNonce);
+
+  // Expansion is local state and starts empty (everything collapsed). A new
+  // nonce means a caller wants the whole tree open; the initial value is
+  // recorded so mounting does not expand anything by itself.
+  useEffect(() => {
+    if (revealNonce === undefined || revealNonce === lastReveal.current) {
+      return;
+    }
+
+    lastReveal.current = revealNonce;
+    setExpandedPaths(new Set(folderPaths));
+  }, [folderPaths, revealNonce]);
 
   const canExpand = expandedPaths.size < folderPaths.length;
   const canCollapse = expandedPaths.size > 0;

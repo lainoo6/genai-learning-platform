@@ -927,6 +927,28 @@ function cutAtLineEnd(text: string, maxChars: number): string {
 }
 
 /**
+ * Orders entries by teaching value: README > entry files > manifests > files
+ * under a source directory > everything else, shallower paths first.
+ *
+ * Shared by the analysis pipeline (`fetchKeyFiles`) and by the AI file
+ * suggestion fallback, so both fall back to the same notion of "important".
+ */
+export function sortByKeyFilePriority(
+  entries: RepoTreeEntry[],
+): RepoTreeEntry[] {
+  return [...entries].sort((a, b) => {
+    const byScore = keyFileScore(b.path) - keyFileScore(a.path);
+    if (byScore !== 0) {
+      return byScore;
+    }
+
+    const byDepth = a.path.split("/").length - b.path.split("/").length;
+
+    return byDepth !== 0 ? byDepth : a.path.localeCompare(b.path);
+  });
+}
+
+/**
  * Picks and downloads the files an analysis needs.
  *
  * Files are fetched in priority order with four concurrent requests; one
@@ -947,19 +969,7 @@ export async function fetchKeyFiles(
     Math.max(1, Math.trunc(limit) || DEFAULT_KEY_FILE_LIMIT),
   );
 
-  const selected = [...tree.entries]
-    .sort((a, b) => {
-      const byScore = keyFileScore(b.path) - keyFileScore(a.path);
-      if (byScore !== 0) {
-        return byScore;
-      }
-
-      const byDepth =
-        a.path.split("/").length - b.path.split("/").length;
-
-      return byDepth !== 0 ? byDepth : a.path.localeCompare(b.path);
-    })
-    .slice(0, cap);
+  const selected = sortByKeyFilePriority(tree.entries).slice(0, cap);
 
   if (selected.length === 0) {
     throw new GithubRepoError(

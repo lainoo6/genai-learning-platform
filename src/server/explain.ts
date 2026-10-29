@@ -5,6 +5,14 @@ import { z } from "zod";
 import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import {
+  MAX_FOLDER_FILES,
+  directChildFiles,
+  folderExplanationPrompt,
+  folderPreviewCandidates,
+  previewExcerpt,
+  type FolderFilePreview,
+} from "@/lib/folder-preview";
+import {
   GithubRepoError,
   fetchFileContent,
   fetchRepoTree,
@@ -160,6 +168,124 @@ export async function explainCodeAction(
 
     console.error("[explain] unexpected failure", error);
     return { ok: false, error: t("server.explain.codeFailed") };
+  }
+}
+
+const explainFolderInputSchema = z.object({
+  repoUrl: z.string().trim().min(1).max(500),
+  branch: z.string().trim().min(1).max(200),
+  folderPath: z.string().trim().min(1).max(500),
+  /** Direct children of the folder; capped before anything is read. */
+  fileNames: z.array(z.string().trim().min(1).max(500)).max(MAX_FOLDER_FILES),
+});
+
+export type ExplainFolderInput = z.input<typeof explainFolderInputSchema>;
+
+export type ExplainFolderResult =
+  | { ok: true; explanation: string }
+  | { ok: false; error: string };
+
+/**
+ * Explains what a folder is responsible for (Phase 4, part 3).
+ *
+ * The explorer sends the folder path and the files directly inside it. The
+ * action re-validates that every file is a direct child of that folder, then
+ * previews at most five code files (first 15 lines each) so the model can see
+ * imports and exports without downloading the whole module. Unreadable files
+ * are skipped; when none can be read the folder is explained from its name and
+ * file list alone. Nothing is generated until the learner clicks the button.
+ */
+export async function explainFolderAction(
+  input: ExplainFolderInput,
+): Promise<ExplainFolderResult> {
+  const { t } = await getI18n();
+
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (userId === undefined) {
+    return { ok: false, error: t("server.explain.codeSignIn") };
+  }
+
+  const parsedInput = explainFolderInputSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { ok: false, error: t("server.explain.folderInvalid") };
+  }
+
+  const { repoUrl, branch, fileNames } = parsedInput.data;
+  const folderPath = parsedInput.data.folderPath.replace(/\/+$/u, "");
+
+  const ref = parseRepoUrl(repoUrl);
+  if (
+    ref === null ||
+    folderPath.length === 0 ||
+    !isRelevantPath(folderPath)
+  ) {
+    return { ok: false, error: t("server.explain.folderInvalid") };
+  }
+
+  const directFiles = directChildFiles(folderPath, fileNames).filter((path) =>
+    isRelevantPath(path),
+  );
+
+  try {
+    const candidates = folderPreviewCandidates(directFiles);
+
+    const previews = await Promise.all(
+      candidates.map(async (path): Promise<FolderFilePreview | null> => {
+        try {
+          const content = await fetchFileContent(
+            ref.owner,
+            ref.repo,
+            path,
+            branch,
+          );
+
+          return { path, excerpt: previewExcerpt(content) };
+        } catch (error: unknown) {
+          // One unreadable file (rate limit, binary, too large) is not fatal.
+          console.warn(`[explain] skipping folder preview ${path}:`, error);
+          return null;
+        }
+      }),
+    );
+
+    const readable = previews.filter(
+      (preview): preview is FolderFilePreview => preview !== null,
+    );
+
+    registerLlmMocks();
+
+    const result = await generateJson(
+      explainCodeSchema,
+      folderExplanationPrompt({
+        folderPath,
+        repoUrl,
+        filePaths: directFiles,
+        previews: readable,
+      }),
+      {
+        usage: "explain-folder",
+        temperature: 0.3,
+        userId,
+        input: {
+          repoUrl,
+          branch,
+          folderPath,
+          fileCount: directFiles.length,
+          previewed: readable.length,
+        },
+      },
+    );
+
+    return { ok: true, explanation: result.explanation };
+  } catch (error: unknown) {
+    if (error instanceof LlmError) {
+      console.error("[explain] folder explanation generation failed", error);
+      return { ok: false, error: t("server.explain.folderFailed") };
+    }
+
+    console.error("[explain] unexpected folder explanation failure", error);
+    return { ok: false, error: t("server.explain.folderFailed") };
   }
 }
 

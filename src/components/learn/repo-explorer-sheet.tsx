@@ -5,6 +5,7 @@ import {
   ChevronRight,
   FileCode2,
   Folder,
+  Lightbulb,
   Loader2,
   Sparkles,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useT } from "@/i18n/client";
+import { MAX_FOLDER_FILES } from "@/lib/folder-preview";
 import {
   buildRepoTree,
   collectFolderPaths,
@@ -31,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   explainCodeAction,
+  explainFolderAction,
   fetchFileContentAction,
   fetchRepoTreeAction,
 } from "@/server/explain";
@@ -71,6 +74,15 @@ type ExplainState =
   | { status: "ready"; explanation: string }
   | { status: "error"; error: string };
 
+/** The folder shown in the right pane, with its direct children captured on select. */
+type SelectedFolder = {
+  path: string;
+  /** Repository-relative paths of direct file children only. */
+  filePaths: string[];
+  /** Direct subfolders, not sent to the model but worth mentioning in the UI. */
+  subfolderCount: number;
+};
+
 export function RepoExplorerSheet({
   open,
   onOpenChange,
@@ -95,10 +107,17 @@ export function RepoExplorerSheet({
   });
   const [selectedCode, setSelectedCode] = useState("");
   const [selectionTruncated, setSelectionTruncated] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<SelectedFolder | null>(
+    null,
+  );
+  const [folderExplainState, setFolderExplainState] = useState<ExplainState>({
+    status: "idle",
+  });
 
   const treeRequested = useRef(false);
   const fileRequest = useRef(0);
   const explainRequest = useRef(0);
+  const folderRequest = useRef(0);
   const preRef = useRef<HTMLPreElement>(null);
   const selectionActionRef = useRef<HTMLDivElement>(null);
   const selectedRangeRef = useRef<Range | null>(null);
@@ -181,7 +200,10 @@ export function RepoExplorerSheet({
       const request = ++fileRequest.current;
       // Any explanation for the previous file is now stale.
       explainRequest.current += 1;
+      folderRequest.current += 1;
       clearSelection();
+      setSelectedFolder(null);
+      setFolderExplainState({ status: "idle" });
 
       setActivePath(path);
       setFileState({ status: "loading", path });
@@ -230,7 +252,10 @@ export function RepoExplorerSheet({
   const loadTree = useCallback(async (): Promise<void> => {
     fileRequest.current += 1;
     explainRequest.current += 1;
+    folderRequest.current += 1;
     clearSelection();
+    setSelectedFolder(null);
+    setFolderExplainState({ status: "idle" });
 
     setTreeStatus("loading");
     setTreeError(null);
@@ -344,13 +369,29 @@ export function RepoExplorerSheet({
 
   function selectFile(path: string): void {
     if (
-      (fileState.status === "ready" && fileState.path === path) ||
-      (fileState.status === "loading" && fileState.path === path)
+      selectedFolder === null &&
+      ((fileState.status === "ready" && fileState.path === path) ||
+        (fileState.status === "loading" && fileState.path === path))
     ) {
       return;
     }
 
     void loadFile(path, resolvedBranch);
+  }
+
+  /** Selects a folder and reveals its children; never calls the model. */
+  function selectFolder(
+    path: string,
+    filePaths: string[],
+    subfolderCount: number,
+  ): void {
+    folderRequest.current += 1;
+    clearSelection();
+    setSelectedFolder({ path, filePaths, subfolderCount });
+    setFolderExplainState({ status: "idle" });
+    setExpandedPaths((current) =>
+      current.has(path) ? current : new Set([...current, path]),
+    );
   }
 
   async function runExplanation(selection?: string): Promise<void> {
@@ -406,6 +447,53 @@ export function RepoExplorerSheet({
 
   function explainSelectedCode(): void {
     void runExplanation(selectedCode);
+  }
+
+  /** Explains the selected folder on demand; nothing is sent until clicked. */
+  async function explainSelectedFolder(): Promise<void> {
+    if (selectedFolder === null) {
+      return;
+    }
+
+    const request = ++folderRequest.current;
+    setFolderExplainState({ status: "loading" });
+
+    try {
+      const result = await explainFolderAction({
+        repoUrl,
+        branch: resolvedBranch ?? branch ?? "",
+        folderPath: selectedFolder.path,
+        // The explorer already sends direct children; the cap is repeated here
+        // so a large folder stays within the action's contract.
+        fileNames: selectedFolder.filePaths.slice(0, MAX_FOLDER_FILES),
+      });
+
+      if (request !== folderRequest.current) {
+        return;
+      }
+
+      if (!result.ok) {
+        setFolderExplainState({ status: "error", error: result.error });
+        return;
+      }
+
+      setFolderExplainState({
+        status: "ready",
+        explanation: result.explanation,
+      });
+    } catch (cause: unknown) {
+      if (request !== folderRequest.current) {
+        return;
+      }
+
+      setFolderExplainState({
+        status: "error",
+        error:
+          cause instanceof Error
+            ? cause.message
+            : t("server.explain.folderFailed"),
+      });
+    }
   }
 
   return (
@@ -497,11 +585,13 @@ export function RepoExplorerSheet({
 
               {treeStatus === "ready" && treeNodes.length > 0 ? (
                 <ExplorerTree
-                  activePath={activePath}
+                  activeFolderPath={selectedFolder?.path ?? null}
+                  activePath={selectedFolder === null ? activePath : null}
                   expandedPaths={expandedPaths}
                   highlightedPaths={highlightedPaths}
                   nodes={treeNodes}
                   onSelect={selectFile}
+                  onSelectFolder={selectFolder}
                   onToggleFolder={toggleFolder}
                 />
               ) : null}
@@ -516,162 +606,183 @@ export function RepoExplorerSheet({
 
           <section className="min-h-0 overflow-y-auto p-4">
             <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="min-w-0 break-all font-mono text-xs text-muted-foreground">
-                    {activePath ?? t("lesson.source.selectFile")}
-                  </p>
-                  {activePath !== null && highlightedPaths.has(activePath) ? (
-                    <Badge variant="secondary">
-                      {t("lesson.source.grounded")}
-                    </Badge>
+              {selectedFolder === null ? (
+                <>
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="min-w-0 break-all font-mono text-xs text-muted-foreground">
+                      {activePath ?? t("lesson.source.selectFile")}
+                    </p>
+                    {activePath !== null && highlightedPaths.has(activePath) ? (
+                      <Badge variant="secondary">
+                        {t("lesson.source.grounded")}
+                      </Badge>
+                    ) : null}
+                  </div>
+
+                  {fileState.status === "idle" ? (
+                    <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                      {t("lesson.source.selectFile")}
+                    </p>
+                  ) : null}
+
+                  {fileState.status === "loading" ? (
+                    <p className="flex items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-sm text-muted-foreground">
+                      <Loader2
+                        aria-hidden="true"
+                        className="size-4 animate-spin"
+                      />
+                      {t("lesson.source.fileLoading")}
+                    </p>
+                  ) : null}
+
+                  {fileState.status === "error" ? (
+                    <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                      <p className="text-sm text-destructive">
+                        {fileState.error}
+                      </p>
+                      <Button
+                        onClick={() => {
+                          void loadFile(fileState.path, resolvedBranch);
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {t("lesson.source.retry")}
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  {fileState.status === "ready" ? (
+                    <div className="space-y-2">
+                      <pre
+                        className="max-h-[45vh] overflow-auto rounded-lg bg-muted/50 p-3 font-mono text-xs leading-relaxed"
+                        onMouseUp={handleCodeMouseUp}
+                        ref={preRef}
+                      >
+                        <code>{fileState.content}</code>
+                      </pre>
+
+                      <p className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
+                        <Lightbulb
+                          aria-hidden="true"
+                          className="size-3.5 shrink-0"
+                        />
+                        {t("lesson.source.selectionHint")}
+                      </p>
+
+                      {selectedCode.length > 10 ? (
+                        <div
+                          className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 shadow-sm"
+                          onMouseDown={(event) => {
+                            // Keep the native text selection alive while the
+                            // action bar is clicked.
+                            event.preventDefault();
+                          }}
+                          ref={selectionActionRef}
+                        >
+                          <p className="text-xs text-muted-foreground">
+                            {selectionTruncated
+                              ? t("lesson.source.selectionTruncated", {
+                                  count: MAX_SELECTED_CHARS,
+                                })
+                              : t("lesson.source.selectedChars", {
+                                  count: selectedCode.length,
+                                })}
+                          </p>
+                          <Button
+                            disabled={explainState.status === "loading"}
+                            onClick={explainSelectedCode}
+                            size="sm"
+                            type="button"
+                            variant="secondary"
+                          >
+                            {explainState.status === "loading" ? (
+                              <Loader2
+                                aria-hidden="true"
+                                className="animate-spin"
+                              />
+                            ) : (
+                              <Sparkles aria-hidden="true" />
+                            )}
+                            {explainState.status === "loading"
+                              ? t("lesson.source.explaining")
+                              : t("lesson.source.explainSelection")}
+                          </Button>
+                          <Button
+                            onClick={clearSelection}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            {t("lesson.source.clearSelection")}
+                          </Button>
+                        </div>
+                      ) : null}
+
+                      {fileState.truncated ? (
+                        <p className="text-xs text-muted-foreground">
+                          {t("lesson.source.fileTruncated")}
+                        </p>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
 
-                {fileState.status === "idle" ? (
-                  <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                    {t("lesson.source.selectFile")}
-                  </p>
-                ) : null}
-
-                {fileState.status === "loading" ? (
-                  <p className="flex items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-sm text-muted-foreground">
-                    <Loader2
-                      aria-hidden="true"
-                      className="size-4 animate-spin"
-                    />
-                    {t("lesson.source.fileLoading")}
-                  </p>
-                ) : null}
-
-                {fileState.status === "error" ? (
-                  <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
-                    <p className="text-sm text-destructive">
-                      {fileState.error}
-                    </p>
+                <div className="space-y-3 border-t pt-4">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <Button
+                      disabled={
+                        fileState.status !== "ready" ||
+                        explainState.status === "loading"
+                      }
                       onClick={() => {
-                        void loadFile(fileState.path, resolvedBranch);
+                        void explainActiveFile();
                       }}
                       size="sm"
                       type="button"
-                      variant="outline"
                     >
-                      {t("lesson.source.retry")}
+                      {explainState.status === "loading" ? (
+                        <Loader2
+                          aria-hidden="true"
+                          className="animate-spin"
+                        />
+                      ) : (
+                        <Sparkles aria-hidden="true" />
+                      )}
+                      {explainState.status === "loading"
+                        ? t("lesson.source.explaining")
+                        : t("lesson.source.explain")}
                     </Button>
                   </div>
-                ) : null}
 
-                {fileState.status === "ready" ? (
-                  <div className="space-y-2">
-                    <pre
-                      className="max-h-[45vh] overflow-auto rounded-lg bg-muted/50 p-3 font-mono text-xs leading-relaxed"
-                      onMouseUp={handleCodeMouseUp}
-                      ref={preRef}
-                    >
-                      <code>{fileState.content}</code>
-                    </pre>
-
-                    {selectedCode.length > 10 ? (
-                      <div
-                        className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2 shadow-sm"
-                        onMouseDown={(event) => {
-                          // Keep the native text selection alive while the
-                          // action bar is clicked.
-                          event.preventDefault();
-                        }}
-                        ref={selectionActionRef}
-                      >
-                        <p className="text-xs text-muted-foreground">
-                          {selectionTruncated
-                            ? t("lesson.source.selectionTruncated", {
-                                count: MAX_SELECTED_CHARS,
-                              })
-                            : t("lesson.source.selectedChars", {
-                                count: selectedCode.length,
-                              })}
-                        </p>
-                        <Button
-                          disabled={explainState.status === "loading"}
-                          onClick={explainSelectedCode}
-                          size="sm"
-                          type="button"
-                          variant="secondary"
-                        >
-                          {explainState.status === "loading" ? (
-                            <Loader2
-                              aria-hidden="true"
-                              className="animate-spin"
-                            />
-                          ) : (
-                            <Sparkles aria-hidden="true" />
-                          )}
-                          {explainState.status === "loading"
-                            ? t("lesson.source.explaining")
-                            : t("lesson.source.explainSelection")}
-                        </Button>
-                        <Button
-                          onClick={clearSelection}
-                          size="sm"
-                          type="button"
-                          variant="ghost"
-                        >
-                          {t("lesson.source.clearSelection")}
-                        </Button>
-                      </div>
-                    ) : null}
-
-                    {fileState.truncated ? (
-                      <p className="text-xs text-muted-foreground">
-                        {t("lesson.source.fileTruncated")}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="space-y-3 border-t pt-4">
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <Button
-                    disabled={
-                      fileState.status !== "ready" ||
-                      explainState.status === "loading"
-                    }
-                    onClick={() => {
-                      void explainActiveFile();
-                    }}
-                    size="sm"
-                    type="button"
-                  >
-                    {explainState.status === "loading" ? (
-                      <Loader2
-                        aria-hidden="true"
-                        className="animate-spin"
-                      />
-                    ) : (
-                      <Sparkles aria-hidden="true" />
-                    )}
-                    {explainState.status === "loading"
-                      ? t("lesson.source.explaining")
-                      : t("lesson.source.explain")}
-                  </Button>
-                </div>
-
-                {explainState.status === "error" ? (
-                  <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                    {explainState.error}
-                  </p>
-                ) : null}
-
-                {explainState.status === "ready" ? (
-                  <div className="rounded-lg border bg-muted/30 p-4">
-                    <p className="mb-2 text-xs font-medium text-muted-foreground">
-                      {t("lesson.source.explanation")}
+                  {explainState.status === "error" ? (
+                    <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                      {explainState.error}
                     </p>
-                    <MarkdownView>{explainState.explanation}</MarkdownView>
-                  </div>
-                ) : null}
-              </div>
+                  ) : null}
+
+                  {explainState.status === "ready" ? (
+                    <div className="rounded-lg border bg-muted/30 p-4">
+                      <p className="mb-2 text-xs font-medium text-muted-foreground">
+                        {t("lesson.source.explanation")}
+                      </p>
+                      <MarkdownView>{explainState.explanation}</MarkdownView>
+                    </div>
+                  ) : null}
+                </div>
+                </>
+              ) : (
+                <FolderOverview
+                  explainState={folderExplainState}
+                  folder={selectedFolder}
+                  onExplain={() => {
+                    void explainSelectedFolder();
+                  }}
+                  onSelectFile={selectFile}
+                />
+              )}
             </div>
           </section>
         </div>
@@ -680,13 +791,132 @@ export function RepoExplorerSheet({
   );
 }
 
+type FolderOverviewProps = {
+  folder: SelectedFolder;
+  explainState: ExplainState;
+  onExplain: () => void;
+  onSelectFile: (path: string) => void;
+};
+
+/**
+ * Right-hand panel for a selected folder: its direct files, an on-demand
+ * explanation, and a way back into the code view by picking a file.
+ */
+function FolderOverview({
+  folder,
+  explainState,
+  onExplain,
+  onSelectFile,
+}: FolderOverviewProps) {
+  const t = useT();
+  const folderName = folder.path.split("/").pop() ?? folder.path;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 space-y-1">
+          <p className="flex items-center gap-1.5 break-all font-mono text-xs text-muted-foreground">
+            <Folder aria-hidden="true" className="size-3.5 shrink-0" />
+            {folder.path}
+          </p>
+          <h2 className="text-base font-semibold">{folderName}</h2>
+        </div>
+        <Badge variant="secondary">
+          {t("lesson.source.folder.fileCount", {
+            count: folder.filePaths.length,
+          })}
+        </Badge>
+      </div>
+
+      {folder.subfolderCount > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {t("lesson.source.folder.subfolders", {
+            count: folder.subfolderCount,
+          })}
+        </p>
+      ) : null}
+
+      {folder.filePaths.length === 0 ? (
+        <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+          {t("lesson.source.folder.empty")}
+        </p>
+      ) : (
+        <ul className="divide-y rounded-lg border">
+          {folder.filePaths.map((path) => (
+            <li key={path}>
+              <button
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-muted/60"
+                onClick={() => {
+                  onSelectFile(path);
+                }}
+                title={path}
+                type="button"
+              >
+                <FileCode2
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                />
+                <span className="truncate">{path.split("/").pop() ?? path}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="space-y-2 border-t pt-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            disabled={explainState.status === "loading"}
+            onClick={onExplain}
+            size="sm"
+            type="button"
+          >
+            {explainState.status === "loading" ? (
+              <Loader2 aria-hidden="true" className="animate-spin" />
+            ) : (
+              <Sparkles aria-hidden="true" />
+            )}
+            {explainState.status === "loading"
+              ? t("lesson.source.explaining")
+              : t("lesson.source.folder.explain")}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            {t("lesson.source.folder.hint")}
+          </p>
+        </div>
+
+        {explainState.status === "error" ? (
+          <p className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+            {explainState.error}
+          </p>
+        ) : null}
+
+        {explainState.status === "ready" ? (
+          <div className="rounded-lg border bg-muted/30 p-4">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              {t("lesson.source.explanation")}
+            </p>
+            <MarkdownView>{explainState.explanation}</MarkdownView>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 type ExplorerTreeProps = {
   nodes: RepoTreeNode[];
   expandedPaths: ReadonlySet<string>;
   highlightedPaths: ReadonlySet<string>;
   activePath: string | null;
+  activeFolderPath: string | null;
   onToggleFolder: (path: string) => void;
   onSelect: (path: string) => void;
+  onSelectFolder: (
+    path: string,
+    filePaths: string[],
+    subfolderCount: number,
+  ) => void;
 };
 
 /** Recursive tree rows: folders toggle, files load their source. */
@@ -695,8 +925,10 @@ function ExplorerTree({
   expandedPaths,
   highlightedPaths,
   activePath,
+  activeFolderPath,
   onToggleFolder,
   onSelect,
+  onSelectFolder,
 }: ExplorerTreeProps) {
   const t = useT();
 
@@ -705,40 +937,73 @@ function ExplorerTree({
       {nodes.map((node) => {
         if (node.kind === "dir") {
           const isExpanded = expandedPaths.has(node.path);
+          const isActive = activeFolderPath === node.path;
+          const directFilePaths = node.children
+            .filter((child) => child.kind === "file")
+            .map((child) => child.path);
+          const subfolderCount = node.children.filter(
+            (child) => child.kind === "dir",
+          ).length;
 
           return (
             <li key={node.path}>
-              <button
-                aria-expanded={isExpanded}
-                className="flex w-full items-center gap-1.5 rounded px-1 py-1 text-left text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                onClick={() => {
-                  onToggleFolder(node.path);
-                }}
-                type="button"
-              >
-                {isExpanded ? (
-                  <ChevronDown
-                    aria-hidden="true"
-                    className="size-3.5 shrink-0"
-                  />
-                ) : (
-                  <ChevronRight
-                    aria-hidden="true"
-                    className="size-3.5 shrink-0"
-                  />
+              <div
+                className={cn(
+                  "flex items-center gap-0.5 rounded pr-1",
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                 )}
-                <Folder aria-hidden="true" className="size-3.5 shrink-0" />
-                <span className="truncate">{node.name}</span>
-              </button>
+              >
+                <button
+                  aria-expanded={isExpanded}
+                  aria-label={t("lesson.source.toggleFolder")}
+                  className="flex size-6 shrink-0 items-center justify-center rounded hover:bg-muted/60"
+                  onClick={() => {
+                    onToggleFolder(node.path);
+                  }}
+                  type="button"
+                >
+                  {isExpanded ? (
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="size-3.5 shrink-0"
+                    />
+                  ) : (
+                    <ChevronRight
+                      aria-hidden="true"
+                      className="size-3.5 shrink-0"
+                    />
+                  )}
+                </button>
+                <button
+                  aria-current={isActive ? "true" : undefined}
+                  className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-1 text-left text-xs font-medium"
+                  onClick={() => {
+                    onSelectFolder(
+                      node.path,
+                      directFilePaths,
+                      subfolderCount,
+                    );
+                  }}
+                  title={node.path}
+                  type="button"
+                >
+                  <Folder aria-hidden="true" className="size-3.5 shrink-0" />
+                  <span className="truncate">{node.name}</span>
+                </button>
+              </div>
 
               {isExpanded ? (
                 <div className="ml-2 border-l pl-2">
                   <ExplorerTree
+                    activeFolderPath={activeFolderPath}
                     activePath={activePath}
                     expandedPaths={expandedPaths}
                     highlightedPaths={highlightedPaths}
                     nodes={node.children}
                     onSelect={onSelect}
+                    onSelectFolder={onSelectFolder}
                     onToggleFolder={onToggleFolder}
                   />
                 </div>

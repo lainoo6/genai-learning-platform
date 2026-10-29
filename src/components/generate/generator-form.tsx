@@ -33,6 +33,7 @@ import {
 import {
   generateCourseFromRepoAction,
   getRepoTreeAction,
+  suggestFilesAction,
   type RepoTreeResult,
 } from "@/server/repo";
 
@@ -96,6 +97,9 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
   const [repoPreview, setRepoPreview] = useState<RepoPreview | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestStatus, setSuggestStatus] = useState<string | null>(null);
+  const [revealNonce, setRevealNonce] = useState(0);
   const [selectionWarning, setSelectionWarning] = useState<string | null>(null);
   const [stage, setStage] = useState(-1);
   const [activeMode, setActiveMode] = useState<RunMode | null>(null);
@@ -237,10 +241,12 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
     setRepoPreview(null);
     setSelectedPaths([]);
     setSelectionWarning(null);
+    setSuggestStatus(null);
+    setRevealNonce(0);
   }
 
   async function previewRepoFiles(): Promise<void> {
-    if (isRunning || isPreviewing) {
+    if (isRunning || isPreviewing || isSuggesting) {
       return;
     }
 
@@ -274,7 +280,51 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
     }
   }
 
+  /**
+   * Asks the model which files to teach. The answer overwrites the current
+   * selection because the point of the button is a fresh, architecture-level
+   * pick; the teacher can still untick anything before generating.
+   */
+  async function suggestRepoFiles(): Promise<void> {
+    if (repoPreview === null || isRunning || isPreviewing || isSuggesting) {
+      return;
+    }
+
+    setError(null);
+    setSuggestStatus(null);
+    setIsSuggesting(true);
+
+    try {
+      const result = await suggestFilesAction({
+        repoUrl: repoUrl.trim(),
+        branch: repoPreview.meta.branch,
+      });
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      setSelectedPaths(result.suggestedPaths);
+      setSelectionWarning(null);
+      setRevealNonce((current) => current + 1);
+      setSuggestStatus(
+        t("generate.form.repo.suggested", {
+          count: result.suggestedPaths.length,
+        }),
+      );
+    } catch (cause: unknown) {
+      setError(
+        cause instanceof Error ? cause.message : t("generate.error.failed"),
+      );
+    } finally {
+      setIsSuggesting(false);
+    }
+  }
+
   function toggleRepoPath(path: string): void {
+    setSuggestStatus(null);
+
     if (selectedPaths.includes(path)) {
       setSelectedPaths(selectedPaths.filter((selected) => selected !== path));
       setSelectionWarning(null);
@@ -298,6 +348,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
       .map((entry) => entry.path);
 
     setSelectedPaths(next);
+    setSuggestStatus(null);
     setSelectionWarning(
       repoFiles.length > MAX_SELECTED_FILES
         ? t("generate.form.repo.selectAllLimited", {
@@ -311,6 +362,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
   function clearRepoSelection(): void {
     setSelectedPaths([]);
     setSelectionWarning(null);
+    setSuggestStatus(null);
   }
 
   async function generateFromRepo(): Promise<void> {
@@ -343,7 +395,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
     <div className="space-y-4 rounded-xl ring-1 ring-foreground/10">
       <div className="space-y-4 px-4 py-4 sm:px-5">
         <ModeSwitch
-          disabled={isRunning || isPreviewing}
+          disabled={isRunning || isPreviewing || isSuggesting}
           onChange={setMode}
           value={mode}
         />
@@ -390,7 +442,9 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
             </div>
 
             <Button
-              disabled={isRunning || isPreviewing || topic.trim().length < 3}
+              disabled={
+                isRunning || isPreviewing || isSuggesting || topic.trim().length < 3
+              }
               onClick={() => {
                 void generate();
               }}
@@ -432,7 +486,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
             />
 
             <Button
-              disabled={isRunning || isPreviewing || file === null}
+              disabled={isRunning || isPreviewing || isSuggesting || file === null}
               onClick={() => {
                 void generateFromFile();
               }}
@@ -462,7 +516,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
               <div className="flex flex-wrap gap-2">
                 <Input
                   className="min-w-0 flex-1 basis-64"
-                  disabled={isRunning || isPreviewing}
+                  disabled={isRunning || isPreviewing || isSuggesting}
                   id="repo-url"
                   maxLength={500}
                   onChange={(event) => {
@@ -474,7 +528,10 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
                 />
                 <Button
                   disabled={
-                    isRunning || isPreviewing || repoUrl.trim().length === 0
+                    isRunning ||
+                    isPreviewing ||
+                    isSuggesting ||
+                    repoUrl.trim().length === 0
                   }
                   onClick={() => {
                     void previewRepoFiles();
@@ -512,7 +569,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
                       count: repoFiles.length,
                     })}
                   </p>
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-1">
                     <span>
                       {t("generate.form.repo.selected", {
                         selected: selectedPaths.length,
@@ -520,7 +577,39 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
                       })}
                     </span>
                     <Button
-                      disabled={isRunning || repoFiles.length === 0}
+                      disabled={
+                        isRunning ||
+                        isPreviewing ||
+                        isSuggesting ||
+                        repoFiles.length === 0
+                      }
+                      onClick={() => {
+                        void suggestRepoFiles();
+                      }}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      {isSuggesting ? (
+                        <>
+                          <Loader2
+                            aria-hidden="true"
+                            className="animate-spin"
+                          />
+                          {t("generate.form.repo.suggesting")}
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles aria-hidden="true" />
+                          {t("generate.form.repo.suggest")}
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      disabled={
+                        isRunning ||
+                        isSuggesting ||
+                        repoFiles.length === 0
+                      }
                       onClick={selectAllRepoFiles}
                       size="sm"
                       variant="ghost"
@@ -528,7 +617,11 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
                       {t("generate.form.repo.selectAll")}
                     </Button>
                     <Button
-                      disabled={isRunning || selectedPaths.length === 0}
+                      disabled={
+                        isRunning ||
+                        isSuggesting ||
+                        selectedPaths.length === 0
+                      }
                       onClick={clearRepoSelection}
                       size="sm"
                       variant="ghost"
@@ -541,10 +634,11 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
                 <div className="max-h-72 overflow-y-auto rounded-lg border p-2">
                   <RepoFileTree
                     key={`${repoPreview.meta.owner}/${repoPreview.meta.repo}@${repoPreview.meta.branch}`}
-                    disabled={isRunning}
+                    disabled={isRunning || isSuggesting}
                     limitReached={selectionLimitReached}
                     nodes={repoTrees}
                     onToggle={toggleRepoPath}
+                    revealNonce={revealNonce}
                     selected={selectedSet}
                   />
                 </div>
@@ -554,6 +648,16 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
                     {t("generate.form.repo.truncated")}
                   </p>
                 ) : null}
+
+                {suggestStatus === null ? null : (
+                  <p
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                    role="status"
+                  >
+                    <Sparkles aria-hidden="true" className="size-3.5 shrink-0" />
+                    {suggestStatus}
+                  </p>
+                )}
 
                 {selectionWarning === null ? null : (
                   <p className="text-xs text-amber-700" role="status">
@@ -582,7 +686,9 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
                   />
 
                   <Button
-                    disabled={isRunning || selectedPaths.length === 0}
+                    disabled={
+                      isRunning || isSuggesting || selectedPaths.length === 0
+                    }
                     onClick={() => {
                       void generateFromRepo();
                     }}

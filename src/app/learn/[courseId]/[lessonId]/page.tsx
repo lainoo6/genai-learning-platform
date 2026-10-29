@@ -265,6 +265,7 @@ async function LessonPlayer({ params, searchParams }: LessonPageProps) {
             {course.repoUrl !== null ? (
               <ExploreSourceButton
                 branch={course.repoBranch}
+                courseId={courseId}
                 filePaths={course.repoSelectedPaths}
                 repoUrl={course.repoUrl}
               />

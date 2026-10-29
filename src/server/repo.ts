@@ -11,6 +11,7 @@ import {
 } from "@/lib/course-source";
 import {
   GithubRepoError,
+  fetchFileContent,
   fetchKeyFiles,
   fetchRepoTree,
   fetchSelectedFiles,
@@ -18,6 +19,7 @@ import {
   filterRelevantFilesWithMeta,
   isRelevantPath,
   parseRepoUrl,
+  sortByKeyFilePriority,
   type GithubErrorCode,
   type RepoTreeEntry,
 } from "@/lib/github-repo";
@@ -28,6 +30,11 @@ import {
   repoAnalysisSchema,
   type RepoAnalysis,
 } from "@/lib/llm/prompts/repo";
+import {
+  samplePathsForPrompt,
+  suggestFilesPrompt,
+  suggestedFilesSchema,
+} from "@/lib/llm/prompts/suggest-files";
 import { MAX_SELECTED_FILES } from "@/lib/repo-tree";
 import {
   generateLearnerCourse,
@@ -466,6 +473,215 @@ export async function generateCourseFromRepoAction(
 
     console.error("[repo] repo course generation failed", error);
     return { ok: false, error: t("server.generate.failed") };
+  }
+}
+
+const suggestFilesInputSchema = z.object({
+  repoUrl: z.string().trim().min(1).max(500),
+  /** Branch returned by `getRepoTreeAction`, so the picks match the preview. */
+  branch: z.string().trim().min(1).max(200),
+});
+
+export type SuggestFilesInput = z.input<typeof suggestFilesInputSchema>;
+
+export type SuggestFilesResult =
+  | {
+      ok: true;
+      /** At most `MAX_SELECTED_FILES` paths, in the order to teach them. */
+      suggestedPaths: string[];
+      /** The listing given to the model (or the preview) was partial. */
+      truncated: boolean;
+    }
+  | { ok: false; error: string; code?: GithubErrorCode };
+
+/** README text sent to the model: enough to read purpose and tone. */
+const MAX_SUGGEST_README_CHARS = 2_000;
+
+function suggestBaseName(path: string): string {
+  return (path.split("/").pop() ?? "").toLowerCase();
+}
+
+/** Shallowest readme in the filtered list, if the repository has one. */
+function findReadmePath(entries: RepoTreeEntry[]): string | undefined {
+  return entries
+    .filter((entry) => suggestBaseName(entry.path).startsWith("readme"))
+    .sort(
+      (a, b) =>
+        a.path.split("/").length - b.path.split("/").length ||
+        a.path.localeCompare(b.path),
+    )[0]?.path;
+}
+
+/**
+ * Reads a short README excerpt for the prompt. Missing, binary or rate-limited
+ * READMEs are not fatal: the file listing alone is enough to suggest files.
+ */
+async function readReadmeExcerpt(
+  owner: string,
+  repo: string,
+  path: string,
+  branch: string,
+): Promise<string | undefined> {
+  try {
+    const content = await fetchFileContent(owner, repo, path, branch);
+    return content.slice(0, MAX_SUGGEST_README_CHARS);
+  } catch (error: unknown) {
+    console.warn(`[repo] could not read ${path} for file suggestions`, error);
+    return undefined;
+  }
+}
+
+/**
+ * Suggests the files a course should teach (teacher-side helper).
+ *
+ * Pipeline: auth → validate → read the tree → keep the same readable files as
+ * the preview → optionally read a README excerpt → ask the model for at most
+ * ten paths → keep only paths that exist in the preview. A model answer with no
+ * usable path falls back to the deterministic priority order used by the
+ * analysis pipeline, so the button always produces a reviewable selection.
+ *
+ * The model never receives file contents, so this costs one tree read, at most
+ * one Contents read (the README) and one LLM call.
+ */
+export async function suggestFilesAction(
+  input: SuggestFilesInput,
+): Promise<SuggestFilesResult> {
+  const { t } = await getI18n();
+
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (userId === undefined) {
+    return { ok: false, error: t("server.generate.signIn") };
+  }
+
+  const parsedInput = suggestFilesInputSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { ok: false, error: INVALID_URL_MESSAGE, code: "INVALID_URL" };
+  }
+
+  const { repoUrl, branch } = parsedInput.data;
+
+  const ref = parseRepoUrl(repoUrl);
+  if (ref === null) {
+    return { ok: false, error: INVALID_URL_MESSAGE, code: "INVALID_URL" };
+  }
+
+  const repoName = `${ref.owner}/${ref.repo}`;
+
+  try {
+    const tree = await fetchRepoTree(ref.owner, ref.repo, branch);
+
+    if (tree.entries.length === 0) {
+      return {
+        ok: false,
+        error: `${repoName} is empty, so there is nothing to teach from it yet.`,
+        code: "EMPTY_REPO",
+      };
+    }
+
+    const { files, truncated } = filterRelevantFilesWithMeta(
+      tree.entries,
+      ref.subpath,
+    );
+
+    if (files.length === 0) {
+      return {
+        ok: false,
+        error: `No readable source files were found in ${repoName}. It may only contain generated, binary or documentation assets.`,
+        code: "NO_FILES",
+      };
+    }
+
+    const available = files.map((file) => file.path);
+    const offered = samplePathsForPrompt(available);
+    const readmePath = findReadmePath(files);
+    const readme =
+      readmePath === undefined
+        ? undefined
+        : await readReadmeExcerpt(
+            ref.owner,
+            ref.repo,
+            readmePath,
+            tree.branch,
+          );
+
+    registerLlmMocks();
+
+    const suggested = await generateJson(
+      suggestedFilesSchema,
+      suggestFilesPrompt({
+        repoName,
+        branch: tree.branch,
+        focus: ref.subpath,
+        readme,
+        paths: offered.paths,
+        pathsTruncated: offered.truncated || truncated,
+      }),
+      {
+        usage: "suggest-files",
+        temperature: 0.2,
+        userId,
+        input: {
+          repoUrl,
+          branch: tree.branch,
+          fileCount: available.length,
+          offeredCount: offered.paths.length,
+          readme: readme !== undefined,
+        },
+      },
+    );
+
+    // A path the preview does not show could not be selected or generated from,
+    // so the answer is filtered against the list the model was given.
+    const known = new Set(available);
+    const seen = new Set<string>();
+    const suggestedPaths: string[] = [];
+
+    for (const path of suggested) {
+      const candidate = path.trim();
+      if (!known.has(candidate) || seen.has(candidate)) {
+        continue;
+      }
+
+      seen.add(candidate);
+      suggestedPaths.push(candidate);
+
+      if (suggestedPaths.length >= MAX_SELECTED_FILES) {
+        break;
+      }
+    }
+
+    if (suggestedPaths.length === 0) {
+      console.warn(
+        `[repo] the file suggestion for ${repoName} contained no listed path; using the priority fallback`,
+      );
+    }
+
+    return {
+      ok: true,
+      suggestedPaths:
+        suggestedPaths.length > 0
+          ? suggestedPaths
+          : sortByKeyFilePriority(files)
+              .slice(0, MAX_SELECTED_FILES)
+              .map((file) => file.path),
+      truncated: truncated || offered.truncated,
+    };
+  } catch (error: unknown) {
+    if (error instanceof GithubRepoError) {
+      console.warn(
+        `[repo] suggesting files for ${repoName} failed with ${error.code}: ${error.message}`,
+      );
+      return { ok: false, error: error.message, code: error.code };
+    }
+
+    if (error instanceof LlmError) {
+      console.error("[repo] file suggestion generation failed", error);
+      return { ok: false, error: t("server.repo.suggestFailed") };
+    }
+
+    console.error("[repo] unexpected file suggestion failure", error);
+    return { ok: false, error: t("server.repo.suggestFailed") };
   }
 }
 
