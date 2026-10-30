@@ -1,10 +1,18 @@
 import { readContentLanguage } from "@/lib/llm/language";
-import { registerMock } from "@/lib/llm/mock";
+import { mockText, registerMock } from "@/lib/llm/mock";
 import { mockLearnerCourse } from "@/lib/llm/prompts/course";
 import { mockExplain } from "@/lib/llm/prompts/explain";
 import { mockLesson } from "@/lib/llm/prompts/lesson";
 import { mockCourseOutline } from "@/lib/llm/prompts/outline";
+import { mockRepoAnalysis } from "@/lib/llm/prompts/repo";
 import { mockRoleplayFeedback } from "@/lib/llm/prompts/roleplay";
+import { mockSuggestedFiles } from "@/lib/llm/prompts/suggest-files";
+
+/** Reads the repository label back out of a repo-analysis prompt. */
+function repoLabelFromPrompt(prompt: string): string {
+  const match = /^Repository:\s*(.+)$/mu.exec(prompt);
+  return match?.[1]?.trim() ?? "demo/repo";
+}
 
 /**
  * Registration point for the canned LLM fallbacks (P4.4, P4.5, P4.6, P4.7).
@@ -26,4 +34,18 @@ export function registerLlmMocks(): void {
   registerMock("learner-course", ({ prompt }) =>
     mockLearnerCourse(readContentLanguage(prompt)),
   );
+  registerMock("repo-analysis", ({ prompt }) =>
+    mockRepoAnalysis(repoLabelFromPrompt(prompt)),
+  );
+  registerMock("explain-code", () => ({
+    explanation: mockText(
+      "Demo explanation only; no AI analysis of the source file has run. Read the file top to bottom, note its exports, then follow how they are imported elsewhere in the project.",
+    ),
+  }));
+  registerMock("explain-folder", () => ({
+    explanation: mockText(
+      "Demo folder explanation only; no AI analysis of the folder has run. A real answer would describe what this module owns, which files form its public surface, and where the rest of the project imports it from.",
+    ),
+  }));
+  registerMock("suggest-files", ({ prompt }) => mockSuggestedFiles(prompt));
 }

@@ -140,7 +140,9 @@ async function TeachContent({ searchParams }: TeachPageProps) {
                         <Badge variant="outline">
                           {course.source === "AI_GENERATED"
                             ? t("teach.badge.ai")
-                            : t("teach.badge.authored")}
+                            : course.source === "LEARNER"
+                              ? t("teach.badge.learner")
+                              : t("teach.badge.authored")}
                         </Badge>
                       </div>
 
@@ -201,7 +203,7 @@ async function TeachContent({ searchParams }: TeachPageProps) {
                           {t("teach.insights")}
                         </Link>
                       </div>
-                      {isPublished ? (
+                      {isPublished && course.source !== "LEARNER" ? (
                         <Link
                           className="text-xs text-muted-foreground hover:underline"
                           href={`/courses/${course.slug}`}

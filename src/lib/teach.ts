@@ -13,9 +13,9 @@ import type {
  *
  * The list is scoped to courses the caller created, which is also the ownership
  * rule for editing: `createdById` is the only authority the teacher surfaces
- * use. Learner self-generated courses (P4.7) are created by the same users when
- * they browse as learners, so they are excluded here — the teaching list is
- * about material this person authored, not about what they are studying.
+ * use. Courses generated on `/generate` are included too: a teacher who used the
+ * generator must be able to open the editor for the result, and ownership is
+ * still proven by `createdById`.
  */
 
 export type TaughtCourse = {
@@ -38,19 +38,11 @@ export const COURSE_STATUS_LABELS: Record<CourseStatus, string> = {
   ARCHIVED: "Archived",
 };
 
-/**
- * Every course the user authored, newest edit first
- * (learner self-service courses excepted — see the module comment).
- *
- * Seeded courses are owned by the instructor who curates them, so a `SEED`
- * source must stay in this list: filtering on "AI_GENERATED or INSTRUCTOR"
- * used to hide every pre-seeded course, including its drafts.
- */
+/** Every course the user authored, newest edit first. */
 export async function listTaughtCourses(userId: string): Promise<TaughtCourse[]> {
   const rows = await prisma.course.findMany({
     where: {
       createdById: userId,
-      source: { not: "LEARNER" },
     },
     orderBy: { updatedAt: "desc" },
     select: {

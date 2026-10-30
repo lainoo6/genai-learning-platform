@@ -68,6 +68,9 @@ export type CourseWithLessons = Pick<
   | "status"
   | "isCurated"
   | "createdById"
+  | "repoUrl"
+  | "repoBranch"
+  | "repoSelectedPaths"
 > & {
   modules: CourseModule[];
 };
@@ -86,6 +89,9 @@ const courseWithLessonsSelect = {
   status: true,
   isCurated: true,
   createdById: true,
+  repoUrl: true,
+  repoBranch: true,
+  repoSelectedPaths: true,
   modules: {
     orderBy: { order: "asc" },
     select: {
@@ -135,6 +141,9 @@ function toCourseWithLessons(row: CourseRow): CourseWithLessons {
     status: row.status,
     isCurated: row.isCurated,
     createdById: row.createdById,
+    repoUrl: row.repoUrl,
+    repoBranch: row.repoBranch,
+    repoSelectedPaths: row.repoSelectedPaths,
     modules: row.modules.map((courseModule) => ({
       id: courseModule.id,
       title: courseModule.title,
@@ -182,13 +191,11 @@ export function firstLesson(
 }
 
 /**
- * Courses shown on every public surface.
+ * Courses shown in the public catalog.
  *
  * Learner-generated courses (P4.7) are published so the player works, but they
  * belong to the learner who asked for them: they never appear in the catalog,
- * the home page preview, the recommendations or a public course page.
- *
- * Exported so the home page reuses the same rule instead of re-deriving it.
+ * the recommendations or a public course page.
  */
 export const PUBLIC_COURSE_WHERE = {
   status: "PUBLISHED",

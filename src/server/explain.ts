@@ -1,0 +1,456 @@
+"use server";
+
+import { z } from "zod";
+
+import { getI18n } from "@/i18n/server";
+import { auth } from "@/lib/auth";
+import {
+  MAX_FOLDER_FILES,
+  directChildFiles,
+  folderExplanationPrompt,
+  folderPreviewCandidates,
+  previewExcerpt,
+  type FolderFilePreview,
+} from "@/lib/folder-preview";
+import {
+  GithubRepoError,
+  fetchFileContent,
+  fetchRepoTree,
+  filterRelevantFilesWithMeta,
+  isRelevantPath,
+  parseRepoUrl,
+  type RepoTreeEntry,
+} from "@/lib/github-repo";
+import { registerLlmMocks } from "@/lib/llm/mocks";
+import { LlmError, generateJson } from "@/lib/llm/provider";
+import {
+  explainFilePrompt,
+  explainSelectionPrompt,
+} from "@/lib/llm/prompts/explain-code";
+
+/**
+ * "Explain this file" for the source-code explorer (Phase 4).
+ *
+ * The learner only sends the path of a file they can already see in the course
+ * tree; the action resolves the repository, downloads the file and asks the
+ * model for a short explanation. Like every other action on the platform it
+ * never throws and turns each failure into a message that is safe to show.
+ */
+
+/** Viewer safety cap: the full file is returned up to this length. */
+const MAX_VIEWER_CHARS = 50_000;
+/** Whole-file prompt budget: tighter than the viewer so the model focuses. */
+const MAX_PROMPT_FILE_CHARS = 2_000;
+/** A highlighted snippet is small by design; the explorer caps it client-side too. */
+const MAX_SELECTED_CHARS = 1_000;
+/** Hard ceiling for caller-supplied paths; the explorer sends at most 50. */
+const MAX_PROMPT_TREE_PATHS = 100;
+
+const explainCodeInputSchema = z.object({
+  repoUrl: z.string().trim().min(1).max(500),
+  branch: z.string().trim().min(1).max(200),
+  filePath: z.string().trim().min(1).max(500),
+  /** Optional highlighted snippet from the file currently open in the explorer. */
+  selectedCode: z.string().trim().max(MAX_SELECTED_CHARS).optional(),
+  /** Optional project context: paths of neighbouring files. */
+  fileTree: z
+    .array(z.string().trim().min(1).max(500))
+    .max(MAX_PROMPT_TREE_PATHS)
+    .optional(),
+});
+
+export type ExplainCodeInput = z.input<typeof explainCodeInputSchema>;
+
+export type ExplainCodeResult =
+  | { ok: true; explanation: string }
+  | { ok: false; error: string };
+
+const explainCodeSchema = z.object({
+  explanation: z.string().trim().min(1).max(8_000),
+});
+
+/**
+ * Explains one repository file for a signed-in learner.
+ *
+ * Only paths that pass the same relevance rules as the file picker are read, so
+ * a direct caller cannot ask for dotfiles, dependencies or build output. When
+ * the explorer sends a highlighted snippet, that snippet is explained directly
+ * and the Contents request is skipped.
+ */
+export async function explainCodeAction(
+  input: ExplainCodeInput,
+): Promise<ExplainCodeResult> {
+  const { t } = await getI18n();
+
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (userId === undefined) {
+    return { ok: false, error: t("server.explain.codeSignIn") };
+  }
+
+  const parsedInput = explainCodeInputSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { ok: false, error: t("server.explain.codeInvalid") };
+  }
+
+  const { repoUrl, branch, filePath, selectedCode, fileTree } =
+    parsedInput.data;
+  const selection =
+    selectedCode !== undefined && selectedCode.length > 0
+      ? selectedCode
+      : undefined;
+
+  const ref = parseRepoUrl(repoUrl);
+  if (ref === null) {
+    return { ok: false, error: t("server.explain.codeInvalid") };
+  }
+
+  if (!isRelevantPath(filePath)) {
+    return { ok: false, error: t("server.explain.codeInvalid") };
+  }
+
+  // Neighbouring paths are only prompt context, but a server action is public:
+  // drop the active file, ignored paths and duplicates before trusting them.
+  const treeContext = [
+    ...new Set(
+      (fileTree ?? [])
+        .map((path) => path.trim())
+        .filter(
+          (path) =>
+            path.length > 0 && path !== filePath && isRelevantPath(path),
+        ),
+    ),
+  ].slice(0, MAX_PROMPT_TREE_PATHS);
+
+  try {
+    let prompt: string;
+    let truncated = false;
+
+    if (selection !== undefined) {
+      // The snippet already contains everything the prompt needs, so the
+      // extra Contents request is skipped for selected-code explanations.
+      prompt = explainSelectionPrompt(filePath, selection, treeContext);
+    } else {
+      const content = await fetchFileContent(
+        ref.owner,
+        ref.repo,
+        filePath,
+        branch,
+      );
+
+      const capped = content.slice(0, MAX_PROMPT_FILE_CHARS);
+      truncated = content.length > capped.length;
+      prompt = explainFilePrompt(filePath, capped, treeContext);
+    }
+
+    registerLlmMocks();
+
+    const result = await generateJson(explainCodeSchema, prompt, {
+      usage: "explain-code",
+      temperature: 0.3,
+      userId,
+      input: {
+        repoUrl,
+        branch,
+        filePath,
+        mode: selection === undefined ? "file" : "selection",
+        selectedChars: selection?.length ?? 0,
+        fileTree: treeContext.length,
+        truncated,
+      },
+    });
+
+    return { ok: true, explanation: result.explanation };
+  } catch (error: unknown) {
+    if (error instanceof GithubRepoError) {
+      // The GitHub message already explains rate limits, private repos, etc.
+      console.warn(
+        `[explain] reading ${ref.owner}/${ref.repo}/${filePath} failed with ${error.code}: ${error.message}`,
+      );
+      return { ok: false, error: error.message };
+    }
+
+    if (error instanceof LlmError) {
+      console.error("[explain] explanation generation failed", error);
+      return { ok: false, error: t("server.explain.codeFailed") };
+    }
+
+    console.error("[explain] unexpected failure", error);
+    return { ok: false, error: t("server.explain.codeFailed") };
+  }
+}
+
+const explainFolderInputSchema = z.object({
+  repoUrl: z.string().trim().min(1).max(500),
+  branch: z.string().trim().min(1).max(200),
+  folderPath: z.string().trim().min(1).max(500),
+  /** Direct children of the folder; capped before anything is read. */
+  fileNames: z.array(z.string().trim().min(1).max(500)).max(MAX_FOLDER_FILES),
+});
+
+export type ExplainFolderInput = z.input<typeof explainFolderInputSchema>;
+
+export type ExplainFolderResult =
+  | { ok: true; explanation: string }
+  | { ok: false; error: string };
+
+/**
+ * Explains what a folder is responsible for (Phase 4, part 3).
+ *
+ * The explorer sends the folder path and the files directly inside it. The
+ * action re-validates that every file is a direct child of that folder, then
+ * previews at most five code files (first 15 lines each) so the model can see
+ * imports and exports without downloading the whole module. Unreadable files
+ * are skipped; when none can be read the folder is explained from its name and
+ * file list alone. Nothing is generated until the learner clicks the button.
+ */
+export async function explainFolderAction(
+  input: ExplainFolderInput,
+): Promise<ExplainFolderResult> {
+  const { t } = await getI18n();
+
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (userId === undefined) {
+    return { ok: false, error: t("server.explain.codeSignIn") };
+  }
+
+  const parsedInput = explainFolderInputSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { ok: false, error: t("server.explain.folderInvalid") };
+  }
+
+  const { repoUrl, branch, fileNames } = parsedInput.data;
+  const folderPath = parsedInput.data.folderPath.replace(/\/+$/u, "");
+
+  const ref = parseRepoUrl(repoUrl);
+  if (
+    ref === null ||
+    folderPath.length === 0 ||
+    !isRelevantPath(folderPath)
+  ) {
+    return { ok: false, error: t("server.explain.folderInvalid") };
+  }
+
+  const directFiles = directChildFiles(folderPath, fileNames).filter((path) =>
+    isRelevantPath(path),
+  );
+
+  try {
+    const candidates = folderPreviewCandidates(directFiles);
+
+    const previews = await Promise.all(
+      candidates.map(async (path): Promise<FolderFilePreview | null> => {
+        try {
+          const content = await fetchFileContent(
+            ref.owner,
+            ref.repo,
+            path,
+            branch,
+          );
+
+          return { path, excerpt: previewExcerpt(content) };
+        } catch (error: unknown) {
+          // One unreadable file (rate limit, binary, too large) is not fatal.
+          console.warn(`[explain] skipping folder preview ${path}:`, error);
+          return null;
+        }
+      }),
+    );
+
+    const readable = previews.filter(
+      (preview): preview is FolderFilePreview => preview !== null,
+    );
+
+    registerLlmMocks();
+
+    const result = await generateJson(
+      explainCodeSchema,
+      folderExplanationPrompt({
+        folderPath,
+        repoUrl,
+        filePaths: directFiles,
+        previews: readable,
+      }),
+      {
+        usage: "explain-folder",
+        temperature: 0.3,
+        userId,
+        input: {
+          repoUrl,
+          branch,
+          folderPath,
+          fileCount: directFiles.length,
+          previewed: readable.length,
+        },
+      },
+    );
+
+    return { ok: true, explanation: result.explanation };
+  } catch (error: unknown) {
+    if (error instanceof LlmError) {
+      console.error("[explain] folder explanation generation failed", error);
+      return { ok: false, error: t("server.explain.folderFailed") };
+    }
+
+    console.error("[explain] unexpected folder explanation failure", error);
+    return { ok: false, error: t("server.explain.folderFailed") };
+  }
+}
+
+const fileContentInputSchema = z.object({
+  repoUrl: z.string().trim().min(1).max(500),
+  /** Null/empty for legacy courses; GitHub then reads the default branch. */
+  branch: z.string().trim().max(200).nullish(),
+  filePath: z.string().trim().min(1).max(500),
+});
+
+export type FetchFileContentInput = z.input<typeof fileContentInputSchema>;
+
+export type FetchFileContentResult =
+  | { ok: true; content: string; truncated: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Reads one repository file for the source explorer (Phase 4, part 2).
+ *
+ * The explorer sends the same path it renders in the tree, so the relevance
+ * guard is repeated here: a server action is a public endpoint and must not
+ * hand out dotfiles, dependencies or binary payloads. The whole file is
+ * returned, up to a 50,000-character safety cap so one huge file cannot freeze
+ * the browser. The explanation prompt still uses only its first 2,000
+ * characters, so showing more code costs no extra tokens.
+ */
+export async function fetchFileContentAction(
+  input: FetchFileContentInput,
+): Promise<FetchFileContentResult> {
+  const { t } = await getI18n();
+
+  const session = await auth();
+  if (session?.user?.id === undefined) {
+    return { ok: false, error: t("server.explain.codeSignIn") };
+  }
+
+  const parsedInput = fileContentInputSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { ok: false, error: t("server.explain.codeInvalid") };
+  }
+
+  const { repoUrl, branch, filePath } = parsedInput.data;
+
+  const ref = parseRepoUrl(repoUrl);
+  if (ref === null || !isRelevantPath(filePath)) {
+    return { ok: false, error: t("server.explain.codeInvalid") };
+  }
+
+  try {
+    const content = await fetchFileContent(
+      ref.owner,
+      ref.repo,
+      filePath,
+      branch ?? undefined,
+    );
+
+    const capped = content.slice(0, MAX_VIEWER_CHARS);
+
+    return {
+      ok: true,
+      content: capped,
+      truncated: content.length > capped.length,
+    };
+  } catch (error: unknown) {
+    if (error instanceof GithubRepoError) {
+      console.warn(
+        `[explain] reading ${ref.owner}/${ref.repo}/${filePath} failed with ${error.code}: ${error.message}`,
+      );
+      return { ok: false, error: error.message };
+    }
+
+    console.error("[explain] unexpected file read failure", error);
+    return { ok: false, error: t("server.explain.fileFailed") };
+  }
+}
+
+const repoTreeInputSchema = z.object({
+  repoUrl: z.string().trim().min(1).max(500),
+  /** The branch stored on the course; null for legacy rows. */
+  branch: z.string().trim().max(200).nullish(),
+});
+
+export type FetchRepoTreeInput = z.input<typeof repoTreeInputSchema>;
+
+export type FetchRepoTreeResult =
+  | {
+      ok: true;
+      entries: RepoTreeEntry[];
+      /** Branch that was actually read, used by every follow-up file read. */
+      branch: string;
+      /** GitHub's tree was partial, or the 400-file preview cap was reached. */
+      truncated: boolean;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Lists the readable source files of a course repository.
+ *
+ * Reuses the generator's relevance filter (`isRelevantPath` and friends), so the
+ * explorer never offers lockfiles, build output or binaries that would fail to
+ * open. The course's `repoUrl` is canonical, which is why the stored branch is
+ * passed explicitly instead of relying on a branch in the URL.
+ */
+export async function fetchRepoTreeAction(
+  input: FetchRepoTreeInput,
+): Promise<FetchRepoTreeResult> {
+  const { t } = await getI18n();
+
+  const session = await auth();
+  if (session?.user?.id === undefined) {
+    return { ok: false, error: t("server.explain.codeSignIn") };
+  }
+
+  const parsedInput = repoTreeInputSchema.safeParse(input);
+  if (!parsedInput.success) {
+    return { ok: false, error: t("server.explain.codeInvalid") };
+  }
+
+  const { repoUrl, branch } = parsedInput.data;
+
+  const ref = parseRepoUrl(repoUrl);
+  if (ref === null) {
+    return { ok: false, error: t("server.explain.codeInvalid") };
+  }
+
+  try {
+    const tree = await fetchRepoTree(
+      ref.owner,
+      ref.repo,
+      branch ?? ref.branch,
+    );
+
+    const { files, truncated } = filterRelevantFilesWithMeta(
+      tree.entries,
+      ref.subpath,
+    );
+
+    if (files.length === 0) {
+      return { ok: false, error: t("server.explain.treeEmpty") };
+    }
+
+    return {
+      ok: true,
+      entries: files,
+      branch: tree.branch,
+      truncated: truncated || tree.truncated,
+    };
+  } catch (error: unknown) {
+    if (error instanceof GithubRepoError) {
+      console.warn(
+        `[explain] listing ${ref.owner}/${ref.repo} failed with ${error.code}: ${error.message}`,
+      );
+      return { ok: false, error: error.message };
+    }
+
+    console.error("[explain] unexpected tree failure", error);
+    return { ok: false, error: t("server.explain.treeFailed") };
+  }
+}

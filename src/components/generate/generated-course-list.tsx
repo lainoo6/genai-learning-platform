@@ -1,7 +1,7 @@
 "use client";
 
 import type { CourseStatus } from "@prisma/client";
-import { ArrowRight, Loader2, Trash2 } from "lucide-react";
+import { ArrowRight, Loader2, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -24,7 +24,12 @@ export type GeneratedCourseItem = {
 };
 
 /**
- * History of the learner's generated courses: reopen one, or delete it.
+ * History of the user's generated courses: reopen one, or delete it.
+ *
+ * Teachers get an "edit" link into the full course editor instead of the
+ * learner player: the same course is owned by them (`createdById`), and the
+ * editor is where they can change the material they just generated. Learners
+ * keep the player link, and never see a link into `/teach`.
  *
  * Deletion is guarded by a confirmation and then re-rendered through
  * `router.refresh()`, so the list always mirrors the database rather than a
@@ -32,8 +37,10 @@ export type GeneratedCourseItem = {
  */
 export function GeneratedCourseList({
   courses,
+  isTeacher,
 }: {
   courses: GeneratedCourseItem[];
+  isTeacher: boolean;
 }) {
   const t = useT();
   const router = useRouter();
@@ -102,7 +109,15 @@ export function GeneratedCourseList({
             </div>
 
             <div className="mt-auto flex items-center gap-2">
-              {course.firstLessonId === null ? (
+              {isTeacher ? (
+                <Link
+                  className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
+                  href={`/teach/courses/${course.id}/edit`}
+                >
+                  <Pencil aria-hidden="true" />
+                  {t("generate.history.edit")}
+                </Link>
+              ) : course.firstLessonId === null ? (
                 <Badge variant="outline">{t("generate.history.noLessons")}</Badge>
               ) : (
                 <Link

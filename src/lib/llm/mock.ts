@@ -17,6 +17,10 @@ export const LLM_USAGES = [
   "course-outline",
   "course-lesson",
   "learner-course",
+  "repo-analysis",
+  "explain-code",
+  "explain-folder",
+  "suggest-files",
 ] as const;
 
 export type LlmUsage = (typeof LLM_USAGES)[number];

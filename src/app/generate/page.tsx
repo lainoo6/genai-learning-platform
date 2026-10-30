@@ -29,6 +29,8 @@ async function GenerateContent() {
     redirect(`/login?callbackUrl=${encodeURIComponent("/generate")}`);
   }
 
+  const isTeacher = user.role === "INSTRUCTOR" || user.role === "ADMIN";
+
   const dateFormat = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
     day: "numeric",
     month: "short",
@@ -58,7 +60,7 @@ async function GenerateContent() {
         </p>
       </header>
 
-      <GeneratorForm />
+      <GeneratorForm isTeacher={isTeacher} />
 
       <section aria-labelledby="history-heading" className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -78,7 +80,7 @@ async function GenerateContent() {
             {t("generate.history.empty")}
           </p>
         ) : (
-          <GeneratedCourseList courses={history} />
+          <GeneratedCourseList courses={history} isTeacher={isTeacher} />
         )}
       </section>
     </div>

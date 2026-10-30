@@ -67,10 +67,6 @@ model Course {
   language    String       @default("en")
   status      CourseStatus @default(DRAFT)
   source      CourseSource @default(SEED)
-  /// Staff pick, shown as its own badge in the catalog. Kept separate from
-  /// `source` so an AI-generated course can be curated without losing its
-  /// provenance. Only admins can change it.
-  isCurated   Boolean      @default(false)
   createdById String
   createdBy   User         @relation("CourseCreator", fields: [createdById], references: [id])
   modules     Module[]
@@ -78,6 +74,18 @@ model Course {
   events      EngagementEvent[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  /// Already present in the dev database via migration
+  /// 20261020110716_add_course_is_curated; kept in the model so local
+  /// migration history and the shared database agree.
+  isCurated   Boolean      @default(false)
+
+  /// Phase 4: GitHub repository this course was generated from.
+  /// Null for courses that did not come from a repository.
+  repoUrl           String?
+  repoBranch        String?
+  /// Repo-relative paths the teacher selected. Prisma does not support
+  /// `String[]?`, so this is a scalar list with an empty-array default.
+  repoSelectedPaths String[] @default([])
 }
 
 model Module {
