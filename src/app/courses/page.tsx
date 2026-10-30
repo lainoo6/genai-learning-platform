@@ -89,6 +89,7 @@ async function PublishedCatalog() {
       languageLabel: t("courses.contentLanguage", {
         language: CONTENT_LANGUAGES[course.language] ?? course.language,
       }),
+      curated: course.isCurated,
       lessonCount: countLessons(course),
       minutes: totalMinutes(course),
       blockTypes,

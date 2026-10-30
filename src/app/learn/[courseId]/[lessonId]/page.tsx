@@ -1,4 +1,5 @@
 import {
+  Archive,
   ArrowLeft,
   ArrowRight,
   ChevronRight,
@@ -123,7 +124,11 @@ async function LessonPlayer({ params, searchParams }: LessonPageProps) {
         course={course}
         enrolled={false}
         firstLessonHref={null}
-        notice={t("course.notice.notEnrolled")}
+        notice={
+          course.status === "ARCHIVED"
+            ? t("course.notice.archived")
+            : t("course.notice.notEnrolled")
+        }
       />
     );
   }
@@ -222,8 +227,8 @@ async function LessonPlayer({ params, searchParams }: LessonPageProps) {
           </Link>
           <ChevronRight aria-hidden="true" className="size-3" />
           {course.source === "LEARNER" || course.status !== "PUBLISHED" ? (
-            // Generated courses and unpublished drafts have no public page;
-            // showing a link here would dead-end on the catalog's 404.
+            // Generated courses and unpublished or archived courses have no
+            // public page; linking them would dead-end on the catalog's 404.
             <span className="text-foreground">{course.title}</span>
           ) : (
             <Link className="hover:text-foreground" href={`/courses/${course.slug}`}>
@@ -234,6 +239,13 @@ async function LessonPlayer({ params, searchParams }: LessonPageProps) {
           <span className="text-foreground">{lesson.title}</span>
         </nav>
 
+        {course.status === "ARCHIVED" ? (
+          <p className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+            <Archive aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            {t("lesson.archived")}
+          </p>
+        ) : null}
+
         {canPreview ? (
           <p
             className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm"
@@ -242,6 +254,7 @@ async function LessonPlayer({ params, searchParams }: LessonPageProps) {
             {t("lesson.preview.notice")}
           </p>
         ) : null}
+
 
         <header className="space-y-3">
           <p className="text-xs text-muted-foreground">

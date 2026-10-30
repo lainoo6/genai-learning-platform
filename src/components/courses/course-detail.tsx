@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, Clock, Eye, Lock } from "lucide-react";
+import { Check, ChevronLeft, Clock, Eye, Lock, Star } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +88,12 @@ export async function CourseDetail({
           </p>
 
           <div className="flex flex-wrap items-center gap-1.5">
+            {course.isCurated ? (
+              <Badge className="gap-1">
+                <Star aria-hidden="true" />
+                {t("courses.badge.curated")}
+              </Badge>
+            ) : null}
             <Badge>{difficultyLabel}</Badge>
             <Badge variant="secondary">{course.audience}</Badge>
             <Badge variant="outline">{course.topic}</Badge>

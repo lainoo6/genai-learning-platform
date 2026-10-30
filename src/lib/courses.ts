@@ -66,6 +66,7 @@ export type CourseWithLessons = Pick<
   | "language"
   | "source"
   | "status"
+  | "isCurated"
   | "createdById"
   | "repoUrl"
   | "repoBranch"
@@ -86,6 +87,7 @@ const courseWithLessonsSelect = {
   language: true,
   source: true,
   status: true,
+  isCurated: true,
   createdById: true,
   repoUrl: true,
   repoBranch: true,
@@ -137,6 +139,7 @@ function toCourseWithLessons(row: CourseRow): CourseWithLessons {
     language: row.language,
     source: row.source,
     status: row.status,
+    isCurated: row.isCurated,
     createdById: row.createdById,
     repoUrl: row.repoUrl,
     repoBranch: row.repoBranch,
@@ -194,7 +197,7 @@ export function firstLesson(
  * belong to the learner who asked for them: they never appear in the catalog,
  * the recommendations or a public course page.
  */
-const PUBLIC_COURSE_WHERE = {
+export const PUBLIC_COURSE_WHERE = {
   status: "PUBLISHED",
   source: { not: "LEARNER" },
 } satisfies Prisma.CourseWhereInput;
