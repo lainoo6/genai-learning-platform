@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MAX_IMAGES } from "@/lib/course-file";
+import { MAX_IMAGE_BYTES, MAX_IMAGES } from "@/lib/course-file";
 import { figureLines, readUploadedImage, readUploadedImages } from "@/lib/upload-images";
 
 /**
@@ -38,8 +38,8 @@ describe("readUploadedImage", () => {
     expect(result.image.height).toBe(1);
   });
 
-  it("rejects an image above the 2 MB cap", async () => {
-    const big = pngFile("huge.png", new Uint8Array(2 * 1024 * 1024 + 1));
+  it("rejects an image above the per-image cap", async () => {
+    const big = pngFile("huge.png", new Uint8Array(MAX_IMAGE_BYTES + 1));
     const result = await readUploadedImage(big, t);
 
     expect(result.ok).toBe(false);
@@ -74,7 +74,7 @@ describe("readUploadedImages", () => {
   it("keeps going when one file in the batch is bad", async () => {
     const files = [
       pngFile("good.png"),
-      pngFile("huge.png", new Uint8Array(2 * 1024 * 1024 + 1)),
+      pngFile("huge.png", new Uint8Array(MAX_IMAGE_BYTES + 1)),
     ];
 
     const result = await readUploadedImages(files, t);

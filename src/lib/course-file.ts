@@ -18,10 +18,17 @@ export const COURSE_FILE_EXTENSIONS = [".pdf", ".pptx"] as const;
 export type CourseFileKind = "pdf" | "pptx";
 
 /**
- * A dropped image becomes one vision call and one prompt paragraph, so it is
- * capped far below the document limit; six of them still fit the input budget.
+ * The whole request body (document + every dropped image) must stay under the
+ * host cap. A per-image cap alone would still let a 4 MB document plus six
+ * images reach the platform as a 413, before the form could show an error.
  */
-export const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+/**
+ * A dropped image becomes one vision call and one prompt paragraph, so one
+ * file must not be able to eat the entire shared upload budget.
+ */
+export const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
 export const MAX_IMAGES = 6;
 
 export const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"] as const;
@@ -71,6 +78,17 @@ export const courseFileSchema = z.object({
     .positive()
     .max(MAX_COURSE_FILE_BYTES, { message: "tooLarge" }),
 });
+
+/** Sum of the document and all dropped images, checked on both sides of the wire. */
+export function uploadTotalBytes(
+  document: { size: number } | null,
+  images: readonly { size: number }[],
+): number {
+  return (
+    (document?.size ?? 0) +
+    images.reduce((total, image) => total + image.size, 0)
+  );
+}
 
 /** Same contract for a dropped image, with its own size cap. */
 export const imageFileSchema = z.object({

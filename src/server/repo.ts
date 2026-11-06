@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getI18n } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { DOCUMENT_ERROR_KEYS, readCourseDocument } from "@/lib/course-document";
+import { MAX_UPLOAD_BYTES, uploadTotalBytes } from "@/lib/course-file";
 import {
   composeRepoSourceText,
   MAX_INSTRUCTIONS_CHARS,
@@ -37,7 +38,7 @@ import {
   suggestFilesPrompt,
   suggestedFilesSchema,
 } from "@/lib/llm/prompts/suggest-files";
-import { MAX_SELECTED_FILES } from "@/lib/repo-tree";
+import { formatBytes, MAX_SELECTED_FILES } from "@/lib/repo-tree";
 import { figureLines, readUploadedImages } from "@/lib/upload-images";
 import {
   generateLearnerCourse,
@@ -400,6 +401,17 @@ export async function generateCourseFromRepoAction(
     (!Array.isArray(images) || images.some((image) => !(image instanceof File)))
   ) {
     return { ok: false, error: t("server.generate.repo.invalidSelection") };
+  }
+
+  // This action is a public endpoint: the form check is only ergonomics, so
+  // the shared body cap has to be enforced here too.
+  if (uploadTotalBytes(document ?? null, images ?? []) > MAX_UPLOAD_BYTES) {
+    return {
+      ok: false,
+      error: t("server.generate.file.totalTooLarge", {
+        limit: formatBytes(MAX_UPLOAD_BYTES),
+      }),
+    };
   }
 
   const paths = [...new Set(selectedPaths)];

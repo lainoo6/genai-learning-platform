@@ -10,7 +10,12 @@ import type { Translator } from "@/i18n/translate";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
 import { DOCUMENT_ERROR_KEYS, readCourseDocument } from "@/lib/course-document";
-import { courseFileKind, isImageName } from "@/lib/course-file";
+import {
+  courseFileKind,
+  isImageName,
+  MAX_UPLOAD_BYTES,
+  uploadTotalBytes,
+} from "@/lib/course-file";
 import {
   instructionsSection,
   withInstructions,
@@ -37,7 +42,7 @@ import {
   type ExtractedImage,
 } from "@/lib/ppt-image-extractor";
 import { prisma } from "@/lib/prisma";
-import { MAX_SELECTED_FILES } from "@/lib/repo-tree";
+import { formatBytes, MAX_SELECTED_FILES } from "@/lib/repo-tree";
 import { figureLines, readUploadedImages } from "@/lib/upload-images";
 
 /**
@@ -542,6 +547,17 @@ export async function generateCourseFromFileAction(
           upload.unknown.length > 0
             ? t("server.generate.file.type")
             : t("server.generate.file.choose"),
+      };
+    }
+
+    // The client checks this too, but only the action is a real gate: a
+    // hand-built FormData must not be able to push a 13 MB body to the host.
+    if (uploadTotalBytes(upload.document, upload.images) > MAX_UPLOAD_BYTES) {
+      return {
+        ok: false,
+        error: t("server.generate.file.totalTooLarge", {
+          limit: formatBytes(MAX_UPLOAD_BYTES),
+        }),
       };
     }
 

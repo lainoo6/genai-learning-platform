@@ -1,9 +1,6 @@
 import { getI18n } from "@/i18n/server";
 
-/**
- * Global footer. The GitHub link stays a placeholder until the repository is
- * created on launch day (task U1).
- */
+/** Global footer. */
 export async function SiteFooter() {
   const { t } = await getI18n();
 
@@ -16,9 +13,14 @@ export async function SiteFooter() {
         </p>
 
         <p className="flex items-center gap-2">
-          {/* TODO(U1): replace this placeholder with the real repository URL. */}
-          <span>{t("footer.github")}</span>
-          <span className="text-xs">{t("footer.pending")}</span>
+          <a
+            className="underline-offset-4 hover:text-foreground hover:underline"
+            href="https://github.com/lainoo6/genai-learning-platform"
+            rel="noreferrer"
+            target="_blank"
+          >
+            {t("footer.github")}
+          </a>
         </p>
       </div>
     </footer>

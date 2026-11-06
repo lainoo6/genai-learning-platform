@@ -18,10 +18,13 @@ import { useT } from "@/i18n/client";
 import {
   courseFileKind,
   MAX_COURSE_FILE_BYTES,
+  MAX_UPLOAD_BYTES,
+  uploadTotalBytes,
 } from "@/lib/course-file";
 import {
   buildRepoTree,
   flattenFiles,
+  formatBytes,
   MAX_SELECTED_FILES,
 } from "@/lib/repo-tree";
 import { cn } from "@/lib/utils";
@@ -275,6 +278,17 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
       return;
     }
 
+    // The host rejects the body before any action can answer; stop here so the
+    // form can explain the limit instead of showing a blank 413.
+    if (uploadTotalBytes(file, images) > MAX_UPLOAD_BYTES) {
+      setError(
+        t("generate.form.images.totalTooLarge", {
+          limit: formatBytes(MAX_UPLOAD_BYTES),
+        }),
+      );
+      return;
+    }
+
     // Images alone still need a subject; a filename is not a topic.
     if (file === null && imageTopic.trim().length < 3) {
       setError(t("generate.error.imagesTopic"));
@@ -434,6 +448,17 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
     const fileProblem = documentError(file);
     if (fileProblem !== null) {
       setError(fileProblem);
+      return;
+    }
+
+    // Repo mode sends the same document + images bundle, so it shares the
+    // request-body cap with the document mode.
+    if (uploadTotalBytes(file, images) > MAX_UPLOAD_BYTES) {
+      setError(
+        t("generate.form.images.totalTooLarge", {
+          limit: formatBytes(MAX_UPLOAD_BYTES),
+        }),
+      );
       return;
     }
 

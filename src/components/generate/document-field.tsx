@@ -10,8 +10,10 @@ import {
   IMAGE_EXTENSIONS,
   MAX_IMAGES,
   MAX_IMAGE_BYTES,
+  MAX_UPLOAD_BYTES,
   courseFileKind,
   isImageName,
+  uploadTotalBytes,
 } from "@/lib/course-file";
 import { formatBytes } from "@/lib/repo-tree";
 import { cn } from "@/lib/utils";
@@ -94,14 +96,25 @@ export function DocumentField({
           });
           continue;
         }
+        // Count first, then the individual file, then the shared budget, so the
+        // message always names the file that could not be added.
+        if (nextImages.length >= MAX_IMAGES) {
+          nextError = t("generate.form.images.limit", { count: MAX_IMAGES });
+          continue;
+        }
         if (candidate.size > MAX_IMAGE_BYTES) {
           nextError = t("generate.form.images.tooLarge", {
             name: candidate.name,
           });
           continue;
         }
-        if (nextImages.length >= MAX_IMAGES) {
-          nextError = t("generate.form.images.limit", { count: MAX_IMAGES });
+        if (
+          uploadTotalBytes(nextDocument, [...nextImages, candidate]) >
+          MAX_UPLOAD_BYTES
+        ) {
+          nextError = t("generate.form.images.totalTooLarge", {
+            limit: formatBytes(MAX_UPLOAD_BYTES),
+          });
           continue;
         }
         nextImages.push(candidate);
@@ -117,6 +130,16 @@ export function DocumentField({
 
       // The document slot holds one file; a later pick replaces it.
       nextDocument = candidate;
+    }
+
+    // Replacing the document can push an already accepted batch over the cap.
+    if (
+      nextError === null &&
+      uploadTotalBytes(nextDocument, nextImages) > MAX_UPLOAD_BYTES
+    ) {
+      nextError = t("generate.form.images.totalTooLarge", {
+        limit: formatBytes(MAX_UPLOAD_BYTES),
+      });
     }
 
     setError(nextError);
@@ -223,6 +246,17 @@ export function DocumentField({
           images={images}
           onRemove={removeImage}
         />
+      )}
+
+      {images === undefined ? null : (
+        <p className="text-xs tabular-nums text-muted-foreground">
+          {t("generate.form.images.usage", {
+            count: images.length,
+            max: MAX_IMAGES,
+            used: formatBytes(uploadTotalBytes(file, images)),
+            limit: formatBytes(MAX_UPLOAD_BYTES),
+          })}
+        </p>
       )}
 
       {error === null ? null : (

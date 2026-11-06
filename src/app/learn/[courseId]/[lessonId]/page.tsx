@@ -16,6 +16,7 @@ import { Suspense } from "react";
 import { BlockRenderer } from "@/components/blocks/BlockRenderer";
 import { CourseDetail } from "@/components/courses/course-detail";
 import { ExploreSourceButton } from "@/components/learn/explore-source-button";
+import { LessonCoach } from "@/components/learn/lesson-coach";
 import { LessonFeedback } from "@/components/learn/lesson-feedback";
 import {
   LessonOutline,
@@ -30,7 +31,7 @@ import { getI18n } from "@/i18n/server";
 import { trackEvent } from "@/lib/analytics";
 import { auth } from "@/lib/auth";
 import { applyBlockOverrides } from "@/lib/blocks/override";
-import { blockListSchema } from "@/lib/blocks/schema";
+import { blockListSchema, type Block } from "@/lib/blocks/schema";
 import { gameActivityContainerSchema } from "@/lib/game-activity";
 import { getGameActivityProgress } from "@/lib/game-activity-progression";
 import {
@@ -58,6 +59,29 @@ type LessonPageProps = {
 
 function isPreviewRequested(value: string | string[] | undefined): boolean {
   return Array.isArray(value) ? value.includes("1") : value === "1";
+}
+
+/**
+ * The coach reads hint text from a data attribute, so it never needs a block
+ * payload or the internal state of a block component.
+ */
+function coachHint(block: Block): string | undefined {
+  const payload = block.payload;
+  if (
+    "hint" in payload &&
+    typeof payload.hint === "string" &&
+    payload.hint.length > 0
+  ) {
+    return payload.hint;
+  }
+  if (
+    "hints" in payload &&
+    Array.isArray(payload.hints) &&
+    typeof payload.hints[0] === "string"
+  ) {
+    return payload.hints[0];
+  }
+  return undefined;
 }
 
 /**
@@ -348,15 +372,24 @@ async function LessonPlayer({ params, searchParams }: LessonPageProps) {
 
         <div className="space-y-4">
           {blocks.map((block) => (
-            <BlockRenderer
-              block={block}
-              completed={completedBlocks.includes(block.id)}
-              courseId={courseId}
+            <div
+              data-block-completed={
+                completedBlocks.includes(block.id) ? "true" : "false"
+              }
+              data-block-hint={coachHint(block)}
+              data-block-id={block.id}
+              data-block-type={block.type}
               key={block.id}
-              lessonId={lessonId}
-              overridden={overriddenBlockIds.has(block.id)}
-              preview={canPreview}
-            />
+            >
+              <BlockRenderer
+                block={block}
+                completed={completedBlocks.includes(block.id)}
+                courseId={courseId}
+                lessonId={lessonId}
+                overridden={overriddenBlockIds.has(block.id)}
+                preview={canPreview}
+              />
+            </div>
           ))}
           {gameActivity ? (
             <section
@@ -385,19 +418,28 @@ async function LessonPlayer({ params, searchParams }: LessonPageProps) {
               </header>
               <div className="space-y-4">
                 {activityChallenges.map((block) => (
-                  <BlockRenderer
-                    block={block}
-                    completed={completedBlocks.includes(block.id)}
-                    courseId={courseId}
-                    key={block.id}
-                    locked={
-                      !canPreview &&
-                      gameActivityProgress?.nextChallenge !== null &&
-                      gameActivityProgress?.nextChallenge?.id !== block.id
+                  <div
+                    data-block-completed={
+                      completedBlocks.includes(block.id) ? "true" : "false"
                     }
-                    lessonId={lessonId}
-                    preview={canPreview}
-                  />
+                    data-block-hint={coachHint(block)}
+                    data-block-id={block.id}
+                    data-block-type={block.type}
+                    key={block.id}
+                  >
+                    <BlockRenderer
+                      block={block}
+                      completed={completedBlocks.includes(block.id)}
+                      courseId={courseId}
+                      locked={
+                        !canPreview &&
+                        gameActivityProgress?.nextChallenge !== null &&
+                        gameActivityProgress?.nextChallenge?.id !== block.id
+                      }
+                      lessonId={lessonId}
+                      preview={canPreview}
+                    />
+                  </div>
                 ))}
               </div>
             </section>
@@ -437,6 +479,22 @@ async function LessonPlayer({ params, searchParams }: LessonPageProps) {
 
         {canPreview ? null : (
           <LessonFeedback initial={feedbackSeed} lessonId={lessonId} />
+        )}
+
+        {/* The next-lesson card belongs in the reading flow above the nav; the
+            stall bar inside the same component is fixed and avoids the tutor. */}
+        {canPreview ? null : (
+          <LessonCoach
+            completed={allBlocksDone}
+            nextLesson={
+              next === undefined
+                ? undefined
+                : {
+                    href: `/learn/${courseId}/${next.id}`,
+                    title: next.title,
+                  }
+            }
+          />
         )}
 
         <nav
