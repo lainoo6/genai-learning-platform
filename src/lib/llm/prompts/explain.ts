@@ -9,10 +9,10 @@ import {
   type ContentLanguage,
 } from "@/lib/llm/language";
 import { mockText } from "@/lib/llm/mock";
+import { getAudienceRule } from "@/lib/llm/prompts/audience";
 import {
   BACKGROUND_LABELS,
   GOAL_LABELS,
-  type Background,
   type LearnerProfile,
 } from "@/lib/profile";
 
@@ -53,18 +53,6 @@ const PERSONA = [
   "You rewrite one block of course material for one specific learner.",
 ].join(" ");
 
-/** How the rewrite should sound for each background. */
-const STYLE_RULES: Record<Background, string> = {
-  NON_CS:
-    "The learner is new to computing. Avoid jargon, define every term you keep, and lean on everyday analogies (a kitchen, a post office, a filing cabinet). Short sentences, no acronyms without expansion.",
-  CS_STUDENT:
-    "The learner studies computing. Keep the depth: name the underlying concepts, compare the idea with things they already know (data structures, version control, testing, APIs), and point out the trade-offs and failure modes.",
-  PRO_DEV:
-    "The learner already writes software for a living. Be concise and practical, tie the idea to a real workflow or code review, and skip beginner analogies entirely.",
-  OTHER:
-    "The learner's background is unknown. Use plain language, define terms the first time they appear, and stay concrete.",
-};
-
 export function explainSystemPrompt(
   profile: LearnerProfile | null,
   language: ContentLanguage = "en",
@@ -72,7 +60,7 @@ export function explainSystemPrompt(
   return [
     PERSONA,
     "",
-    `Style for this learner: ${profile === null ? STYLE_RULES.OTHER : STYLE_RULES[profile.background]}`,
+    `Style for this learner: ${getAudienceRule(profile?.background ?? null)}`,
     "",
     "Output rules:",
     '- Reply with a single JSON object: { "title": string, "markdown": string }.',

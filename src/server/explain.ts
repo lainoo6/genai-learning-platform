@@ -23,10 +23,12 @@ import {
 } from "@/lib/github-repo";
 import { registerLlmMocks } from "@/lib/llm/mocks";
 import { LlmError, generateJson } from "@/lib/llm/provider";
+import { getAudienceRule } from "@/lib/llm/prompts/audience";
 import {
   explainFilePrompt,
   explainSelectionPrompt,
 } from "@/lib/llm/prompts/explain-code";
+import { loadLearnerProfile } from "@/lib/profile";
 
 /**
  * "Explain this file" for the source-code explorer (Phase 4).
@@ -123,13 +125,20 @@ export async function explainCodeAction(
   ].slice(0, MAX_PROMPT_TREE_PATHS);
 
   try {
+    const profile = await loadLearnerProfile(userId);
+    const audienceRule = getAudienceRule(profile?.background ?? null);
     let prompt: string;
     let truncated = false;
 
     if (selection !== undefined) {
       // The snippet already contains everything the prompt needs, so the
       // extra Contents request is skipped for selected-code explanations.
-      prompt = explainSelectionPrompt(filePath, selection, treeContext);
+      prompt = explainSelectionPrompt(
+        filePath,
+        selection,
+        treeContext,
+        audienceRule,
+      );
     } else {
       const content = await fetchFileContent(
         ref.owner,
@@ -140,7 +149,7 @@ export async function explainCodeAction(
 
       const capped = content.slice(0, MAX_PROMPT_FILE_CHARS);
       truncated = content.length > capped.length;
-      prompt = explainFilePrompt(filePath, capped, treeContext);
+      prompt = explainFilePrompt(filePath, capped, treeContext, audienceRule);
     }
 
     registerLlmMocks();
@@ -157,6 +166,7 @@ export async function explainCodeAction(
         selectedChars: selection?.length ?? 0,
         fileTree: treeContext.length,
         truncated,
+        background: profile?.background ?? null,
       },
     });
 
@@ -237,6 +247,8 @@ export async function explainFolderAction(
   );
 
   try {
+    const profile = await loadLearnerProfile(userId);
+    const audienceRule = getAudienceRule(profile?.background ?? null);
     const candidates = folderPreviewCandidates(directFiles);
 
     const previews = await Promise.all(
@@ -271,6 +283,7 @@ export async function explainFolderAction(
         repoUrl,
         filePaths: directFiles,
         previews: readable,
+        audienceRule,
       }),
       {
         usage: "explain-folder",
@@ -282,6 +295,7 @@ export async function explainFolderAction(
           folderPath,
           fileCount: directFiles.length,
           previewed: readable.length,
+          background: profile?.background ?? null,
         },
       },
     );

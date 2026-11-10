@@ -9,6 +9,12 @@
 
 const ROLE = "You are a helpful teaching assistant.";
 
+/** The learner's tone rule, or nothing when no profile is available. */
+function styleLines(audienceRule: string): string[] {
+  const rule = audienceRule.trim();
+  return rule.length === 0 ? [] : [`Style for this learner: ${rule}`, ""];
+}
+
 function neighborContext(filePath: string, fileTree: string[]): string[] {
   if (fileTree.length === 0) {
     return [];
@@ -26,20 +32,26 @@ export function explainFilePrompt(
   filePath: string,
   content: string,
   fileTree: string[] = [],
+  audienceRule: string = "",
 ): string {
   const context = neighborContext(filePath, fileTree);
+  const style = styleLines(audienceRule);
 
   if (context.length === 0) {
-    return `You are a helpful teaching assistant. Explain the following code from the file ${filePath} in the context of the repository. Focus on its purpose and how it fits into the project.
-
-\`\`\`
-${content}
-\`\`\``;
+    return [
+      ...style,
+      `${ROLE} Explain the following code from the file ${filePath} in the context of the repository. Focus on its purpose and how it fits into the project.`,
+      "",
+      "```",
+      content,
+      "```",
+    ].join("\n");
   }
 
   return [
     ROLE,
     "",
+    ...style,
     ...context,
     "Based on the file's content and its neighboring files, explain its purpose and how it fits into the project.",
     "",
@@ -54,20 +66,26 @@ export function explainSelectionPrompt(
   filePath: string,
   selectedCode: string,
   fileTree: string[] = [],
+  audienceRule: string = "",
 ): string {
   const context = neighborContext(filePath, fileTree);
+  const style = styleLines(audienceRule);
 
   if (context.length === 0) {
-    return `The user selected the following code from ${filePath}. Explain what this specific snippet does and how it fits into the file.
-
-\`\`\`
-${selectedCode}
-\`\`\``;
+    return [
+      ...style,
+      `The user selected the following code from ${filePath}. Explain what this specific snippet does and how it fits into the file.`,
+      "",
+      "```",
+      selectedCode,
+      "```",
+    ].join("\n");
   }
 
   return [
     ROLE,
     "",
+    ...style,
     ...context,
     `The user selected the following code from '${filePath}'. Based on the neighboring files, explain what this specific snippet does.`,
     "",

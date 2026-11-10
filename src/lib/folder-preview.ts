@@ -200,8 +200,14 @@ export function folderExplanationPrompt(input: {
   repoUrl: string;
   filePaths: string[];
   previews: FolderFilePreview[];
+  /** Tone rule for the learner, when their profile is known. */
+  audienceRule?: string;
 }): string {
-  const { folderPath, repoUrl, filePaths, previews } = input;
+  const { folderPath, repoUrl, filePaths, previews, audienceRule } = input;
+  const style =
+    audienceRule !== undefined && audienceRule.trim().length > 0
+      ? ["", `Style for this learner: ${audienceRule.trim()}`]
+      : [];
 
   const fileLines =
     filePaths.length === 0
@@ -215,6 +221,7 @@ export function folderExplanationPrompt(input: {
 
   return [
     `The user wants to understand the purpose of the folder '${folderPath}' in '${repoUrl}'.`,
+    ...style,
     "",
     "Here are the files in this folder:",
     ...fileLines,
