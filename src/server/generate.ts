@@ -29,8 +29,10 @@ import {
 import { registerLlmMocks } from "@/lib/llm/mocks";
 import { generateJson } from "@/lib/llm/provider";
 import {
+  courseAudienceSchema,
   learnerCoursePrompt,
   learnerCourseSchema,
+  type CourseAudience,
 } from "@/lib/llm/prompts/course";
 import {
   enhanceTopicPrompt,
@@ -72,6 +74,10 @@ const generateInputSchema = z.object({
 });
 
 type GenerateCourseInput = z.input<typeof generateInputSchema> & {
+  /**
+   * Optional target audience; unknown values fall back to "student".
+   */
+  audience?: string;
   /**
    * Extracted document text appended to the course prompt. The Zod schema is
    * deliberately unchanged, so `safeParse` simply drops this field and every
@@ -270,10 +276,11 @@ function buildCoursePrompt(
   topic: string,
   goal: string,
   language: ContentLanguage,
+  audience: CourseAudience,
   sourceText: string,
   instructions = "",
 ): string {
-  const parts = [learnerCoursePrompt(topic, goal, language)];
+  const parts = [learnerCoursePrompt(topic, goal, language, audience)];
   const guidance = instructionsSection(instructions);
 
   if (guidance.length > 0) {
@@ -344,6 +351,10 @@ export async function generateLearnerCourse(
     typeof input?.sourceText === "string" ? input.sourceText : "";
   const instructions =
     typeof input?.instructions === "string" ? input.instructions : "";
+  const parsedAudience = courseAudienceSchema.safeParse(input?.audience);
+  const audience: CourseAudience = parsedAudience.success
+    ? parsedAudience.data
+    : "student";
 
   const parsedRepo =
     input.repo === undefined ? null : repoMetadataSchema.safeParse(input.repo);
@@ -357,7 +368,7 @@ export async function generateLearnerCourse(
   try {
     const generated = await generateJson(
       learnerCourseSchema,
-      buildCoursePrompt(topic, goal, language, sourceText, instructions),
+      buildCoursePrompt(topic, goal, language, audience, sourceText, instructions),
       {
         usage: "learner-course",
         userId,
@@ -633,6 +644,8 @@ export async function generateCourseFromFileAction(
     const rawInstructions = formData.get("instructions");
     const instructions =
       typeof rawInstructions === "string" ? rawInstructions : "";
+    const rawAudience = formData.get("audience");
+    const audience = typeof rawAudience === "string" ? rawAudience : undefined;
 
     let sourceText = plan.text;
 
@@ -655,6 +668,7 @@ export async function generateCourseFromFileAction(
       topic,
       goal,
       sourceText: withInstructions(sourceText, instructions),
+      audience,
     });
     if (!result.ok) {
       return result;

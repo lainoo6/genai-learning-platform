@@ -175,6 +175,20 @@ export const learnerCourseSchema = z.preprocess(
 
 export type LearnerCourse = z.infer<typeof learnerCourseSchema>;
 
+/** Target audiences the generator can tune its difficulty and tone for. */
+export const COURSE_AUDIENCES = ["beginner", "student", "developer"] as const;
+export const courseAudienceSchema = z.enum(COURSE_AUDIENCES);
+export type CourseAudience = (typeof COURSE_AUDIENCES)[number];
+
+const AUDIENCE_RULES: Record<CourseAudience, string> = {
+  beginner:
+    "IMPORTANT: The target audience is a complete beginner. Use simple analogies, avoid dense technical jargon, and explain every concept from scratch.",
+  student:
+    "IMPORTANT: The target audience has some foundational knowledge. Balance conceptual explanations with practical implementation details.",
+  developer:
+    "IMPORTANT: The target audience is an experienced developer. Focus on advanced architectural patterns, trade-offs, and concise technical explanations. Do not explain basic syntax.",
+};
+
 /**
  * Prompt for the whole course. The JSON skeleton and the per-block shapes are
  * spelled out because the reply is parsed directly by `learnerCourseSchema`.
@@ -183,6 +197,7 @@ export function learnerCoursePrompt(
   topic: string,
   goal: string,
   language: ContentLanguage = "en",
+  audience: CourseAudience = "student",
 ): string {
   const goalLine =
     goal.trim().length === 0
@@ -212,6 +227,7 @@ export function learnerCoursePrompt(
     "Every Challenge needs feedback.correct, feedback.incorrect, and a hint.",
     "",
     "Rules:",
+    AUDIENCE_RULES[audience],
     "- Block ids look like \"blk_l1_reading\" and \"blk_l1_quiz\".",
     "- Question ids look like \"q_l1_1\". Challenge ids look like \"chal_l1_1\".",
     "- Every lesson title is concrete (\"Tea arrives in Taiwan\"), never \"Lesson 1\".",
