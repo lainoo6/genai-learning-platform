@@ -1,6 +1,7 @@
 "use server";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -8,10 +9,12 @@ import { isRobotCourse, ROBOT_COURSE_TOPIC, robotCourseDraftSchema, type RobotCo
 import { courseProgrammingPayloadSchema, isParallelProgramming } from "@/lib/programming-game/course-config";
 
 export async function saveRobotCourse(courseId: string | null, input: unknown, removedLessonIds: unknown = []) {
+  let language: "zh" | "en" = "en";
   try {
     const user = (await auth())?.user;
     if (!user || (user.role !== "INSTRUCTOR" && user.role !== "ADMIN")) throw new Error("Teacher access required.");
     const p = robotCourseDraftSchema.parse(input);
+    language = p.language;
     const removed = z.array(z.string().uuid()).max(20).parse(removedLessonIds);
     if (new Set(removed).size !== removed.length || (!courseId && removed.length)) throw new Error("Invalid removed level IDs.");
     const historyError = p.language === "zh" ? "无法删除已有学习记录的关卡，请恢复被删除的关卡后保存。" : "Cannot delete levels with learning records. Restore the removed levels before saving.";
@@ -54,17 +57,31 @@ export async function saveRobotCourse(courseId: string | null, input: unknown, r
         const deleted = await tx.lesson.deleteMany({ where: { id: { in: removed }, moduleId: courseModule.id, ...protectedRelations } });
         if (deleted.count !== removed.length) throw new Error(historyError);
       }
-      const oldIds = new Set(courseModule.lessons.map((l) => l.id));
+      const oldLevels = new Map(courseModule.lessons.map((l) => [l.id, l]));
       for (const [i, l] of p.levels.entries()) {
         const data = { title: l.title, order: i, blocks: JSON.parse(JSON.stringify([{ id: l.blockId, type: "game", title: l.title, payload: l.payload }])) as Prisma.InputJsonValue };
-        if (oldIds.has(l.lessonId)) await tx.lesson.update({ where: { id: l.lessonId }, data });
-        else await tx.lesson.create({ data: { id: l.lessonId, moduleId: courseModule.id, estimatedMinutes: 10, ...data } });
+        const old = oldLevels.get(l.lessonId);
+        if (old) {
+          // PostgreSQL JSONB may reorder object keys; compare JSON values, not serialization.
+          if (old.title !== data.title || old.order !== i || !isDeepStrictEqual(old.blocks, data.blocks))
+            await tx.lesson.update({ where: { id: l.lessonId }, data });
+        } else await tx.lesson.create({ data: { id: l.lessonId, moduleId: courseModule.id, estimatedMinutes: 10, ...data } });
       }
       const stamp = await tx.course.findUniqueOrThrow({ where: { id: courseId }, select: { updatedAt: true } });
       return { courseId, updatedAt: stamp.updatedAt.toISOString() };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      // A 20-level update can exceed Prisma's default 5s interactive transaction.
+      // Keep the total wait/run budget below the editor's 30s request timeout.
+      maxWait: 5000, timeout: 20000,
+    });
     return { ok: true as const, ...saved };
-  } catch (e) { return { ok: false as const, error: e instanceof Error ? e.message : "Could not save course." }; }
+  } catch (e) {
+    if (e && typeof e === "object" && "code" in e && e.code === "P2028") return { ok: false as const, error: language === "zh"
+      ? "数据库事务已失效或超时，本次保存未确认成功。请保留当前编辑内容，检查数据库连接后重试；若提示版本冲突，请先导出当前课程，再刷新核对。"
+      : "The database transaction expired or closed. Saving was not confirmed. Keep your edits, check the database connection and retry. If a version conflict appears, export the course before reloading." };
+    return { ok: false as const, error: e instanceof Error ? e.message : "Could not save course." };
+  }
 }
 
 export async function loadRobotCourseDraft(courseId: string): Promise<{ courseId: string; draft: RobotCourseDraft } | null> {

@@ -11,7 +11,7 @@ import { createRobotCourseDraft } from "@/lib/programming-game/robot-course";
 let i = 0; const id = () => `00000000-0000-4000-8000-${String(++i).padStart(12, "0")}`;
 function fixture() {
   const p = createRobotCourseDraft("en", id); p.updatedAt = "2026-11-02T00:00:00.000Z";
-  const row = { id: p.draftId, slug: "robot-game-example", topic: "Robot programming", title: p.title, description: p.description, language: p.language, status: "PUBLISHED", createdById: "teacher", updatedAt: new Date(p.updatedAt), modules: [{ id: "module", lessons: p.levels.map((l) => ({ id: l.lessonId, title: l.title, blocks: [{ id: l.blockId, type: "game", title: l.title, payload: l.payload }] })) }] };
+  const row = { id: p.draftId, slug: "robot-game-example", topic: "Robot programming", title: p.title, description: p.description, language: p.language, status: "PUBLISHED", createdById: "teacher", updatedAt: new Date(p.updatedAt), modules: [{ id: "module", lessons: p.levels.map((l, order) => ({ id: l.lessonId, title: l.title, order, blocks: [{ id: l.blockId, type: "game", title: l.title, payload: l.payload }] })) }] };
   return { p, row };
 }
 beforeEach(() => {
@@ -37,7 +37,7 @@ describe("dedicated course persistence", () => {
   it("updates only owned levels and preserves their lesson/block identities", async () => {
     const { p, row } = fixture(); m.find.mockResolvedValue(row); p.levels[0].title = "Updated level";
     expect(await saveRobotCourse(row.id, p)).toMatchObject({ ok: true });
-    expect(m.lessonUpdate).toHaveBeenCalledTimes(7); expect(m.lessonUpdate.mock.calls[0][0]).toMatchObject({ where: { id: p.levels[0].lessonId }, data: { blocks: [{ id: p.levels[0].blockId }] } });
+    expect(m.lessonUpdate).toHaveBeenCalledTimes(1); expect(m.lessonUpdate.mock.calls[0][0]).toMatchObject({ where: { id: p.levels[0].lessonId }, data: { blocks: [{ id: p.levels[0].blockId }] } });
   });
   it("adds new levels without removing old history-bearing lessons", async () => {
     const { p, row } = fixture(); m.find.mockResolvedValue(row); p.levels.push({ ...p.levels[0], lessonId: id(), blockId: id() });
@@ -128,7 +128,9 @@ describe("robot level deletion and ordering", () => {
   it("persists a new order while preserving all lesson and block identities", async () => {
     const { p, row } = fixture(); m.find.mockResolvedValue(row);
     p.levels.reverse(); expect(await saveRobotCourse(row.id, p)).toMatchObject({ ok: true });
-    for (const [order, level] of p.levels.entries()) expect(m.lessonUpdate.mock.calls[order][0]).toMatchObject({ where: { id: level.lessonId }, data: { order, blocks: [{ id: level.blockId }] } });
+    const changed = p.levels.filter((level, order) => row.modules[0].lessons.find(old => old.id === level.lessonId)?.order !== order);
+    expect(m.lessonUpdate).toHaveBeenCalledTimes(changed.length);
+    for (const level of changed) expect(m.lessonUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: level.lessonId }, data: expect.objectContaining({ order: p.levels.indexOf(level) }) }));
     expect(m.lessonDelete).not.toHaveBeenCalled(); expect(m.eligible).not.toHaveBeenCalled();
   });
   it("deletes only explicitly acknowledged history-free levels and reindexes the remainder", async () => {
@@ -137,7 +139,7 @@ describe("robot level deletion and ordering", () => {
     expect(m.eligible.mock.calls[0][0].where).toMatchObject({ id: { in: [removed.lessonId] }, moduleId: "module", progress: { none: {} }, activityAttempts: { none: {} }, playthroughs: { none: {} }, gameActivityVersions: { none: {} }, feedback: { none: {} } });
     expect(m.overrides).toHaveBeenCalledWith({ where: { lessonId: { in: [removed.lessonId] } } });
     expect(m.lessonDelete.mock.calls[0][0].where).toEqual(m.eligible.mock.calls[0][0].where);
-    expect(m.lessonUpdate).toHaveBeenCalledTimes(6); expect(m.lessonUpdate.mock.calls[2][0].data.order).toBe(2);
+    expect(m.lessonUpdate).toHaveBeenCalledTimes(4); expect(m.lessonUpdate.mock.calls[0][0].data.order).toBe(2);
     expect(m.transaction.mock.calls[0][1]).toMatchObject({ isolationLevel: "Serializable" });
   });
   it.each(["records", "overrides"])("protects lessons with %s before writing course or lessons", async (kind) => {
@@ -163,5 +165,29 @@ describe("robot level deletion and ordering", () => {
   it("stops when the final guarded deletion finds a newly protected lesson", async () => {
     const { p, row } = fixture(); m.find.mockResolvedValue(row); const removed = p.levels.pop()!; m.lessonDelete.mockResolvedValue({ count: 0 });
     expect(await saveRobotCourse(row.id, p, [removed.lessonId])).toMatchObject({ ok: false }); expect(m.lessonUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("robot course save transaction budget", () => {
+  it("uses a bounded transaction budget below the client request timeout", async () => {
+    const {p,row}=fixture();m.find.mockResolvedValue(row);
+    expect(await saveRobotCourse(row.id,p)).toMatchObject({ok:true});
+    expect(m.transaction.mock.calls[0][1]).toEqual({isolationLevel:"Serializable",maxWait:5000,timeout:20000});
+    expect(m.lessonUpdate).not.toHaveBeenCalled();
+  });
+  it("does not rewrite unchanged JSONB when object key order differs", async () => {
+    const {p,row}=fixture();
+    // Rebuild the full JSON value with keys reordered recursively, as JSONB can do.
+    function reorder(value: unknown): unknown {return Array.isArray(value)?value.map(reorder):value&&typeof value==="object"?Object.fromEntries(Object.entries(value).reverse().map(([k,v])=>[k,reorder(v)])):value;}
+    row.modules[0].lessons=row.modules[0].lessons.map(l=>({...l,blocks:reorder(l.blocks) as typeof l.blocks}));
+    m.find.mockResolvedValue(row);expect(await saveRobotCourse(row.id,p)).toMatchObject({ok:true});expect(m.lessonUpdate).not.toHaveBeenCalled();
+  });
+  it("writes changed reference content even when the lesson title and order are unchanged", async () => {
+    const {p,row}=fixture();row.modules[0].lessons=structuredClone(row.modules[0].lessons);p.levels[0].payload.hints=["A new hint"];
+    m.find.mockResolvedValue(row);expect(await saveRobotCourse(row.id,p)).toMatchObject({ok:true});expect(m.lessonUpdate).toHaveBeenCalledOnce();
+  });
+  it("reports expired transactions as a failed save without an automatic replay", async () => {
+    const p=createRobotCourseDraft("zh",id);m.transaction.mockRejectedValue(Object.assign(new Error("Transaction not found"),{code:"P2028"}));
+    expect(await saveRobotCourse(null,p)).toMatchObject({ok:false,error:expect.stringContaining("本次保存未确认成功")});expect(m.transaction).toHaveBeenCalledOnce();
   });
 });
