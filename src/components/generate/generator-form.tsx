@@ -21,6 +21,7 @@ import {
   MAX_UPLOAD_BYTES,
   uploadTotalBytes,
 } from "@/lib/course-file";
+import type { CourseAudience } from "@/lib/llm/prompts/course";
 import {
   buildRepoTree,
   flattenFiles,
@@ -100,6 +101,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
   /** Names the course when the upload is images only; ignored for documents. */
   const [imageTopic, setImageTopic] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [audience, setAudience] = useState<CourseAudience>("student");
   const [showInstructions, setShowInstructions] = useState(false);
   const [enhancedQuestions, setEnhancedQuestions] = useState<string[]>([]);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -211,6 +213,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
         topic: trimmedTopic,
         goal: goal.trim(),
         instructions: instructions.trim(),
+        audience,
       }),
     );
   }
@@ -304,6 +307,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
     }
     formData.append("instructions", instructions.trim());
     formData.append("topic", imageTopic.trim());
+    formData.append("audience", audience);
 
     await run("file", () => generateCourseFromFileAction(formData));
   }
@@ -468,6 +472,7 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
         branch: repoPreview.meta.branch,
         selectedPaths,
         instructions: instructions.trim(),
+        audience,
         document: file ?? undefined,
         images: images.length > 0 ? images : undefined,
       }),
@@ -482,6 +487,31 @@ export function GeneratorForm({ isTeacher }: { isTeacher: boolean }) {
           onChange={setMode}
           value={mode}
         />
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium" htmlFor="course-audience">
+            {t("generate.form.audience.label")}
+          </label>
+          <select
+            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 sm:w-64 dark:bg-input/30"
+            disabled={isRunning || isEnhancing || isPreviewing || isSuggesting}
+            id="course-audience"
+            onChange={(event) => {
+              setAudience(event.target.value as CourseAudience);
+            }}
+            value={audience}
+          >
+            <option value="beginner">
+              {t("generate.form.audience.beginner")}
+            </option>
+            <option value="student">
+              {t("generate.form.audience.student")}
+            </option>
+            <option value="developer">
+              {t("generate.form.audience.developer")}
+            </option>
+          </select>
+        </div>
 
         {mode === "topic" ? (
           <div className="space-y-4">

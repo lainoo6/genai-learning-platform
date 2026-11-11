@@ -33,6 +33,24 @@ describe("learnerCoursePrompt", () => {
   });
 });
 
+describe("learnerCoursePrompt audience", () => {
+  it("defaults to the student rule", () => {
+    expect(learnerCoursePrompt("Tea history", "")).toContain(
+      "some foundational knowledge",
+    );
+  });
+
+  it.each([
+    ["beginner", "complete beginner"],
+    ["student", "some foundational knowledge"],
+    ["developer", "experienced developer"],
+  ] as const)("injects the %s rule", (audience, phrase) => {
+    expect(
+      learnerCoursePrompt("Tea history", "", "en", audience),
+    ).toContain(phrase);
+  });
+});
+
 describe("learnerCourseSchema variant coercion", () => {
   it("lowercases Challenge variants when the payload shape already matches", () => {
     const sample = structuredClone(course) as {

@@ -336,6 +336,8 @@ const generateFromRepoInputSchema = z.object({
     .max(MAX_SELECTED_FILES),
   /** Optional guidance; placed before the source material in the prompt. */
   instructions: z.string().trim().max(MAX_INSTRUCTIONS_CHARS).optional(),
+  /** Optional target audience; unknown values fall back to "student". */
+  audience: z.string().trim().max(20).optional(),
 });
 
 export type GenerateCourseFromRepoInput = z.input<
@@ -383,7 +385,8 @@ export async function generateCourseFromRepoAction(
     return { ok: false, error: t("server.generate.repo.invalidSelection") };
   }
 
-  const { repoUrl, branch, selectedPaths, instructions } = parsedInput.data;
+  const { repoUrl, branch, selectedPaths, instructions, audience } =
+    parsedInput.data;
 
   const ref = parseRepoUrl(repoUrl);
   if (ref === null) {
@@ -488,6 +491,7 @@ export async function generateCourseFromRepoAction(
     const result = await generateLearnerCourse({
       topic: topicFromRepo(ref.owner, ref.repo),
       sourceText,
+      audience,
       repo: {
         // Canonical repository URL; the branch and subpath live separately.
         repoUrl: `https://github.com/${ref.owner}/${ref.repo}`,

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { CONTENT_LANGUAGE_LABEL, type ContentLanguage } from "@/lib/llm/language";
 import { mockText } from "@/lib/llm/mock";
+import { getAudienceRule } from "@/lib/llm/prompts/audience";
 import { BACKGROUND_LABELS, GOAL_LABELS, type LearnerProfile } from "@/lib/profile";
 
 /**
@@ -53,6 +54,9 @@ export function describeProfile(profile: LearnerProfile | null): string {
   return [
     `Background: ${BACKGROUND_LABELS[profile.background]}.`,
     `Goals: ${goals.length > 0 ? goals : "not stated"}.`,
+    profile.backgroundNote.length > 0
+      ? `Note on background: ${profile.backgroundNote}`
+      : "",
     profile.statement.length > 0
       ? `In their own words: "${profile.statement}".`
       : "",
@@ -79,6 +83,8 @@ export function tutorSystemPrompt(context: TutorContext): string {
     "",
     "Learner profile:",
     describeProfile(context.profile),
+    "",
+    `Style for this learner: ${getAudienceRule(context.profile?.background ?? null)}`,
     "",
     "Material in front of the learner:",
     ...material,

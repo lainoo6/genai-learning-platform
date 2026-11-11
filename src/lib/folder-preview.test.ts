@@ -9,6 +9,7 @@ import {
   previewExcerpt,
   previewLines,
 } from "@/lib/folder-preview";
+import { getAudienceRule } from "@/lib/llm/prompts/audience";
 
 describe("isPreviewableCodePath", () => {
   it("accepts common source extensions", () => {
@@ -176,5 +177,18 @@ describe("folderExplanationPrompt", () => {
 
     expect(prompt).toContain("(No files were provided.)");
     expect(prompt).not.toContain("first few lines");
+  });
+
+  it("adds the learner's audience rule when one is given", () => {
+    const audienceRule = getAudienceRule("CS_STUDENT");
+    const prompt = folderExplanationPrompt({
+      folderPath: "src/components/learn",
+      repoUrl: "https://github.com/acme/widgets",
+      filePaths: ["src/components/learn/index.ts"],
+      previews: [],
+      audienceRule,
+    });
+
+    expect(prompt).toContain(`Style for this learner: ${audienceRule}`);
   });
 });

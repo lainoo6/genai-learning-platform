@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { getAudienceRule } from "@/lib/llm/prompts/audience";
 import {
   explainFilePrompt,
   explainSelectionPrompt,
@@ -38,6 +39,18 @@ describe("explainFilePrompt", () => {
     expect(prompt).not.toContain("partial list");
     expect(prompt).not.toContain("neighboring files");
   });
+
+  it("adds the learner's audience rule when one is given", () => {
+    const rule = getAudienceRule("NON_CS");
+    const prompt = explainFilePrompt(
+      "src/lib/auth.ts",
+      "const x = 1;",
+      [],
+      rule,
+    );
+
+    expect(prompt).toContain(`Style for this learner: ${rule}`);
+  });
 });
 
 describe("explainSelectionPrompt", () => {
@@ -65,5 +78,17 @@ describe("explainSelectionPrompt", () => {
       "The user selected the following code from src/lib/auth.ts. Explain what this specific snippet does and how it fits into the file.",
     );
     expect(prompt).not.toContain("partial list");
+  });
+
+  it("adds the learner's audience rule when one is given", () => {
+    const rule = getAudienceRule("PRO_DEV");
+    const prompt = explainSelectionPrompt(
+      "src/lib/auth.ts",
+      "await signIn()",
+      tree,
+      rule,
+    );
+
+    expect(prompt).toContain(`Style for this learner: ${rule}`);
   });
 });

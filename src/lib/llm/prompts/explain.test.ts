@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { Block } from "@/lib/blocks/schema";
+import { getAudienceRule } from "@/lib/llm/prompts/audience";
 import {
   explainResultSchema,
+  explainSystemPrompt,
   explainUserPrompt,
   mockExplain,
 } from "@/lib/llm/prompts/explain";
@@ -55,6 +57,22 @@ function mockFor(learner: LearnerProfile, block: Block): string {
 
   return explainResultSchema.parse(mockExplain(prompt)).markdown;
 }
+
+describe("explainSystemPrompt", () => {
+  it("uses the shared audience rule for the learner's background", () => {
+    const learner = profile("NON_CS");
+
+    expect(explainSystemPrompt(learner)).toContain(
+      `Style for this learner: ${getAudienceRule("NON_CS")}`,
+    );
+  });
+
+  it("uses the unknown-background rule without a profile", () => {
+    expect(explainSystemPrompt(null)).toContain(
+      `Style for this learner: ${getAudienceRule(null)}`,
+    );
+  });
+});
 
 describe("mockExplain", () => {
   it("produces content that satisfies the result schema", () => {
