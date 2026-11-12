@@ -142,9 +142,12 @@ export async function activityAccess(
       activity.data,
       completedIds,
     );
+    // The completion adapter revisits a Challenge right after its result is
+    // saved; only lock Challenges that are still ahead of the learner.
     if (
       activityProgress.nextChallenge !== null &&
-      activityProgress.nextChallenge.id !== blockId
+      activityProgress.nextChallenge.id !== blockId &&
+      !activityProgress.completedChallengeIds.includes(blockId)
     ) {
       throw new Error("Complete Game Activity Challenges in order.");
     }
