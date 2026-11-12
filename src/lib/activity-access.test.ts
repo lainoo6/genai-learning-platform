@@ -96,6 +96,15 @@ describe("activity access / preview isolation", () => {
       block: { id: "challenge-2" },
     });
   });
+  it("authorizes a finished Challenge again so completion can be recorded", async () => {
+    mocks.lessonProgress.mockResolvedValue({
+      completedBlocks: ["challenge-1"],
+    });
+
+    await expect(activityAccess("l", "challenge-1")).resolves.toMatchObject({
+      block: { id: "challenge-1" },
+    });
+  });
   it("allows an enrolled learner in a published lesson", async () =>
     expect(await activityAccess("l", "b")).toMatchObject({
       preview: false,
