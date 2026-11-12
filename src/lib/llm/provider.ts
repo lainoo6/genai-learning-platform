@@ -14,7 +14,6 @@ import { prisma } from "@/lib/prisma";
  * and the GenerationJob audit trail.
  */
 
-const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const DEFAULT_TEMPERATURE = 0.4;
 const DEFAULT_MAX_ATTEMPTS = 2;
 
@@ -106,9 +105,13 @@ export function isMockMode(): boolean {
   return isFlagEnabled(readEnv("LLM_MOCK")) || llmApiKey() === null;
 }
 
-/** Model actually used: `LLM_MODEL` when set, otherwise the default. */
+/** Model id is mandatory; no fallback, so a missing config fails immediately. */
 export function llmModel(): string {
-  return readEnv("LLM_MODEL") ?? DEFAULT_OPENAI_MODEL;
+  const model = readEnv("LLM_MODEL");
+  if (model === null) {
+    throw new LlmError("LLM_MODEL is not configured. Set it in .env.");
+  }
+  return model;
 }
 
 /**

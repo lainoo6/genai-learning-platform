@@ -95,13 +95,26 @@ function hasChinese(value: string): boolean {
   return /[\u3400-\u9fff]/u.test(value);
 }
 
-function hasLatin(value: string): boolean {
-  return /[A-Za-z]/u.test(value);
+/** Two adjacent latin words form an English phrase, not an isolated term. */
+const englishPhrase = /\b[A-Za-z]{2,}\s+[A-Za-z]{2,}\b/u;
+const cjkCharacter = /[\u3400-\u9fff]/gu;
+
+/**
+ * A Chinese answer is only "mixed locale" when it carries a real English
+ * phrase, or when it contains no Chinese at all. Isolated latin tokens
+ * belong to the subject matter and must not fail the check.
+ */
+function hasForeignLatin(value: string): boolean {
+  if (englishPhrase.test(value)) return true;
+  if ((value.match(cjkCharacter) ?? []).length > 0) return false;
+  return (value.match(/[A-Za-z]/gu) ?? []).length >= 8;
 }
 
 const technicalTerms =
   /\b(?:AI|API|Bash|CSS|Docker|Git|GitHub|GraphQL|HTML|HTTP|Java|JavaScript|JSON|Kubernetes|Markdown|Next\.js|Node\.js|npm|Python|React|SQL|TypeScript|URL)\b/giu;
 const technicalIdentifier = /\b[A-Za-z]+(?:[A-Z][A-Za-z]+|[_-][A-Za-z0-9]+|\d)[A-Za-z0-9_-]*\b/gu;
+/** Standalone latin letters are not a language signal on their own. */
+const singleLetterToken = /\b[A-Za-z]\b/gu;
 
 function localeText(value: string): string {
   return value
@@ -109,7 +122,8 @@ function localeText(value: string): string {
     .replace(/`[^`]*`/gu, " ")
     .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/gu, " ")
     .replace(technicalTerms, " ")
-    .replace(technicalIdentifier, " ");
+    .replace(technicalIdentifier, " ")
+    .replace(singleLetterToken, " ");
 }
 
 function stringsFor(block: GameChallengeBlock): string[] {
@@ -149,7 +163,7 @@ export function validateGameActivity(
   const title = localeText(activity.title);
   if (
     (language === "en" && hasChinese(title)) ||
-    (language === "zh" && hasLatin(title))
+    (language === "zh" && hasForeignLatin(title))
   )
     errors.push("The Game Activity title does not match the lesson locale.");
   const variants = new Set(challenges.map((block) => block.payload.variant));
@@ -174,7 +188,7 @@ export function validateGameActivity(
         block.payload.feedback?.incorrect ?? "",
         block.payload.hint ?? "",
       ].join(" "));
-      if ((language === "en" && hasChinese(text)) || (language === "zh" && hasLatin(text)))
+      if ((language === "en" && hasChinese(text)) || (language === "zh" && hasForeignLatin(text)))
         errors.push(`Challenge ${index + 1} does not match the lesson locale.`);
       if (/(?:click|color|colour|audio-only|sound-only)/iu.test(text))
         errors.push(`Challenge ${index + 1} contains an inaccessible interaction cue.`);
