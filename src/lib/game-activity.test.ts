@@ -174,6 +174,48 @@ describe("game activity validation", () => {
     expect(validateGameActivity(mixed, "en").ok).toBe(false);
   });
 
+  it("accepts Chinese content with isolated latin letters", () => {
+    const base = mockGameActivity("zh");
+    const activity = {
+      ...base,
+      title: "单元练习 B",
+      challenges: base.challenges.map((block, index) => ({
+        ...block,
+        title: `第 ${index + 1} 题：比较 A 与 B，并记录 C`,
+      })),
+    };
+
+    expect(validateGameActivity(activity, "zh")).toEqual({ ok: true });
+  });
+
+  it("still rejects English challenge text for a Chinese lesson", () => {
+    const base = mockGameActivity("zh");
+    const activity = {
+      ...base,
+      title: "课程练习",
+      challenges: base.challenges.map((block) => ({
+        ...block,
+        title: "Which statement is correct for this lesson?",
+      })),
+    };
+
+    const result = validateGameActivity(activity, "zh");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.errors.filter((error) =>
+          error.includes("does not match the lesson locale"),
+        ),
+      ).toHaveLength(5);
+    }
+  });
+
+  it("rejects an English activity title for a Chinese lesson", () => {
+    const activity = { ...mockGameActivity("zh"), title: "Lesson Practice" };
+
+    expect(validateGameActivity(activity, "zh").ok).toBe(false);
+  });
+
   it("migrates five standalone game blocks into one Game Activity container", () => {
     const source = mockGameActivity("en");
     const normalized = normalizeLessonGameActivity({
