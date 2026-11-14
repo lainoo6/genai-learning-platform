@@ -43,6 +43,7 @@ import type { Translator } from "@/i18n/translate";
 import { prisma } from "@/lib/prisma";
 import {
   gameActivityContainerSchema,
+  sanitizeGameActivityCues,
   validateGameActivity,
 } from "@/lib/game-activity";
 
@@ -339,15 +340,13 @@ export async function generateLessonBlocks(
       ).slice(0, 20_000),
       language,
     });
-    const activity = await generateJson(
-      generatedGameActivitySchema,
-      activityPrompt,
-      {
+    const activity = sanitizeGameActivityCues(
+      await generateJson(generatedGameActivitySchema, activityPrompt, {
         usage: "course-game-activity",
         userId: instructor.userId,
         input: jobInput,
         temperature: 0.4,
-      },
+      }),
     );
     const activityValidation = validateGameActivity(activity, language);
     if (!activityValidation.ok) {
@@ -398,12 +397,14 @@ export async function generateGameActivity(
   const prompt = gameActivityPrompt({ ...parsedInput.data, language });
 
   try {
-    const activity = await generateJson(generatedGameActivitySchema, prompt, {
-      usage: "course-game-activity",
-      userId: instructor.userId,
-      input: parsedInput.data,
-      temperature: 0.4,
-    });
+    const activity = sanitizeGameActivityCues(
+      await generateJson(generatedGameActivitySchema, prompt, {
+        usage: "course-game-activity",
+        userId: instructor.userId,
+        input: parsedInput.data,
+        temperature: 0.4,
+      }),
+    );
     const validation = validateGameActivity(activity, language);
     if (!validation.ok) {
       return {

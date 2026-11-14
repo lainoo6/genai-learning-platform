@@ -21,7 +21,10 @@ import {
   withInstructions,
 } from "@/lib/course-source";
 import { describeImages } from "@/lib/describe-images";
-import { validateGameActivity } from "@/lib/game-activity";
+import {
+  sanitizeGameActivityCues,
+  validateGameActivity,
+} from "@/lib/game-activity";
 import {
   contentLanguageFromLocale,
   type ContentLanguage,
@@ -376,7 +379,11 @@ export async function generateLearnerCourse(
         temperature: 0.6,
       },
     );
-    for (const [index, lesson] of generated.lessons.entries()) {
+    const lessons = generated.lessons.map((lesson) => ({
+      ...lesson,
+      gameActivity: sanitizeGameActivityCues(lesson.gameActivity),
+    }));
+    for (const [index, lesson] of lessons.entries()) {
       const validation = validateGameActivity(lesson.gameActivity, language);
       if (!validation.ok) {
         return {
@@ -408,7 +415,7 @@ export async function generateLearnerCourse(
               title: language === "zh" ? "模块 1 · 核心内容" : "Module 1 · The essentials",
               order: 0,
               lessons: {
-                create: generated.lessons.map((lesson, index) => ({
+                create: lessons.map((lesson, index) => ({
                   title: lesson.title,
                   order: index,
                   estimatedMinutes: lesson.estimatedMinutes,

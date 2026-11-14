@@ -225,6 +225,10 @@ export function learnerCoursePrompt(
     "Across those five, include at least one of each payload.variant",
     '"sort", "match", and "choose" (lowercase only — never "Sort" or "quiz").',
     "Every Challenge needs feedback.correct, feedback.incorrect, and a hint.",
+    "Challenge wording must be interaction-neutral: never write \"click\",",
+    "\"color\" / \"colour\", \"audio-only\", or \"sound-only\" in a Challenge",
+    "title, prompt, option, pair, hint, or feedback. Use \"select\" or \"choose\"",
+    "instead of \"click\", and identify items by name or meaning instead of color.",
     "",
     "Rules:",
     AUDIENCE_RULES[audience],
@@ -259,6 +263,8 @@ export function learnerCoursePrompt(
     'choose payload: {"variant": "choose", "prompt": string,',
     '                "options": [{"text": string, "correct": boolean}, ...],',
     '                "feedback": {"correct": string, "incorrect": string}, "hint": string}',
+    "Every Challenge string: no \"click\", \"color\", \"colour\", \"audio-only\",",
+    "or \"sound-only\" wording.",
     "Choose options: exactly one correct:true and at least two correct:false.",
   ].join("\n");
 }

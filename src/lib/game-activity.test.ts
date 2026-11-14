@@ -4,6 +4,7 @@ import {
   gameActivityContainerSchema,
   gameActivitySchema,
   normalizeLessonGameActivity,
+  sanitizeGameActivityCues,
   validateGameActivity,
   type GameActivity,
 } from "./game-activity";
@@ -82,6 +83,18 @@ describe("game activity validation", () => {
     expect(prompt).toContain('"variant": "match"');
     expect(prompt).toContain('"variant": "choose"');
     expect(prompt).toContain("challenges");
+  });
+
+  it("forbids inaccessible interaction wording in Challenge strings", () => {
+    const prompt = gameActivityPrompt({
+      lessonTitle: "Tea",
+      objectives: "Understand tea",
+      sourceContent: "Tea is a drink.",
+      language: "en",
+    });
+
+    expect(prompt).toContain("interaction-neutral");
+    expect(prompt).toContain('"audio-only"');
   });
 
   it("generates one explicit Game Activity container", () => {
@@ -295,5 +308,41 @@ describe("game activity validation", () => {
         "en",
       ).ok,
     ).toBe(false);
+  });
+});
+
+describe("sanitizeGameActivityCues", () => {
+  it("replaces inaccessible wording across Challenge fields", () => {
+    const source = structuredClone(mockGameActivity("en"));
+    source.challenges[0].title = "Click the color";
+    const sort = source.challenges[0].payload;
+    if (sort.variant === "sort") {
+      sort.items[0] = { ...sort.items[0], text: "Click the colour swatch" };
+    }
+    source.challenges[1].title = "Audio-only pairing";
+    source.challenges[2].title = "Sound-only choice";
+    source.challenges[3].payload.feedback = {
+      correct: "You clicked the right color.",
+      incorrect: "Click another colour.",
+    };
+    source.challenges[4].payload.hint = "Click the colour.";
+
+    const sanitized = sanitizeGameActivityCues(source);
+
+    expect(JSON.stringify(sanitized)).not.toMatch(
+      /click|color|colour|audio-only|sound-only/iu,
+    );
+    expect(sanitized.challenges[0].title).toBe("Select the appearance");
+  });
+
+  it("makes a compliant activity pass validation after sanitizing", () => {
+    const dirty = structuredClone(mockGameActivity("en"));
+    dirty.challenges[0].title = "Click the color";
+    dirty.challenges[2].payload.hint = "Click the right colour.";
+
+    expect(validateGameActivity(dirty, "en").ok).toBe(false);
+    expect(validateGameActivity(sanitizeGameActivityCues(dirty), "en")).toEqual({
+      ok: true,
+    });
   });
 });

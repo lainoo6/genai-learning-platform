@@ -31,6 +31,14 @@ describe("learnerCoursePrompt", () => {
     expect(prompt).toContain('"variant": "choose"');
     expect(prompt).toContain('lowercase only');
   });
+
+  it("forbids inaccessible interaction wording in Challenge strings", () => {
+    const prompt = learnerCoursePrompt("Tea history", "");
+
+    expect(prompt).toContain("interaction-neutral");
+    expect(prompt).toContain('never write "click"');
+    expect(prompt).toContain('"audio-only"');
+  });
 });
 
 describe("learnerCoursePrompt audience", () => {

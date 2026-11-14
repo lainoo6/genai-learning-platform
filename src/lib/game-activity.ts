@@ -134,6 +134,109 @@ function stringsFor(block: GameChallengeBlock): string[] {
   ];
 }
 
+const CUE_PATTERN = /audio-only|sound-only|click|colou?r/giu;
+
+function replacementForCue(match: string): string {
+  const lower = match.toLowerCase();
+  if (lower === "audio-only") return "audio-based";
+  if (lower === "sound-only") return "sound-based";
+  if (lower.startsWith("click")) {
+    return `select${lower.slice("click".length)}`; // select / selects / selected / selecting
+  }
+  const suffix = lower.replace(/^colou?r/u, "");
+  if (suffix === "s") return "appearances";
+  if (suffix === "ed") return "with a distinct appearance";
+  return "appearance";
+}
+
+function sanitizeCueText(text: string): string {
+  return text.replace(CUE_PATTERN, (match) => {
+    const replacement = replacementForCue(match);
+    if (match === match.toUpperCase()) return replacement.toUpperCase();
+    if (match[0] === match[0]?.toUpperCase()) {
+      return replacement[0]!.toUpperCase() + replacement.slice(1);
+    }
+    return replacement;
+  });
+}
+
+/**
+ * Rewrites generated Challenge wording that would trip the accessibility
+ * validation. Generation-only fallback; stored editor data is not touched.
+ */
+export function sanitizeGameActivityCues(
+  activity: GameActivityContainer,
+): GameActivityContainer {
+  return {
+    ...activity,
+    title: sanitizeCueText(activity.title),
+    challenges: activity.challenges.map((block) => {
+      const payload = block.payload;
+      const base = {
+        ...payload,
+        ...(payload.feedback === undefined
+          ? {}
+          : {
+              feedback: {
+                correct: sanitizeCueText(payload.feedback.correct),
+                incorrect: sanitizeCueText(payload.feedback.incorrect),
+              },
+            }),
+        ...(payload.hint === undefined
+          ? {}
+          : { hint: sanitizeCueText(payload.hint) }),
+        ...(payload.supportingMedia === undefined
+          ? {}
+          : {
+              supportingMedia: {
+                ...payload.supportingMedia,
+                ...(payload.supportingMedia.altText === undefined
+                  ? {}
+                  : {
+                      altText: sanitizeCueText(
+                        payload.supportingMedia.altText,
+                      ),
+                    }),
+              },
+            }),
+      };
+
+      const sanitizedPayload =
+        payload.variant === "sort"
+          ? {
+              ...base,
+              items: payload.items.map((item) => ({
+                ...item,
+                text: sanitizeCueText(item.text),
+              })),
+            }
+          : payload.variant === "match"
+            ? {
+                ...base,
+                pairs: payload.pairs.map((pair) => ({
+                  ...pair,
+                  left: sanitizeCueText(pair.left),
+                  right: sanitizeCueText(pair.right),
+                })),
+              }
+            : {
+                ...base,
+                prompt: sanitizeCueText(payload.prompt),
+                options: payload.options.map((option) => ({
+                  ...option,
+                  text: sanitizeCueText(option.text),
+                })),
+              };
+
+      return {
+        ...block,
+        title: sanitizeCueText(block.title),
+        payload: sanitizedPayload,
+      };
+    }),
+  };
+}
+
 export function validateGameActivity(
   input: unknown,
   language: ContentLanguage,
