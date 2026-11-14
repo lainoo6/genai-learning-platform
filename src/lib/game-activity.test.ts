@@ -60,13 +60,16 @@ describe("game activity validation", () => {
     expect(validateGameActivity(container, "en").ok).toBe(false);
   });
 
-  it("validates the activity title against the lesson locale", () => {
+  it("reports a mismatched activity title without rejecting the activity", () => {
     const activity = {
       ...mockGameActivity("en"),
       title: "课程练习",
     };
 
-    expect(validateGameActivity(activity, "en").ok).toBe(false);
+    const result = validateGameActivity(activity, "en");
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toEqual([{ code: "activityTitleLocale" }]);
   });
 
   it("uses canonical Game Activity terminology in generation guidance", () => {
@@ -133,7 +136,7 @@ describe("game activity validation", () => {
     );
   });
 
-  it("rejects ambiguous choose answers and mixed-locale content", () => {
+  it("rejects ambiguous choose answers and reports mixed-locale content", () => {
     const first = challenge(0);
     if (first.payload.variant !== "choose") throw new Error("Expected choose");
     const ambiguous = {
@@ -171,7 +174,12 @@ describe("game activity validation", () => {
         "en",
       ).ok,
     ).toBe(false);
-    expect(validateGameActivity(mixed, "en").ok).toBe(false);
+    // The missing Sort/Match variants still fail the structural check; the
+    // Chinese titles are reported separately instead of being folded into it.
+    const mixedResult = validateGameActivity(mixed, "en");
+    expect(mixedResult.ok).toBe(false);
+    // Four of the five Challenges carry a Chinese title, so four are reported.
+    expect(mixedResult.warnings).toHaveLength(4);
   });
 
   it("accepts Chinese content with isolated latin letters", () => {
@@ -188,7 +196,7 @@ describe("game activity validation", () => {
     expect(validateGameActivity(activity, "zh")).toEqual({ ok: true });
   });
 
-  it("still rejects English challenge text for a Chinese lesson", () => {
+  it("reports English challenge text in a Chinese lesson without rejecting it", () => {
     const base = mockGameActivity("zh");
     const activity = {
       ...base,
@@ -200,20 +208,73 @@ describe("game activity validation", () => {
     };
 
     const result = validateGameActivity(activity, "zh");
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(
-        result.errors.filter((error) =>
-          error.includes("does not match the lesson locale"),
-        ),
-      ).toHaveLength(5);
-    }
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toEqual(
+      Array.from({ length: 5 }, (_, index) => ({
+        code: "challengeLocale",
+        challenge: index + 1,
+      })),
+    );
   });
 
-  it("rejects an English activity title for a Chinese lesson", () => {
+  it("reports an English activity title for a Chinese lesson", () => {
     const activity = { ...mockGameActivity("zh"), title: "Lesson Practice" };
 
-    expect(validateGameActivity(activity, "zh").ok).toBe(false);
+    const result = validateGameActivity(activity, "zh");
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toEqual([{ code: "activityTitleLocale" }]);
+  });
+
+  it("keeps Chinese technical prose with embedded commands and code", () => {
+    const base = mockGameActivity("zh");
+    const samples = [
+      "先运行 pip install requests 安装依赖",
+      "用 pull request 提交改动",
+      "调整 min ready seconds 参数",
+      "执行 ```\nnpm run build\n``` 打包",
+    ];
+    const activity = {
+      ...base,
+      title: "课程练习",
+      challenges: base.challenges.map((block, index) => ({
+        ...block,
+        title: samples[index % samples.length],
+      })),
+    };
+
+    expect(validateGameActivity(activity, "zh")).toEqual({ ok: true });
+  });
+
+  it("treats a standalone code block as code, not as foreign prose", () => {
+    const base = mockGameActivity("zh");
+    const activity = {
+      ...base,
+      title: "课程练习",
+      challenges: base.challenges.map((block) => ({
+        ...block,
+        title: "```\nnpm run build\n```",
+      })),
+    };
+
+    expect(validateGameActivity(activity, "zh")).toEqual({ ok: true });
+  });
+
+  it("reports a fully English challenge instead of rejecting the course", () => {    const base = mockGameActivity("zh");
+    const activity = {
+      ...base,
+      title: "课程练习",
+      challenges: base.challenges.map((block) => ({
+        ...block,
+        title: "Run the installer before you continue",
+      })),
+    };
+
+    const result = validateGameActivity(activity, "zh");
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toHaveLength(5);
   });
 
   it("migrates five standalone game blocks into one Game Activity container", () => {

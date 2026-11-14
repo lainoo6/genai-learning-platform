@@ -505,9 +505,13 @@ export async function generateCourseFromRepoAction(
       return result;
     }
 
+    // Keep the upload notes collected here and the locale notes from the
+    // activity check; spreading only one side would silently drop the other.
+    const allWarnings = [...warnings, ...(result.warnings ?? [])];
+
     return {
       ...result,
-      warnings: warnings.length > 0 ? warnings : undefined,
+      warnings: allWarnings.length > 0 ? allWarnings : undefined,
     };
   } catch (error: unknown) {
     if (error instanceof GithubRepoError) {

@@ -923,6 +923,7 @@
   "server.feedback.notFound": "This lesson no longer exists.",
   "server.feedback.signIn": "Sign in to leave feedback.",
   "server.feedback.unavailable": "This course is not accepting feedback right now.",
+  "server.generate.activityLocale": "Lesson {lesson}: some Game Activity wording does not match the course language. The course was kept — review it in the editor.",
   "server.generate.courseNotFound": "Course not found.",
   "server.generate.enhance.failed": "The topic could not be expanded. Please try again.",
   "server.generate.enhance.topicLength": "Enter a topic between 3 and 120 characters first.",

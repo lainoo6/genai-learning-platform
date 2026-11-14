@@ -87,28 +87,29 @@ export function normalizeLessonGameActivity(input: {
   };
 }
 
+/**
+ * Locale mismatches are reported as warnings, not errors: a Chinese course that
+ * quotes a command or an English course that mentions one Chinese term is a
+ * quality problem, not a reason to discard an otherwise valid course.
+ */
+export type ActivityWarning =
+  | { code: "activityTitleLocale" }
+  | { code: "challengeLocale"; challenge: number };
+
 type ValidationResult =
-  | { ok: true }
-  | { ok: false; errors: string[] };
+  | { ok: true; warnings?: ActivityWarning[] }
+  | { ok: false; errors: string[]; warnings?: ActivityWarning[] };
 
 function hasChinese(value: string): boolean {
   return /[\u3400-\u9fff]/u.test(value);
 }
 
-/** Two adjacent latin words form an English phrase, not an isolated term. */
-const englishPhrase = /\b[A-Za-z]{2,}\s+[A-Za-z]{2,}\b/u;
-const cjkCharacter = /[\u3400-\u9fff]/gu;
-
 /**
- * A Chinese answer is only "mixed locale" when it carries a real English
- * phrase, or when it contains no Chinese at all. Isolated latin tokens
- * belong to the subject matter and must not fail the check.
+ * Code samples are not prose. Fenced blocks go first: the inline pattern would
+ * otherwise eat the opening and closing fences and leave the sample in place.
  */
-function hasForeignLatin(value: string): boolean {
-  if (englishPhrase.test(value)) return true;
-  if ((value.match(cjkCharacter) ?? []).length > 0) return false;
-  return (value.match(/[A-Za-z]/gu) ?? []).length >= 8;
-}
+const fencedCodeBlock = /```[\s\S]*?```/gu;
+const inlineCodeSpan = /`[^`\n]*`/gu;
 
 const technicalTerms =
   /\b(?:AI|API|Bash|CSS|Docker|Git|GitHub|GraphQL|HTML|HTTP|Java|JavaScript|JSON|Kubernetes|Markdown|Next\.js|Node\.js|npm|Python|React|SQL|TypeScript|URL)\b/giu;
@@ -118,12 +119,50 @@ const singleLetterToken = /\b[A-Za-z]\b/gu;
 
 function localeText(value: string): string {
   return value
+    .replace(fencedCodeBlock, " ")
+    .replace(inlineCodeSpan, " ")
     .replace(/https?:\/\/\S+/gu, " ")
-    .replace(/`[^`]*`/gu, " ")
     .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/gu, " ")
     .replace(technicalTerms, " ")
     .replace(technicalIdentifier, " ")
     .replace(singleLetterToken, " ");
+}
+
+/**
+ * True when a field reads as a foreign sentence rather than as subject
+ * terminology or a quoted command.
+ *
+ * The old rule failed any Chinese field holding two adjacent latin words, so
+ * "先运行 pip install requests 安装依赖" was rejected and every Chinese
+ * technical course failed to generate. The rule is now the inverse: a Chinese
+ * field only fails when it carries no Chinese at all and still reads as a
+ * sentence (two or more words, ten or more letters) after code, URLs and
+ * identifiers are removed. Isolated terms ("Python", "HTML", "Pod") and prose
+ * with an embedded command stay valid.
+ */
+function readsAsForeign(value: string): boolean {
+  const text = localeText(value);
+
+  if (hasChinese(text)) {
+    return false;
+  }
+
+  const words = text.match(/[A-Za-z]{2,}/gu) ?? [];
+
+  if (words.length < 2) {
+    return false;
+  }
+
+  return (text.match(/[A-Za-z]/gu) ?? []).length >= 10;
+}
+
+/** The inverse check: an English field must not carry Chinese characters. */
+function readsAsChinese(value: string): boolean {
+  return hasChinese(localeText(value));
+}
+
+function mismatchesLocale(value: string, language: ContentLanguage): boolean {
+  return language === "zh" ? readsAsForeign(value) : readsAsChinese(value);
 }
 
 function stringsFor(block: GameChallengeBlock): string[] {
@@ -148,6 +187,16 @@ function stringsFor(block: GameChallengeBlock): string[] {
   ];
 }
 
+/** Every field of one Challenge that carries human-readable text. */
+function challengeTextFields(block: GameChallengeBlock): string[] {
+  return [
+    ...stringsFor(block),
+    block.payload.feedback?.correct ?? "",
+    block.payload.feedback?.incorrect ?? "",
+    block.payload.hint ?? "",
+  ];
+}
+
 export function validateGameActivity(
   input: unknown,
   language: ContentLanguage,
@@ -160,12 +209,12 @@ export function validateGameActivity(
   const activity = parsed.data;
   const challenges: GameActivity = activity.challenges;
   const errors: string[] = [];
-  const title = localeText(activity.title);
-  if (
-    (language === "en" && hasChinese(title)) ||
-    (language === "zh" && hasForeignLatin(title))
-  )
-    errors.push("The Game Activity title does not match the lesson locale.");
+  const warnings: ActivityWarning[] = [];
+
+  if (mismatchesLocale(activity.title, language)) {
+    warnings.push({ code: "activityTitleLocale" });
+  }
+
   const variants = new Set(challenges.map((block) => block.payload.variant));
   for (const variant of ["sort", "match", "choose"] as const) {
     if (!variants.has(variant))
@@ -182,17 +231,21 @@ export function validateGameActivity(
         errors.push(`Challenge ${index + 1} has ambiguous matching keys.`);
     }
 
-      const text = localeText([
-        ...stringsFor(block),
-        block.payload.feedback?.correct ?? "",
-        block.payload.feedback?.incorrect ?? "",
-        block.payload.hint ?? "",
-      ].join(" "));
-      if ((language === "en" && hasChinese(text)) || (language === "zh" && hasForeignLatin(text)))
-        errors.push(`Challenge ${index + 1} does not match the lesson locale.`);
-      if (/(?:click|color|colour|audio-only|sound-only)/iu.test(text))
-        errors.push(`Challenge ${index + 1} contains an inaccessible interaction cue.`);
+    const fields = challengeTextFields(block);
+    if (fields.some((field) => mismatchesLocale(field, language))) {
+      warnings.push({ code: "challengeLocale", challenge: index + 1 });
+    }
+
+    const text = localeText(fields.join(" "));
+    if (/(?:click|color|colour|audio-only|sound-only)/iu.test(text))
+      errors.push(`Challenge ${index + 1} contains an inaccessible interaction cue.`);
   }
 
-  return errors.length === 0 ? { ok: true } : { ok: false, errors };
+  if (errors.length > 0) {
+    return warnings.length > 0
+      ? { ok: false, errors, warnings }
+      : { ok: false, errors };
+  }
+
+  return warnings.length > 0 ? { ok: true, warnings } : { ok: true };
 }
