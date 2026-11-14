@@ -923,6 +923,7 @@
   "server.feedback.notFound": "这节课不存在。",
   "server.feedback.signIn": "请先登录。",
   "server.feedback.unavailable": "这门课当前不接受反馈。",
+  "server.generate.activityLocale": "第 {lesson} 课的游戏活动用词与课程语言不完全一致，内容已保留，建议在编辑器里检查。",
   "server.generate.courseNotFound": "找不到该课程。",
   "server.generate.enhance.failed": "主题扩写失败，请重试。",
   "server.generate.enhance.topicLength": "请先输入 3–120 个字符的主题。",

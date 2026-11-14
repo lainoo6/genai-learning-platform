@@ -365,6 +365,9 @@ export async function generateLearnerCourse(
 
   registerLlmMocks();
 
+  /** Locale notes from the Game Activity check, surfaced after generation. */
+  const warnings: string[] = [];
+
   try {
     const generated = await generateJson(
       learnerCourseSchema,
@@ -383,6 +386,13 @@ export async function generateLearnerCourse(
           ok: false,
           error: `Generated lesson ${index + 1} needs review: ${validation.errors.join(" ")}`,
         };
+      }
+      // A locale mismatch no longer discards the course; it is reported so the
+      // learner can review the wording in the editor.
+      if ((validation.warnings ?? []).length > 0) {
+        warnings.push(
+          t("server.generate.activityLocale", { lesson: index + 1 }),
+        );
       }
     }
 
@@ -465,6 +475,7 @@ export async function generateLearnerCourse(
       courseId: course.id,
       lessonId: firstLessonId,
       title: course.title,
+      warnings: warnings.length > 0 ? warnings : undefined,
     };
   } catch (error: unknown) {
     console.error("[generate] course generation failed", error);
@@ -674,9 +685,11 @@ export async function generateCourseFromFileAction(
       return result;
     }
 
+    const allWarnings = [...warnings, ...(result.warnings ?? [])];
+
     return {
       ...result,
-      warnings: warnings.length > 0 ? warnings : undefined,
+      warnings: allWarnings.length > 0 ? allWarnings : undefined,
     };
   } catch (error: unknown) {
     console.error("[generate] file course generation failed", error);
